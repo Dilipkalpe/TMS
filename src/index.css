@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-secondary: #0f172a;
+  --color-surface: #f8fafc;
+  --radius-card: 12px;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  @apply bg-surface text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.login-page {
+  min-height: 100dvh;
+}
+
+@keyframes truck-drive {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+}
+
+.login-truck {
+  animation: truck-drive 4s ease-in-out infinite;
+}
+
+.login-truck-delay {
+  animation: truck-drive 5s ease-in-out infinite 0.8s;
+}
+
+@keyframes chart-grow {
+  from { transform: scaleY(0); opacity: 0.5; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+.chart-bar {
+  transform-origin: bottom;
+  animation: chart-grow 0.6s ease-out forwards;
+}
+
+.analytics-chart-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.analytics-chart-card:hover {
+  transform: translateY(-2px);
+}
