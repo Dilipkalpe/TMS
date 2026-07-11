@@ -43,7 +43,7 @@ export default function VehicleList() {
       onRefreshExternal={paged.refresh}
       sortKey="number"
       onRowClick={(r) => navigate(`/vehicles/${r.id}`)}
-      onEdit={(r) => navigate(`/vehicles/${r.id}`)}
+      onEdit={(r) => navigate(`/vehicles/${r.id}/edit`)}
       onDelete={async (r) => {
         if (!window.confirm(`Delete vehicle ${r.number}?`)) return
         try { await vehiclesApi.remove(r.id); toast({ title: 'Deleted', type: 'success' }); paged.refresh() }

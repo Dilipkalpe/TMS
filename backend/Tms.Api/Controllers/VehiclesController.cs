@@ -77,36 +77,43 @@ public class VehiclesController(TmsDbContext db, IBranchContext branches, ITenan
     private static Vehicle MapVehicle(Dictionary<string, object?> b, string id) => new()
     {
         Id = id,
-        Number = GetStr(b, "number") ?? "",
-        Type = GetStr(b, "type"),
-        Model = GetStr(b, "model"),
-        Capacity = GetStr(b, "capacity"),
-        Owner = GetStr(b, "owner") ?? "Self",
-        Status = GetStr(b, "status") ?? "Active",
-        Insurance = ParseDate(GetStr(b, "insurance")),
-        Fitness = ParseDate(GetStr(b, "fitness")),
-        Permit = ParseDate(GetStr(b, "permit")),
-        Puc = ParseDate(GetStr(b, "puc")),
-        LastMaintenance = ParseDate(GetStr(b, "lastMaintenance"))
+        Number = BodyStr(b, "number") ?? "",
+        Type = BodyStr(b, "type"),
+        Model = BodyStr(b, "model"),
+        Capacity = BodyStr(b, "capacity"),
+        Owner = BodyStr(b, "owner") ?? "Self",
+        Status = BodyStr(b, "status") ?? "Active",
+        Insurance = ParseDate(b, "insurance"),
+        Fitness = ParseDate(b, "fitness"),
+        Permit = ParseDate(b, "permit"),
+        Puc = ParseDate(b, "puc"),
+        LastMaintenance = ParseDate(b, "lastMaintenance"),
     };
 
     private static void ApplyVehicle(Dictionary<string, object?> b, Vehicle v)
     {
-        if (b.ContainsKey("number")) v.Number = GetStr(b, "number") ?? v.Number;
-        if (b.ContainsKey("type")) v.Type = GetStr(b, "type");
-        if (b.ContainsKey("model")) v.Model = GetStr(b, "model");
-        if (b.ContainsKey("capacity")) v.Capacity = GetStr(b, "capacity");
-        if (b.ContainsKey("owner")) v.Owner = GetStr(b, "owner");
-        if (b.ContainsKey("status")) v.Status = GetStr(b, "status") ?? v.Status;
-        if (b.ContainsKey("insurance")) v.Insurance = ParseDate(GetStr(b, "insurance"));
-        if (b.ContainsKey("fitness")) v.Fitness = ParseDate(GetStr(b, "fitness"));
-        if (b.ContainsKey("permit")) v.Permit = ParseDate(GetStr(b, "permit"));
-        if (b.ContainsKey("puc")) v.Puc = ParseDate(GetStr(b, "puc"));
+        if (b.ContainsKey("number")) v.Number = BodyStr(b, "number") ?? v.Number;
+        if (b.ContainsKey("type")) v.Type = BodyStr(b, "type");
+        if (b.ContainsKey("model")) v.Model = BodyStr(b, "model");
+        if (b.ContainsKey("capacity")) v.Capacity = BodyStr(b, "capacity");
+        if (b.ContainsKey("owner")) v.Owner = BodyStr(b, "owner") ?? v.Owner;
+        if (b.ContainsKey("status"))
+        {
+            var status = BodyStr(b, "status");
+            if (!string.IsNullOrWhiteSpace(status)) v.Status = status;
+        }
+        if (b.ContainsKey("insurance")) v.Insurance = ParseDate(b, "insurance");
+        if (b.ContainsKey("fitness")) v.Fitness = ParseDate(b, "fitness");
+        if (b.ContainsKey("permit")) v.Permit = ParseDate(b, "permit");
+        if (b.ContainsKey("puc")) v.Puc = ParseDate(b, "puc");
     }
 
-    private static string? GetStr(Dictionary<string, object?> b, string key) =>
-        b.TryGetValue(key, out var v) ? v?.ToString() : null;
+    static string? BodyStr(Dictionary<string, object?> b, string key) => ApiParseHelper.BodyString(b, key);
 
-    private static DateOnly? ParseDate(string? s) =>
-        DateOnly.TryParse(s, out var d) ? d : null;
+    static DateOnly? ParseDate(Dictionary<string, object?> b, string key)
+    {
+        var s = ApiParseHelper.BodyString(b, key);
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        return DateOnly.TryParse(s, out var d) ? d : null;
+    }
 }

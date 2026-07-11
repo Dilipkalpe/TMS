@@ -8,7 +8,7 @@ import Tabs from '../../components/ui/Tabs'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { useApiItem } from '../../hooks/useApiResource'
 import { maintenanceApi, vehiclesApi } from '../../services/api'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Pencil } from 'lucide-react'
 import PrintButton from '../../components/print/PrintButton'
 
 const RISK_VARIANT = { LOW: 'success', MEDIUM: 'warning', HIGH: 'danger' }
@@ -151,6 +151,7 @@ export default function VehicleDetails() {
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/vehicles')}>Back</Button>
           <div className="flex items-center gap-2">
             <Badge variant={statusVariant(vehicle.status)}>{vehicle.status}</Badge>
+            <Button variant="outline" icon={Pencil} onClick={() => navigate(`/vehicles/${id}/edit`)}>Edit</Button>
             <PrintButton title="Vehicle Profile" subtitle={vehicle.number} fields={printFields} />
           </div>
         </div>

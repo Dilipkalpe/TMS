@@ -8,7 +8,7 @@ import PageFallback from './components/ui/PageFallback'
 import {
   Dashboard, BookingList, NewBooking, BookingDetails, EditBooking,
   GenerateLR, LRList, EditLR,
-  VehicleList, VehicleDetails, NewVehicle,
+  VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
   VendorList, VendorDetails, NewVendor,
   ExpenseList, NewExpense,
@@ -69,6 +69,7 @@ export default function App() {
         <Route path="lr/:lrNumber/edit" element={<EditLR />} />
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="vehicles/new" element={<NewVehicle />} />
+        <Route path="vehicles/:id/edit" element={<EditVehicle />} />
         <Route path="vehicles/:id" element={<VehicleDetails />} />
         <Route path="maintenance" element={<MaintenancePage />} />
         <Route path="operations" element={<OperationsHub />} />
