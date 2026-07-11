@@ -1,0 +1,67 @@
+# TMS Pro — production SQL install order (idempotent)
+# Applied by: deploy/apply-all-database-sql.sh
+# Paths are relative to repository root.
+
+# Core
+database/schema.sql
+database/settings_extension.sql
+database/core/stored_procedures.sql
+
+# HR + Payroll (tables)
+database/hr/schema.sql
+database/payroll/schema.sql
+
+# HR + Payroll (procedures & extensions)
+database/hr/employment_types.sql
+database/hr/upgrade_drop_employee_sp.sql
+database/hr/stored_procedures.sql
+database/payroll/upgrade_drop_functions.sql
+database/payroll/stored_procedures.sql
+database/payroll/accounting_integration.sql
+database/payroll/payroll_hr_extension.sql
+database/payroll/payroll_accounting_sp.sql
+database/hr/employment_hr_sp.sql
+database/payroll/upgrade_drop_transport.sql
+database/payroll/employment_payroll.sql
+database/hr/tms_transport_hr.sql
+database/payroll/tms_transport_payroll.sql
+
+# Maintenance (full module)
+database/maintenance/install.sql
+
+# Enterprise modules
+database/modules/schema.sql
+
+# GPS
+database/gps/schema.sql
+
+# Notifications
+database/notifications/schema.sql
+
+# Branches
+database/branches/schema.sql
+
+# Portal
+database/portal/schema.sql
+
+# Routing
+database/routing/schema.sql
+
+# Booking finance
+database/booking_finance/schema.sql
+
+# Reports
+database/reports/report_indexes.sql
+database/reports/sp_dashboard_stats.sql
+database/reports/sp_accounting_customer_ledger.sql
+database/reports/sp_accounting_ledger_report.sql
+database/reports/sp_accounting_registers.sql
+
+# SaaS / multi-tenant
+database/saas/schema.sql
+database/saas/tenant_modules.sql
+database/saas/tenant_hr_payroll_columns.sql
+database/saas/tenant_hr_payroll_procs.sql
+
+# Performance indexes (safe, optional)
+database/perf/add_perf_indexes.sql

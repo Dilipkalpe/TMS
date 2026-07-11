@@ -64,48 +64,8 @@ else
 fi
 
 echo ""
-echo "==> Applying module SQL (idempotent, in order)..."
-
-# Core only if users table missing
-if ! echo "$EXISTING" | grep -qx "users"; then
-  echo "-- Core bootstrap"
-  run_sql_file database/schema.sql
-fi
-
-run_sql_file database/settings_extension.sql
-run_sql_file database/core/stored_procedures.sql
-run_sql_file database/hr/schema.sql
-run_sql_file database/payroll/schema.sql
-run_sql_file database/payroll/payroll_hr_extension.sql
-run_sql_file database/payroll/accounting_integration.sql
-run_sql_file database/maintenance/install.sql
-run_sql_file database/modules/schema.sql
-run_sql_file database/gps/schema.sql
-run_sql_file database/notifications/schema.sql
-run_sql_file database/branches/schema.sql
-run_sql_file database/portal/schema.sql
-run_sql_file database/routing/schema.sql
-run_sql_file database/booking_finance/schema.sql
-run_sql_file database/reports/report_indexes.sql
-run_sql_file database/reports/sp_dashboard_stats.sql
-run_sql_file database/reports/sp_accounting_customer_ledger.sql
-run_sql_file database/reports/sp_accounting_ledger_report.sql
-run_sql_file database/reports/sp_accounting_registers.sql
-run_sql_file database/saas/schema.sql
-run_sql_file database/saas/tenant_modules.sql
-run_sql_file database/saas/tenant_hr_payroll_columns.sql
-run_sql_file database/saas/tenant_hr_payroll_procs.sql
-
-# Repair known constraints (GPS + notifications ON CONFLICT)
-if [ -f database/gps/schema.sql ]; then
-  psql_exec <<'SQL' 2>/dev/null || true
-DELETE FROM vehicle_last_position a USING vehicle_last_position b WHERE a.vehicle_id = b.vehicle_id AND a.ctid < b.ctid;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicle_last_position_vehicle_id ON vehicle_last_position(vehicle_id);
-DELETE FROM notification_templates a USING notification_templates b
-WHERE a.code = b.code AND a.channel = b.channel AND a.language = b.language AND a.ctid < b.ctid;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_templates_code_channel_lang ON notification_templates(code, channel, language);
-SQL
-fi
+echo "==> Applying all SQL from database/install-manifest.txt ..."
+SKIP_API_RESTART=1 bash "$REPO_DIR/deploy/apply-all-database-sql.sh"
 
 echo ""
 echo "==> Re-check missing tables:"
