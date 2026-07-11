@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../config/api'
 import { getStoredCompanyId } from '../context/CompanyContext'
+import { formatApiErrorBody } from '../utils/apiErrors'
 
 const DEMO_COMPANY_ID = '00000000-0000-4000-8000-000000000001'
 
@@ -20,10 +21,24 @@ export function setToken(token) {
 }
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, details = null) {
     super(message)
     this.status = status
+    this.details = details
   }
+}
+
+async function readApiError(res, fallbackMessage) {
+  let message = fallbackMessage || res.statusText
+  let details = null
+  try {
+    const err = await res.json()
+    details = err
+    message = formatApiErrorBody(err) || message
+  } catch {
+    /* ignore */
+  }
+  return { message, details }
 }
 
 /** Unwrap `{ items, total }` paged API responses or return arrays unchanged. */
@@ -89,7 +104,7 @@ export async function apiRequest(path, options = {}) {
     let message = 'Invalid username or password.'
     try {
       const err = await res.json()
-      message = err.message || err.Message || err.title || message
+      message = formatApiErrorBody(err) || err.message || err.Message || message
     } catch {
       /* ignore */
     }
@@ -97,14 +112,8 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!res.ok) {
-    let message = res.statusText
-    try {
-      const err = await res.json()
-      message = err.message || err.Message || err.title || message
-    } catch {
-      /* ignore */
-    }
-    throw new ApiError(message, res.status)
+    const { message, details } = await readApiError(res, res.statusText)
+    throw new ApiError(message, res.status, details)
   }
 
   if (res.status === 204) return null
@@ -308,8 +317,7 @@ export const settingsApi = {
     form.append('file', file)
     const res = await fetch(`${API_BASE_URL}/settings/logo`, { method: 'POST', headers, body: form })
     if (!res.ok) {
-      let message = res.statusText
-      try { message = (await res.json()).message || message } catch { /* ignore */ }
+      const { message } = await readApiError(res, res.statusText)
       throw new ApiError(message, res.status)
     }
     return res.json()
@@ -448,7 +456,7 @@ export async function portalRequest(path, options = {}) {
     if (!auth) {
       try {
         const err = await res.json()
-        message = err.message || err.Message || 'Invalid phone or PIN'
+        message = formatApiErrorBody(err) || err.message || err.Message || 'Invalid phone or PIN'
       } catch {
         message = 'Invalid phone or PIN'
       }
@@ -457,14 +465,8 @@ export async function portalRequest(path, options = {}) {
   }
 
   if (!res.ok) {
-    let message = res.statusText
-    try {
-      const err = await res.json()
-      message = err.message || err.Message || err.title || message
-    } catch {
-      /* ignore */
-    }
-    throw new ApiError(message, res.status)
+    const { message, details } = await readApiError(res, res.statusText)
+    throw new ApiError(message, res.status, details)
   }
 
   if (res.status === 204) return null

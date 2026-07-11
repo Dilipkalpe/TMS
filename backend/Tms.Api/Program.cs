@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.ResponseCompression;
 
 using Microsoft.AspNetCore.Authorization;
@@ -27,6 +28,25 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
 
     .AddJsonOptions(o => o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var messages = context.ModelState
+            .Where(kv => kv.Value?.Errors.Count > 0)
+            .SelectMany(kv => kv.Value!.Errors.Select(e => FormatValidationMessage(kv.Key, e.ErrorMessage)))
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Distinct()
+            .ToArray();
+
+        var message = messages.Length > 0
+            ? string.Join(" ", messages)
+            : "Please check the required fields and try again.";
+
+        return new BadRequestObjectResult(new ApiError(message));
+    };
+});
 
 
 
@@ -352,4 +372,24 @@ app.MapGet("/api/health", async (TmsDbContext db) =>
 
 app.Run();
 
-public partial class Program { }
+public partial class Program
+{
+    static string FormatValidationMessage(string field, string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error)) return string.Empty;
+
+        var name = field.Trim().TrimStart('$', '.');
+        if (name.StartsWith("body.", StringComparison.OrdinalIgnoreCase))
+            name = name[5..];
+        name = name.Replace("_", " ");
+        if (name.Length > 0 && !char.IsUpper(name[0]))
+            name = char.ToUpper(name[0]) + name[1..];
+
+        if (string.IsNullOrWhiteSpace(name) || name.Equals("request", StringComparison.OrdinalIgnoreCase))
+            return error;
+
+        return error.Contains(name, StringComparison.OrdinalIgnoreCase)
+            ? error
+            : $"{name}: {error}";
+    }
+}

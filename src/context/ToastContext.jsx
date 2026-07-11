@@ -31,7 +31,7 @@ function ToastContainer(props) {
             <Icon className="mt-0.5 h-5 w-5 shrink-0" />
             <div className="min-w-0 flex-1">
               {t.title && <p className="text-sm font-semibold">{t.title}</p>}
-              {t.message && <p className="text-xs opacity-90">{t.message}</p>}
+              {t.message && <p className="whitespace-pre-line text-xs opacity-90">{t.message}</p>}
             </div>
             <button type="button" onClick={() => onDismiss(t.id)} className="shrink-0 rounded p-0.5 opacity-70 hover:opacity-100">
               <X className="h-4 w-4" />
@@ -53,11 +53,12 @@ export function ToastProvider(props) {
 
   const toast = useCallback(
     (options = {}) => {
-      const { title, message, type = 'info', duration = 3500 } = options
+      const { title, message, type = 'info', duration } = options
+      const autoDuration = duration ?? (type === 'error' && message?.includes('\n') ? 6000 : 3500)
       const id = crypto.randomUUID?.() ?? String(Date.now())
       setToasts((prev) => [...prev.slice(-4), { id, title, message, type }])
       if (duration > 0) {
-        setTimeout(() => dismiss(id), duration)
+        setTimeout(() => dismiss(id), autoDuration)
       }
       return id
     },

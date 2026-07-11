@@ -121,6 +121,18 @@ export default function EmployeeDetails() {
   const totalSalary = employeeTotalPay(form)
 
   const handleSave = async () => {
+    const missing = []
+    if (!form.employeeCode?.trim()) missing.push('Employee code')
+    if (!form.name?.trim()) missing.push('Name')
+    if (missing.length) {
+      toast({
+        title: 'Required fields missing',
+        message: `Please fill: ${missing.join(', ')}`,
+        type: 'error',
+      })
+      return
+    }
+
     setSaving(true)
     try {
       const body = {
