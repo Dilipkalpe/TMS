@@ -1,0 +1,60 @@
+# TMS Pro — full stack for VPS (PostgreSQL + API + Web)
+# Run from repo root: docker compose -f deploy/docker-compose.vps.yml up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tms_pro
+      POSTGRES_USER: tms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - tms_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tms -d tms_pro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tms-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      TMS_CONNECTION_STRING: Host=postgres;Port=5432;Database=tms_pro;Username=tms;Password=${POSTGRES_PASSWORD}
+      TMS_JWT_KEY: ${TMS_JWT_KEY:?Set TMS_JWT_KEY in deploy/.env}
+      Database__RunStartupMigrations: ${Database__RunStartupMigrations:-true}
+      Database__FailOnMigrationError: ${Database__FailOnMigrationError:-false}
+      DemoData__Enabled: ${DemoData__Enabled:-false}
+      Gps__AllowSimulator: ${Gps__AllowSimulator:-false}
+      Cors__Origins__0: ${Cors__Origins__0:-http://tms.144.91.98.218.nip.io}
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
+
+  tms-web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      tms-api:
+        condition: service_healthy
+    ports:
+      - "${TMS_WEB_PORT:-8080}:80"
+
+volumes:
+  tms_pg_data:
