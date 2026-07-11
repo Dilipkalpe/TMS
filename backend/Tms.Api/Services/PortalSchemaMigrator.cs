@@ -81,6 +81,7 @@ public static class PortalSchemaMigrator
         {
             var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == demo.CustomerId, ct);
             if (customer == null) continue;
+            if (customer.PortalEnabled && customer.PortalPinHash != null) continue;
 
             customer.PortalEnabled = true;
             customer.PortalPinHash = BCrypt.Net.BCrypt.HashPassword(demo.Pin);

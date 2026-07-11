@@ -63,5 +63,8 @@ database/saas/tenant_modules.sql
 database/saas/tenant_hr_payroll_columns.sql
 database/saas/tenant_hr_payroll_procs.sql
 
+# Portal demo customer logins (safe — only updates C-001, C-002, C-004 if missing PIN)
+database/portal/seed_demo_portal.sql
+
 # Performance indexes (safe, optional)
 database/perf/add_perf_indexes.sql

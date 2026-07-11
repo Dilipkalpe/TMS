@@ -53,6 +53,8 @@ public static class DbSeeder
         if (ho != null)
             await BackfillBranchIdsAsync(db, ho.Id);
 
+        await PortalSchemaMigrator.SeedDemoPortalAccessAsync(db);
+
         if (!demo) return;
 
         var largeDataset = await db.Customers.AsNoTracking().CountAsync() > 10_000;

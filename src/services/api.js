@@ -444,7 +444,16 @@ export async function portalRequest(path, options = {}) {
       setPortalToken(null)
       window.dispatchEvent(new CustomEvent('tms-portal-unauthorized'))
     }
-    throw new ApiError('Session expired. Please sign in again.', 401)
+    let message = 'Session expired. Please sign in again.'
+    if (!auth) {
+      try {
+        const err = await res.json()
+        message = err.message || err.Message || 'Invalid phone or PIN'
+      } catch {
+        message = 'Invalid phone or PIN'
+      }
+    }
+    throw new ApiError(message, 401)
   }
 
   if (!res.ok) {
