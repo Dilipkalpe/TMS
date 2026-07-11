@@ -77,9 +77,9 @@ public class HrController(HrService hr, DriverSyncService driverSync) : Controll
     }
 
     [HttpPost("employees")]
-    public async Task<ActionResult<object>> SaveEmployee([FromBody] Dictionary<string, JsonElement> body, CancellationToken ct)
+    public async Task<ActionResult<object>> SaveEmployee([FromBody] JsonElement body, CancellationToken ct)
     {
-        var request = HrEmployeeRequestMapper.FromJson(body);
+        var request = HrEmployeeRequestMapper.FromJsonElement(body);
         if (string.IsNullOrWhiteSpace(request.EmployeeCode))
             return BadRequest(new ApiError("Employee code is required."));
         if (string.IsNullOrWhiteSpace(request.Name))

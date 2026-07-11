@@ -137,7 +137,6 @@ export default function EmployeeDetails() {
     setSaving(true)
     try {
       const body = {
-        id: isNew ? null : id,
         employeeCode: form.employeeCode.trim(),
         name: form.name.trim(),
         employeeType: form.employeeType || null,
@@ -165,7 +164,6 @@ export default function EmployeeDetails() {
         esiApplicable: !!form.esiApplicable,
         insuranceApplicable: !!form.insuranceApplicable,
         insuranceAmount: Number(form.insuranceAmount) || 0,
-        contractEndDate: form.employmentType === 'Contract' ? normalizeDateForApi(form.contractEndDate) : null,
         licenseNumber: form.licenseNumber?.trim() || null,
         licenseExpiry: normalizeDateForApi(form.licenseExpiry),
         assignedVehicleId: form.assignedVehicleId || null,
@@ -175,6 +173,11 @@ export default function EmployeeDetails() {
         haltingAllowance: Number(form.haltingAllowance) || 0,
         driverBhatta: Number(form.driverBhatta) || 0,
         status: form.status || 'Active',
+      }
+      if (!isNew) body.id = id
+      if (form.employmentType === 'Contract') {
+        const end = normalizeDateForApi(form.contractEndDate)
+        if (end) body.contractEndDate = end
       }
       await hrApi.saveEmployee(body)
       toast({ title: 'Saved', message: 'Employee saved successfully.', type: 'success' })

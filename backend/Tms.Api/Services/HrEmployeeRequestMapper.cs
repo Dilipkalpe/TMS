@@ -6,6 +6,17 @@ namespace Tms.Api.Services;
 
 public static class HrEmployeeRequestMapper
 {
+    public static SaveEmployeeRequest FromJsonElement(JsonElement body)
+    {
+        var dict = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        if (body.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var prop in body.EnumerateObject())
+                dict[prop.Name] = prop.Value;
+        }
+        return FromJson(dict);
+    }
+
     public static SaveEmployeeRequest FromJson(Dictionary<string, JsonElement> body) => new(
         Id: ParseGuidN(body, "id"),
         EmployeeCode: GetString(body, "employeeCode") ?? "",

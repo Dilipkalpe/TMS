@@ -114,12 +114,17 @@ export function getErrorMessage(error, fallback = 'Something went wrong. Please 
   return error.message || fallback
 }
 
-/** Convert empty strings to null so optional dates/ids deserialize on the API. */
+/** Strip empty/null fields so optional dates never break API model binding. */
 export function sanitizeApiBody(value) {
-  if (value === '') return null
-  if (value == null || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map(sanitizeApiBody)
-  return Object.fromEntries(
-    Object.entries(value).map(([k, v]) => [k, sanitizeApiBody(v)]),
-  )
+  if (value === '' || value == null) return undefined
+  if (typeof value !== 'object') return value
+  if (Array.isArray(value)) {
+    return value.map(sanitizeApiBody).filter((v) => v !== undefined)
+  }
+  const out = {}
+  for (const [k, v] of Object.entries(value)) {
+    const cleaned = sanitizeApiBody(v)
+    if (cleaned !== undefined) out[k] = cleaned
+  }
+  return out
 }
