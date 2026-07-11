@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using Tms.Api.Models;
+using Tms.Api.Services;
 
 namespace Tms.Api.DTOs;
 
@@ -218,16 +220,24 @@ public record HrEmployeeDetailDto(
     string Status, DateTime CreatedAt);
 
 public record SaveEmployeeRequest(
-    Guid? Id, string EmployeeCode, string Name, string? EmployeeType,
+    [property: JsonConverter(typeof(NullableGuidJsonConverter))] Guid? Id,
+    string EmployeeCode, string Name, string? EmployeeType,
     string? EmploymentType,
-    Guid? DepartmentId, Guid? DesignationId, string? DriverId,
-    string? Email, string? Phone, DateOnly? DateOfJoining, DateOnly? DateOfBirth,
+    [property: JsonConverter(typeof(NullableGuidJsonConverter))] Guid? DepartmentId,
+    [property: JsonConverter(typeof(NullableGuidJsonConverter))] Guid? DesignationId,
+    string? DriverId,
+    string? Email, string? Phone,
+    [property: JsonConverter(typeof(NullableDateOnlyJsonConverter))] DateOnly? DateOfJoining,
+    [property: JsonConverter(typeof(NullableDateOnlyJsonConverter))] DateOnly? DateOfBirth,
     string? Gender, string? Address, string? BankAccount, string? BankIfsc, string? Pan,
     decimal BasicSalary = 0, decimal DailyWage = 0, decimal Hra = 0, decimal Da = 0,
     decimal Conveyance = 0, decimal OtherAllowance = 0, decimal Advance = 0,
     bool PfApplicable = true, bool EsiApplicable = true, bool InsuranceApplicable = true,
-    decimal InsuranceAmount = 0, DateOnly? ContractEndDate = null,
-    string? LicenseNumber = null, DateOnly? LicenseExpiry = null, string? AssignedVehicleId = null,
+    decimal InsuranceAmount = 0,
+    [property: JsonConverter(typeof(NullableDateOnlyJsonConverter))] DateOnly? ContractEndDate = null,
+    string? LicenseNumber = null,
+    [property: JsonConverter(typeof(NullableDateOnlyJsonConverter))] DateOnly? LicenseExpiry = null,
+    string? AssignedVehicleId = null,
     decimal RouteAllowance = 0, decimal FuelAllowance = 0, decimal LoadingAllowance = 0,
     decimal HaltingAllowance = 0, decimal DriverBhatta = 0,
     string? Status = "Active");

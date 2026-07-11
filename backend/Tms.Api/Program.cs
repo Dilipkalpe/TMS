@@ -32,6 +32,7 @@ builder.Services.AddControllers()
         o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         o.JsonSerializerOptions.Converters.Add(new NullableDateOnlyJsonConverter());
         o.JsonSerializerOptions.Converters.Add(new DateOnlyJsonConverter());
+        o.JsonSerializerOptions.Converters.Add(new NullableGuidJsonConverter());
     });
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -357,9 +358,9 @@ app.MapGet("/api/health", async (TmsDbContext db) =>
 
         return ok
 
-            ? Results.Ok(new { status = "healthy", service = "TMS Pro API", database = "connected", build = "2026-06-28-booking-id" })
+            ? Results.Ok(new { status = "healthy", service = "TMS Pro API", database = "connected", build = "2026-07-11-employee-save" })
 
-            : Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "disconnected", build = "2026-06-28-booking-id" }, statusCode: 503);
+            : Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "disconnected", build = "2026-07-11-employee-save" }, statusCode: 503);
 
     }
 

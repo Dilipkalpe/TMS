@@ -26,7 +26,29 @@ public sealed class NullableDateOnlyJsonConverter : JsonConverter<DateOnly?>
     }
 }
 
-/// <summary>Accepts yyyy-MM-dd strings for required date fields.</summary>
+/// <summary>Accepts null, empty string, or GUID for optional id fields.</summary>
+public sealed class NullableGuidJsonConverter : JsonConverter<Guid?>
+{
+    public override Guid? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            var s = reader.GetString();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            if (Guid.TryParse(s, out var g)) return g;
+            throw new JsonException($"Invalid id '{s}'.");
+        }
+        throw new JsonException("Expected a GUID string or null.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, Guid? value, JsonSerializerOptions options)
+    {
+        if (value == null) writer.WriteNullValue();
+        else writer.WriteStringValue(value.Value);
+    }
+}
+
 public sealed class DateOnlyJsonConverter : JsonConverter<DateOnly>
 {
     public override DateOnly Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
