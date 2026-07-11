@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
@@ -76,15 +77,20 @@ public class HrController(HrService hr, DriverSyncService driverSync) : Controll
     }
 
     [HttpPost("employees")]
-    public async Task<ActionResult<object>> SaveEmployee([FromBody] SaveEmployeeRequest body, CancellationToken ct)
+    public async Task<ActionResult<object>> SaveEmployee([FromBody] Dictionary<string, JsonElement> body, CancellationToken ct)
     {
+        var request = HrEmployeeRequestMapper.FromJson(body);
+        if (string.IsNullOrWhiteSpace(request.EmployeeCode))
+            return BadRequest(new ApiError("Employee code is required."));
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest(new ApiError("Name is required."));
         try
         {
-            var id = await hr.SaveEmployeeAsync(body, ct);
-            if (string.Equals(body.EmployeeType, "Driver", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(body.Name))
+            var id = await hr.SaveEmployeeAsync(request, ct);
+            if (string.Equals(request.EmployeeType, "Driver", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(request.Name))
             {
-                await driverSync.EnsureDriverByNameAsync(body.Name, body.Phone, body.LicenseNumber, ct);
+                await driverSync.EnsureDriverByNameAsync(request.Name, request.Phone, request.LicenseNumber, ct);
             }
             return Ok(new { id });
         }

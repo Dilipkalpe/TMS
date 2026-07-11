@@ -10,6 +10,7 @@ import { hrApi, vehiclesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 
+import { normalizeDateForApi } from '../../utils/dates'
 import { EMPLOYMENT_TYPES, applyEmploymentNorms, employeeTotalPay } from '../../config/employmentNorms'
 
 const EMP_TYPES = ['Driver', 'Staff', 'Office', 'Mechanic', 'Loader']
@@ -146,8 +147,8 @@ export default function EmployeeDetails() {
         driverId: form.driverId || null,
         email: form.email?.trim() || null,
         phone: form.phone?.trim() || null,
-        dateOfJoining: form.dateOfJoining || null,
-        dateOfBirth: form.dateOfBirth || null,
+        dateOfJoining: normalizeDateForApi(form.dateOfJoining),
+        dateOfBirth: normalizeDateForApi(form.dateOfBirth),
         gender: form.gender?.trim() || null,
         address: form.address?.trim() || null,
         bankAccount: form.bankAccount?.trim() || null,
@@ -164,9 +165,9 @@ export default function EmployeeDetails() {
         esiApplicable: !!form.esiApplicable,
         insuranceApplicable: !!form.insuranceApplicable,
         insuranceAmount: Number(form.insuranceAmount) || 0,
-        contractEndDate: form.employmentType === 'Contract' ? (form.contractEndDate || null) : null,
+        contractEndDate: form.employmentType === 'Contract' ? normalizeDateForApi(form.contractEndDate) : null,
         licenseNumber: form.licenseNumber?.trim() || null,
-        licenseExpiry: form.licenseExpiry || null,
+        licenseExpiry: normalizeDateForApi(form.licenseExpiry),
         assignedVehicleId: form.assignedVehicleId || null,
         routeAllowance: Number(form.routeAllowance) || 0,
         fuelAllowance: Number(form.fuelAllowance) || 0,
