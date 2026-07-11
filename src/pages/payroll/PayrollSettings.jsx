@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -35,12 +35,13 @@ export default function PayrollSettings() {
   const { toast } = useToast()
   const [values, setValues] = useState({})
   const [saving, setSaving] = useState(false)
-  const { data: settings, loading, error, refresh } = useApiResource(async () => {
-    const s = await payrollApi.settings()
-    const map = Object.fromEntries(s.map((x) => [x.key, x.value]))
-    setValues(map)
-    return s
-  }, [])
+  const { data: settings, loading, error, refresh } = useApiResource(() => payrollApi.settings(), [])
+
+  useEffect(() => {
+    if (settings?.length) {
+      setValues(Object.fromEntries(settings.map((x) => [x.key, x.value])))
+    }
+  }, [settings])
 
   const handleSave = async (key) => {
     setSaving(true)
