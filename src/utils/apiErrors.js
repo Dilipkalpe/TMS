@@ -18,8 +18,10 @@ const FIELD_LABELS = {
   amount: 'Amount',
   category: 'Category',
   pin: 'PIN',
-  month: 'Month',
-  year: 'Year',
+  dateOfJoining: 'Date of joining',
+  dateOfBirth: 'Date of birth',
+  contractEndDate: 'Contract end date',
+  licenseExpiry: 'License expiry',
   branchCode: 'Branch code',
   companyName: 'Company name',
 }
@@ -32,7 +34,9 @@ export function formatApiErrorBody(err) {
   if (!err || typeof err !== 'object') return null
 
   const direct = err.message || err.Message
-  if (direct && typeof direct === 'string' && direct.trim()) return direct.trim()
+  if (direct && typeof direct === 'string' && direct.trim()) {
+    return humanizeRawApiMessage(direct.trim())
+  }
 
   if (err.errors && typeof err.errors === 'object') {
     const lines = []
@@ -40,7 +44,13 @@ export function formatApiErrorBody(err) {
       const parts = Array.isArray(msgs) ? msgs : [msgs]
       for (const part of parts) {
         const text = String(part ?? '').trim()
-        if (!text) continue
+        if (text.includes('could not be converted') && text.includes('Path:')) {
+          const field = text.match(/Path:\s*\$\.(\w+)/i)?.[1]
+          if (field) {
+            lines.push(`${friendlyFieldName(field)}: invalid or missing value`)
+            continue
+          }
+        }
         const label = friendlyFieldName(field)
         if (!field || field === '$' || field === 'request') {
           lines.push(text)
@@ -67,6 +77,23 @@ export function formatApiErrorBody(err) {
   return null
 }
 
+function humanizeRawApiMessage(text) {
+  const lines = []
+  if (text.includes('could not be converted') && text.includes('Path:')) {
+    const match = text.match(/Path:\s*\$\.(\w+)/i)
+    if (match) lines.push(`${friendlyFieldName(match[1])}: invalid or missing value`)
+  }
+  const required = [...text.matchAll(/The (\w+) field is required/gi)]
+  for (const [, field] of required) {
+    lines.push(`${friendlyFieldName(field)}: required`)
+  }
+  if (lines.length) return [...new Set(lines)].join('\n')
+  if (text.startsWith('The body field is required')) {
+    return 'Please check required fields and date formats, then try again.'
+  }
+  return text
+}
+
 export function friendlyFieldName(field) {
   const raw = String(field ?? '')
     .replace(/^\$\.?/, '')
@@ -85,4 +112,14 @@ export function getErrorMessage(error, fallback = 'Something went wrong. Please 
   if (!error) return fallback
   if (typeof error === 'string') return error
   return error.message || fallback
+}
+
+/** Convert empty strings to null so optional dates/ids deserialize on the API. */
+export function sanitizeApiBody(value) {
+  if (value === '') return null
+  if (value == null || typeof value !== 'object') return value
+  if (Array.isArray(value)) return value.map(sanitizeApiBody)
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [k, sanitizeApiBody(v)]),
+  )
 }

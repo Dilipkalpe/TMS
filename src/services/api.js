@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '../config/api'
 import { getStoredCompanyId } from '../context/CompanyContext'
-import { formatApiErrorBody } from '../utils/apiErrors'
+import { formatApiErrorBody, sanitizeApiBody } from '../utils/apiErrors'
 
 const DEMO_COMPANY_ID = '00000000-0000-4000-8000-000000000001'
 
@@ -77,7 +77,7 @@ export async function apiRequest(path, options = {}) {
     res = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body != null ? JSON.stringify(body) : undefined,
+      body: body != null ? JSON.stringify(sanitizeApiBody(body)) : undefined,
       signal: controller.signal,
     })
   } catch (err) {
@@ -444,7 +444,7 @@ export async function portalRequest(path, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers,
-    body: body != null ? JSON.stringify(body) : undefined,
+    body: body != null ? JSON.stringify(sanitizeApiBody(body)) : undefined,
   })
 
   if (res.status === 401) {

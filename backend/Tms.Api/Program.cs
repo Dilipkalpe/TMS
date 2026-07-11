@@ -27,7 +27,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
 
-    .AddJsonOptions(o => o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        o.JsonSerializerOptions.Converters.Add(new NullableDateOnlyJsonConverter());
+        o.JsonSerializerOptions.Converters.Add(new DateOnlyJsonConverter());
+    });
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
