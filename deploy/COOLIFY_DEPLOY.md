@@ -15,31 +15,36 @@ Use one of these patterns:
 
 | Pattern | When to use | TMS URL example |
 |---------|-------------|-----------------|
-| **Subdomain (recommended)** | You have a domain | `https://tms.yourdomain.com` |
-| **Dedicated port** | No domain yet | `http://144.91.98.218:8080` |
-| **Coolify FQDN** | Coolify assigns routing | Set in service **Domains** tab |
+| **nip.io subdomain (no domain needed)** | Free subdomain → your VPS IP | `http://tms.144.91.98.218.nip.io` |
+| **Dedicated port** | Backup / testing | `http://144.91.98.218:8080` |
+| **Custom subdomain** | You own a domain | `https://tms.yourdomain.com` |
 
-Steps for subdomain (best for production):
+### No domain? Use nip.io (assigned for this server)
 
-1. DNS: `tms` A-record → `144.91.98.218`
-2. Coolify → **tms-web** service → **Domains** → `tms.yourdomain.com` → Enable HTTPS
-3. Env: `Cors__Origins__0=https://tms.yourdomain.com`
-4. Leave `TMS_WEB_PORT` **empty** (Coolify proxy handles port 80/443)
+nip.io resolves hostnames to the IP embedded in the name — no DNS setup required.
 
-Steps for dedicated port (quick test):
+| Item | Value |
+|------|--------|
+| **TMS URL** | `http://tms.144.91.98.218.nip.io` |
+| Coolify domain (tms-web) | `tms.144.91.98.218.nip.io` |
+| CORS env | `Cors__Origins__0=http://tms.144.91.98.218.nip.io` |
 
-1. Env: `TMS_WEB_PORT=8080`
-2. Env: `Cors__Origins__0=http://144.91.98.218:8080`
-3. Open `http://144.91.98.218:8080`
+After HTTPS in Coolify, change CORS to `https://tms.144.91.98.218.nip.io`.
 
-**Stop host nginx** if it shows "Welcome to nginx!" on port 80 and blocks Coolify:
+Steps:
+
+1. Coolify → TMS stack → **tms-web** → **Domains** → add `tms.144.91.98.218.nip.io`
+2. Env: `Cors__Origins__0=http://tms.144.91.98.218.nip.io`
+3. Redeploy
+4. Open **http://tms.144.91.98.218.nip.io**
+
+Ensure port **80** is free for Coolify proxy (stop host nginx if needed):
 
 ```bash
-systemctl stop nginx
-systemctl disable nginx
+systemctl stop nginx && systemctl disable nginx
 ```
 
-Each app should have its **own PostgreSQL database** (`tms_pro` for TMS only).
+Steps for custom subdomain (when you buy a domain later):
 
 ## 1. Create PostgreSQL in Coolify
 
