@@ -3,10 +3,43 @@
 ## Architecture
 
 ```
-Browser → Coolify proxy / port 80 → tms-web (nginx + React)
-                                      └─ /api/* → tms-api (.NET 8)
-                                                    └─ PostgreSQL (Coolify DB)
+Browser → Coolify proxy (shared with other apps) → tms-web (nginx + React)
+                                                    └─ /api/* → tms-api (.NET 8)
+                                                                  └─ PostgreSQL (dedicated tms_pro DB)
 ```
+
+## Multiple apps on one server
+
+When other applications already use port 80, **do not** compete for `144.91.98.218:80`.
+Use one of these patterns:
+
+| Pattern | When to use | TMS URL example |
+|---------|-------------|-----------------|
+| **Subdomain (recommended)** | You have a domain | `https://tms.yourdomain.com` |
+| **Dedicated port** | No domain yet | `http://144.91.98.218:8080` |
+| **Coolify FQDN** | Coolify assigns routing | Set in service **Domains** tab |
+
+Steps for subdomain (best for production):
+
+1. DNS: `tms` A-record → `144.91.98.218`
+2. Coolify → **tms-web** service → **Domains** → `tms.yourdomain.com` → Enable HTTPS
+3. Env: `Cors__Origins__0=https://tms.yourdomain.com`
+4. Leave `TMS_WEB_PORT` **empty** (Coolify proxy handles port 80/443)
+
+Steps for dedicated port (quick test):
+
+1. Env: `TMS_WEB_PORT=8080`
+2. Env: `Cors__Origins__0=http://144.91.98.218:8080`
+3. Open `http://144.91.98.218:8080`
+
+**Stop host nginx** if it shows "Welcome to nginx!" on port 80 and blocks Coolify:
+
+```bash
+systemctl stop nginx
+systemctl disable nginx
+```
+
+Each app should have its **own PostgreSQL database** (`tms_pro` for TMS only).
 
 ## 1. Create PostgreSQL in Coolify
 
