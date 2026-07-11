@@ -58,6 +58,10 @@ public static class MaintenanceSchemaMigrator
         """,
         "ALTER TABLE maintenance_schedules ADD COLUMN IF NOT EXISTS company_id UUID",
         "ALTER TABLE maintenance_records ADD COLUMN IF NOT EXISTS company_id UUID",
+    ];
+
+    static readonly string[] Phase4CompanyIdStatements =
+    [
         "ALTER TABLE maintenance_work_orders ADD COLUMN IF NOT EXISTS company_id UUID",
         "ALTER TABLE maintenance_prediction_snapshots ADD COLUMN IF NOT EXISTS company_id UUID",
     ];
@@ -68,13 +72,47 @@ public static class MaintenanceSchemaMigrator
         if (conn.State != System.Data.ConnectionState.Open)
             await conn.OpenAsync(ct);
 
+        await EnsureBaseTablesAsync(conn, ct);
+
         foreach (var sql in SchemaStatements)
         {
             await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.CommandTimeout = SchemaMigrationHelper.CommandTimeoutSeconds;
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
         await ApplyPhase4Async(conn, ct);
+
+        foreach (var sql in Phase4CompanyIdStatements)
+        {
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.CommandTimeout = SchemaMigrationHelper.CommandTimeoutSeconds;
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+    }
+
+    static async Task EnsureBaseTablesAsync(NpgsqlConnection conn, CancellationToken ct)
+    {
+        if (await SchemaMigrationHelper.TableExistsAsync(conn, "maintenance_records", ct)) return;
+
+        const string sql = """
+            CREATE TABLE IF NOT EXISTS maintenance_records (
+                id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                vehicle_id      VARCHAR(20) NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+                record_date     DATE NOT NULL,
+                type            VARCHAR(100),
+                record_type     VARCHAR(30) DEFAULT 'SCHEDULED',
+                description     TEXT,
+                odometer        INT,
+                next_due_at     TIMESTAMPTZ,
+                performed_at    TIMESTAMPTZ,
+                cost            DECIMAL(12,2) NOT NULL DEFAULT 0,
+                vendor          VARCHAR(200),
+                remarks         TEXT,
+                created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """;
+        await SchemaMigrationHelper.ExecuteNonQueryAsync(conn, sql, ct);
     }
 
     static async Task ApplyPhase4Async(NpgsqlConnection conn, CancellationToken ct)

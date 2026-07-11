@@ -54,6 +54,7 @@
     <None Include="..\..\database\modules\schema.sql" Link="database\modules\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\gps\schema.sql" Link="database\gps\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\maintenance\phase4.sql" Link="database\maintenance\phase4.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\maintenance\install.sql" Link="database\maintenance\install.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\notifications\schema.sql" Link="database\notifications\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\portal\schema.sql" Link="database\portal\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\routing\schema.sql" Link="database\routing\schema.sql" CopyToOutputDirectory="PreserveNewest" />

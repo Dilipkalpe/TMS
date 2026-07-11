@@ -10,8 +10,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $invoke = Join-Path $scriptDir "Invoke-TmsPsql.ps1"
 
 $files = @(
-    "database\maintenance\schema.sql",
-    "database\maintenance\seed.sql"
+    "database\maintenance\install.sql"
 )
 
 Write-Host "=== Installing Predictive Maintenance module ===" -ForegroundColor Cyan
