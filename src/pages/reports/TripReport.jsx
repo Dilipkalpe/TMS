@@ -1,14 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
-import Badge, { statusVariant } from '../../components/ui/Badge'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { tripReport } from '../../data/reports'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { useApiResource } from '../../hooks/useApiResource'
+import { reportsApi } from '../../services/api'
 
 export default function TripReport() {
   const navigate = useNavigate()
+  const { data: tripReport, loading, error, refresh } = useApiResource(() => reportsApi.trips(), [])
+
   const columns = [
     { key: 'lr', label: 'LR No.' },
     { key: 'date', label: 'Date' },
@@ -27,11 +29,14 @@ export default function TripReport() {
       module="Reports"
       title="Trip Report"
       statusCards={registerStatusCards('Total Trips', tripReport.length, 'violet', 'Route')}
-showActions={false}
+      showActions={false}
       searchPlaceholder="LR No., vehicle, driver..."
       searchKeys={['lr', 'vehicle', 'driver', 'route']}
       columns={columns}
       data={tripReport}
+      loading={loading}
+      error={error}
+      onRefreshExternal={refresh}
       sortKey="date"
       filterRow={<ReportFilterRow />}
     />

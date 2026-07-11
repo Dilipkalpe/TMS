@@ -1,11 +1,16 @@
+import { useMemo, useState } from 'react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import StatusSummaryCards from '../../components/ui/StatusSummaryCards'
 import Card, { CardHeader } from '../../components/ui/Card'
+import Input from '../../components/ui/Input'
+import Button from '../../components/ui/Button'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { balanceSheet } from '../../data/accounting'
+import { TablePrintButton } from '../../components/print/ReportPrintButton'
+import { useApiObject } from '../../hooks/useApiResource'
+import { accountingApi } from '../../services/api'
 
 function Section({ title, items }) {
-  const total = items.reduce((s, i) => s + i.amount, 0)
+  const total = items.reduce((s, i) => s + (i.amount ?? 0), 0)
   return (
     <Card>
       <CardHeader title={title} />
@@ -17,8 +22,8 @@ function Section({ title, items }) {
           </div>
         ))}
         <div className="flex justify-between pt-2 font-bold">
-          <span>Total {title}</span>
-          <span className="text-primary">{formatCurrency(total)}</span>
+          <span>Total</span>
+          <span>{formatCurrency(total)}</span>
         </div>
       </div>
     </Card>
@@ -26,35 +31,70 @@ function Section({ title, items }) {
 }
 
 export default function BalanceSheet() {
-  const assetsTotal = balanceSheet.assets.reduce((s, i) => s + i.amount, 0)
-  const liabilitiesTotal = balanceSheet.liabilities.reduce((s, i) => s + i.amount, 0)
-  const capitalTotal = balanceSheet.capital.reduce((s, i) => s + i.amount, 0)
-  const isBalanced = assetsTotal === liabilitiesTotal + capitalTotal
+  const now = new Date()
+  const [month, setMonth] = useState(String(now.getMonth() + 1))
+  const [year, setYear] = useState(String(now.getFullYear()))
+  const params = useMemo(() => ({ month, year }), [month, year])
+  const { data, loading, error, refresh } = useApiObject(() => accountingApi.balanceSheet(params), [month, year])
+
+  const assets = data?.assets ?? []
+  const liabilities = data?.liabilities ?? []
+  const capital = data?.capital ?? []
+  const totalAssets = assets.reduce((s, i) => s + (i.amount ?? 0), 0)
+  const totalLiab = liabilities.reduce((s, i) => s + (i.amount ?? 0), 0) + capital.reduce((s, i) => s + (i.amount ?? 0), 0)
 
   const statusCards = [
-    { label: 'Total Assets', color: 'green', icon: 'Landmark', count: formatCurrency(assetsTotal) },
-    { label: 'Total Liabilities', color: 'orange', icon: 'Scale', count: formatCurrency(liabilitiesTotal) },
-    { label: 'Total Capital', color: 'blue', icon: 'Building2', count: formatCurrency(capitalTotal) },
-    { label: 'Balanced', color: isBalanced ? 'green' : 'red', icon: 'CheckCircle', count: isBalanced ? 'Yes' : 'No' },
+    { label: 'Period', color: 'blue', icon: 'Calendar', count: data?.periodLabel ?? 'Current' },
+    { label: 'Total Assets', color: 'green', icon: 'Landmark', count: formatCurrency(totalAssets) },
+    { label: 'Total Liabilities', color: 'orange', icon: 'Scale', count: formatCurrency(liabilities.reduce((s, i) => s + i.amount, 0)) },
+    { label: 'Balanced', color: 'violet', icon: 'CheckCircle', count: Math.abs(totalAssets - totalLiab) < 1 ? 'Yes' : 'No' },
   ]
 
+  const printRows = [
+    ...assets.map((item) => ({ group: 'Assets', name: item.name, amount: item.amount })),
+    ...liabilities.map((item) => ({ group: 'Liabilities', name: item.name, amount: item.amount })),
+    ...capital.map((item) => ({ group: 'Capital', name: item.name, amount: item.amount })),
+  ]
+  const printColumns = [
+    { key: 'group', label: 'Group' },
+    { key: 'name', label: 'Account' },
+    { key: 'amount', label: 'Amount', printValue: (r) => formatCurrency(r.amount) },
+  ]
+
+  if (loading) {
+    return (
+      <ERPContentPage module="Accounting" title="Balance Sheet">
+        <p className="text-sm text-slate-500">Loading…</p>
+      </ERPContentPage>
+    )
+  }
+
   return (
-    <ERPContentPage module="Accounting" title="Balance Sheet">
+    <ERPContentPage
+      module="Accounting"
+      title="Monthly Balance Sheet"
+      toolbar={(
+        <div className="flex flex-wrap items-end justify-end gap-2">
+          <Input label="Month" type="number" min="1" max="12" value={month} onChange={(e) => setMonth(e.target.value)} className="w-24" />
+          <Input label="Year" type="number" min="2000" max="2100" value={year} onChange={(e) => setYear(e.target.value)} className="w-28" />
+          <Button variant="outline" onClick={refresh}>Apply</Button>
+          <TablePrintButton
+            title={`Balance Sheet — ${data?.periodLabel ?? ''}`}
+            columns={printColumns}
+            rows={printRows}
+            summary={`Total Assets: ${formatCurrency(totalAssets)} · Total Liabilities & Capital: ${formatCurrency(totalLiab)}`}
+          />
+        </div>
+      )}
+    >
       <div className="space-y-4">
+        {error && <p className="text-sm text-red-500">{error}</p>}
         <StatusSummaryCards cards={statusCards} />
         <div className="grid gap-4 lg:grid-cols-3">
-          <Section title="Assets" items={balanceSheet.assets} />
-          <Section title="Liabilities" items={balanceSheet.liabilities} />
-          <Section title="Capital" items={balanceSheet.capital} />
+          <Section title="Assets" items={assets} />
+          <Section title="Liabilities" items={liabilities} />
+          <Section title="Capital" items={capital} />
         </div>
-        <Card className="text-center">
-          <p className="text-sm text-slate-500">
-            Assets ({formatCurrency(assetsTotal)}) = Liabilities ({formatCurrency(liabilitiesTotal)}) + Capital ({formatCurrency(capitalTotal)})
-          </p>
-          {isBalanced && (
-            <p className="mt-2 font-medium text-green-600">✓ Balance Sheet is balanced</p>
-          )}
-        </Card>
       </div>
     </ERPContentPage>
   )

@@ -3,8 +3,10 @@ import {
   Columns3,
   Download,
   Plus,
+  Printer,
   RefreshCw,
   Search,
+  Upload,
 } from 'lucide-react'
 import Button from './Button'
 
@@ -21,6 +23,8 @@ export default function ERPListToolbar({
   onRefresh,
   onManageColumns,
   onExport,
+  onImport,
+  onPrint,
   recordCount = 0,
   extra,
 }) {
@@ -70,6 +74,17 @@ export default function ERPListToolbar({
             <span className="sm:hidden">Export</span>
             <ChevronDown className="h-3.5 w-3.5" />
           </Button>
+          {onImport && (
+            <Button variant="outline" size="sm" icon={Upload} onClick={onImport}>
+              <span className="hidden sm:inline">Import CSV</span>
+              <span className="sm:hidden">Import</span>
+            </Button>
+          )}
+          {onPrint && (
+            <Button variant="outline" size="sm" icon={Printer} onClick={onPrint}>
+              Print
+            </Button>
+          )}
         </div>
       </div>
       {extra}

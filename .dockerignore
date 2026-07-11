@@ -1,0 +1,35 @@
+# Git / IDE
+.git
+.cursor
+.build-cache
+**/.vs
+**/.vscode
+
+# Node / frontend dev
+node_modules
+dist
+coverage
+
+# .NET build output
+**/bin
+**/obj
+**/publish
+backend/_build_out
+
+# Secrets & local env
+.env
+.env.*
+!.env.example
+!deploy/.env.production.example
+
+# Enterprise stack (separate deploy)
+enterprise-tms
+
+# Docs / marketing (not needed in image)
+docs
+marketing
+agent-transcripts
+
+# OS
+**/.DS_Store
+**/Thumbs.db

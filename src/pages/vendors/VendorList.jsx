@@ -1,21 +1,20 @@
 import { useNavigate } from 'react-router-dom'
 import ERPListPage from '../../components/ui/ERPListPage'
-import { vendors } from '../../data/vendors'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
-
-const vendorStatusCards = (data) => {
-  const totalOutstanding = data.reduce((s, v) => s + v.outstanding, 0)
-  return [
-    { label: 'Total Vendors', color: 'blue', icon: 'Building2', count: data.length },
-    { label: 'With Outstanding', color: 'orange', icon: 'AlertTriangle', count: data.filter((v) => v.outstanding > 0).length },
-    { label: 'Total Bills', color: 'violet', icon: 'Receipt', count: data.reduce((s, v) => s + v.totalBills, 0) },
-    { label: 'Outstanding', color: 'red', icon: 'IndianRupee', count: formatCurrency(totalOutstanding) },
-  ]
-}
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
+import { vendorsApi } from '../../services/api'
+import { useToast } from '../../context/ToastContext'
+import { importTemplates } from '../../config/importTemplates'
 
 export default function VendorList() {
   const navigate = useNavigate()
+  const { toast } = useToast()
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search, filter }) =>
+      vendorsApi.list(buildListParams({ page, pageSize, search, filter, filterKey: 'category' })),
+    [],
+  )
 
   const columns = [
     { key: 'name', label: 'Vendor' },
@@ -31,17 +30,36 @@ export default function VendorList() {
       onAdd={() => navigate(addRecordRoutes.vendors)}
       module="Vendors"
       title="Vendor Management"
-      statusCards={vendorStatusCards(vendors)}
-      
+      statusCards={[{ label: 'Total Vendors', color: 'blue', icon: 'Building2', count: paged.total }]}
       searchPlaceholder="Name, category, contact..."
-      searchKeys={['name', 'category', 'contact', 'phone']}
       filterOptions={['(All)', 'Fuel', 'Maintenance', 'Toll', 'Office']}
       filterKey="category"
       columns={columns}
-      data={vendors}
+      data={paged.items}
+      loading={paged.loading}
+      error={paged.error}
+      onRefreshExternal={paged.refresh}
       sortKey="name"
       onRowClick={(r) => navigate(`/vendors/${r.id}`)}
       onEdit={(r) => navigate(`/vendors/${r.id}`)}
+      onDelete={async (r) => {
+        if (!window.confirm(`Delete vendor ${r.name}?`)) return
+        try { await vendorsApi.remove(r.id); toast({ title: 'Deleted', type: 'success' }); paged.refresh() }
+        catch (err) { toast({ title: 'Delete failed', message: err.message, type: 'error' }) }
+      }}
+      exportFilename="vendors-export.csv"
+      importTemplate={importTemplates.vendors}
+      serverMode
+      serverTotal={paged.total}
+      serverHasMore={paged.hasMore}
+      totalIsApproximate={paged.totalIsApproximate}
+      serverPage={paged.page}
+      onServerPageChange={paged.setPage}
+      serverPageSize={paged.pageSize}
+      onServerPageSizeChange={paged.setPageSize}
+      onServerSearch={paged.setSearch}
+      onServerFilter={paged.setFilter}
+      searchValue={paged.search}
     />
   )
 }

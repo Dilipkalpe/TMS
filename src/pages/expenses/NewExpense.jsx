@@ -1,5 +1,5 @@
 import NewRecordForm from '../../components/forms/NewRecordForm'
-import { expenseCategories } from '../../data/expenses'
+import { expensesApi } from '../../services/api'
 
 export default function NewExpense() {
   return (
@@ -8,14 +8,24 @@ export default function NewExpense() {
       title="Add New Record"
       listPath="/expenses"
       saveLabel="Save Expense"
+      onSubmit={(form) => expensesApi.create({
+        date: form.date,
+        category: form.category,
+        description: form.description,
+        vehicle: form.vehicle,
+        vendor: form.vendor,
+        amount: Number(form.amount) || 0,
+        paymentMode: form.paymentmode,
+        status: 'Approved',
+      })}
       fields={[
-        { label: 'Date', type: 'date' },
-        { label: 'Category', type: 'select', options: expenseCategories },
-        { label: 'Description', placeholder: 'Expense description' },
-        { label: 'Vehicle', placeholder: 'Vehicle number (optional)' },
-        { label: 'Vendor', placeholder: 'Vendor name' },
-        { label: 'Amount (₹)', type: 'number', placeholder: '0' },
-        { label: 'Payment Mode', type: 'select', options: ['Cash', 'Bank Transfer', 'FASTag', 'Cheque'] },
+        { name: 'date', label: 'Expense Date', type: 'date', defaultValue: new Date().toISOString().slice(0, 10) },
+        { name: 'category', label: 'Category', type: 'select', options: ['Fuel', 'Toll', 'Maintenance', 'Salary', 'Office Expense', 'Miscellaneous'] },
+        { name: 'description', label: 'Description', placeholder: 'Expense details' },
+        { name: 'vehicle', label: 'Vehicle', placeholder: 'MH-12-AB-1234' },
+        { name: 'vendor', label: 'Vendor', placeholder: 'Vendor name' },
+        { name: 'amount', label: 'Amount (₹)', type: 'number', placeholder: '0' },
+        { name: 'paymentmode', label: 'Payment Mode', type: 'select', options: ['Cash', 'Bank Transfer', 'FASTag', 'UPI'] },
       ]}
     />
   )

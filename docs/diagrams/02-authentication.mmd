@@ -1,0 +1,14 @@
+flowchart LR
+    A([User opens app]) --> B{Logged in?}
+    B -->|No| C[Login Page]
+    C --> D[POST /api/auth/login]
+    D --> E{Valid credentials?}
+    E -->|No| F[Show error]
+    F --> C
+    E -->|Yes| G[Store JWT in localStorage]
+    G --> H[Redirect to Dashboard]
+    B -->|Yes| H
+    H --> I[API calls with Bearer token]
+    I --> J{Token valid?}
+    J -->|Yes| K[Return data]
+    J -->|No 401| L[Logout → Login]

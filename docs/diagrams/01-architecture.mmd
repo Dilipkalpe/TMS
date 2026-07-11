@@ -1,0 +1,17 @@
+flowchart TB
+    subgraph Client["Presentation Layer — Port 5173"]
+        UI["React + Vite + Tailwind\nDashboard | Bookings | LR | Accounting"]
+    end
+    subgraph API["Application Layer — Port 5000"]
+        REST["ASP.NET Core 8 REST API\nJWT Authentication"]
+        EF["Entity Framework Core"]
+    end
+    subgraph DB["Data Layer — Port 5432"]
+        PG[("PostgreSQL\ntms_pro database")]
+    end
+    UI -->|"HTTP /api/* + Bearer Token"| REST
+    REST --> EF
+    EF --> PG
+    PG --> EF
+    EF --> REST
+    REST -->|"JSON Response"| UI

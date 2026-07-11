@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tms.Api</RootNamespace>
+    <!-- Set to false to skip auto-stop (e.g. CI). Local Debug builds stop a running Tms.Api to avoid MSB3026 file locks. -->
+    <StopRunningApiBeforeBuild Condition="'$(StopRunningApiBeforeBuild)' == ''">true</StopRunningApiBeforeBuild>
+  </PropertyGroup>
+
+  <Target Name="StopRunningApiBeforeBuild"
+          BeforeTargets="Build"
+          Condition="'$(Configuration)' == 'Debug' AND '$(StopRunningApiBeforeBuild)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="taskkill /F /IM Tms.Api.exe /T 2&gt;nul" IgnoreExitCode="true" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\scripts\stop-api.ps1&quot; -Quiet"
+          IgnoreExitCode="true" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.11" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\database\schema.sql" Link="database\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\core\stored_procedures.sql" Link="database\core\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\perf\add_perf_indexes.sql" Link="database\perf\add_perf_indexes.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\perf\partition_bookings.sql" Link="database\perf\partition_bookings.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\settings_extension.sql" Link="database\settings_extension.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\schema.sql" Link="database\hr\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\stored_procedures.sql" Link="database\hr\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\seed.sql" Link="database\hr\seed.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\employment_types.sql" Link="database\hr\employment_types.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\upgrade_drop_employee_sp.sql" Link="database\hr\upgrade_drop_employee_sp.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\employment_hr_sp.sql" Link="database\hr\employment_hr_sp.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\tms_transport_hr.sql" Link="database\hr\tms_transport_hr.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\schema.sql" Link="database\payroll\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\stored_procedures.sql" Link="database\payroll\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\accounting_integration.sql" Link="database\payroll\accounting_integration.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\upgrade_drop_functions.sql" Link="database\payroll\upgrade_drop_functions.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\payroll_hr_extension.sql" Link="database\payroll\payroll_hr_extension.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\payroll_accounting_sp.sql" Link="database\payroll\payroll_accounting_sp.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\employment_payroll.sql" Link="database\payroll\employment_payroll.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\tms_transport_payroll.sql" Link="database\payroll\tms_transport_payroll.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\payroll\upgrade_drop_transport.sql" Link="database\payroll\upgrade_drop_transport.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\modules\schema.sql" Link="database\modules\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\gps\schema.sql" Link="database\gps\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\maintenance\phase4.sql" Link="database\maintenance\phase4.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\notifications\schema.sql" Link="database\notifications\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\portal\schema.sql" Link="database\portal\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\routing\schema.sql" Link="database\routing\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\branches\schema.sql" Link="database\branches\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\booking_finance\schema.sql" Link="database\booking_finance\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\stored_procedures.sql" Link="database\reports\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\sp_dashboard_stats.sql" Link="database\reports\sp_dashboard_stats.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\sp_accounting_customer_ledger.sql" Link="database\reports\sp_accounting_customer_ledger.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\report_indexes.sql" Link="database\reports\report_indexes.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\sp_accounting_ledger_report.sql" Link="database\reports\sp_accounting_ledger_report.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\sp_accounting_registers.sql" Link="database\reports\sp_accounting_registers.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\saas\schema.sql" Link="database\saas\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\saas\tenant_modules.sql" Link="database\saas\tenant_modules.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\saas\tenant_hr_payroll_columns.sql" Link="database\saas\tenant_hr_payroll_columns.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\saas\tenant_hr_payroll_procs.sql" Link="database\saas\tenant_hr_payroll_procs.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

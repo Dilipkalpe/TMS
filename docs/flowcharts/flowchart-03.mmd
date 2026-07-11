@@ -1,0 +1,11 @@
+sequenceDiagram
+  participant C as Customer
+  participant P as Portal UI
+  participant API as POST /api/portal/auth/login
+  participant DB as portal_access
+
+  C->>P: Customer code + PIN / password
+  P->>API: Portal credentials
+  API->>DB: Validate access scope
+  API-->>P: Portal JWT (booking or customer scope)
+  P-->>C: Shipments / invoices dashboard

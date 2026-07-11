@@ -6,8 +6,12 @@ import ERPDataTable from './ERPDataTable'
 import TablePagination from './TablePagination'
 import Modal from './Modal'
 import Button from './Button'
+import ImportModal from './ImportModal'
 import { exportToCsv } from '../../utils/export'
 import { useToast } from '../../context/ToastContext'
+import { usePrint } from '../../context/PrintContext'
+import TablePrintFormat from '../print/TablePrintFormat'
+import { formatPrintDate } from '../../utils/printUtils'
 
 export default function ERPListPage({
   module,
@@ -30,25 +34,49 @@ export default function ERPListPage({
   onEdit,
   onDelete,
   showActions = true,
+  rowPrintTitle = 'Print',
   showSerial = true,
   filterRow,
   pageSize: initialPageSize = 25,
   exportFilename,
+  importTemplate = null,
+  loading = false,
+  error = null,
+  onRefreshExternal,
+  serverMode = false,
+  serverTotal = 0,
+  serverHasMore = false,
+  totalIsApproximate = false,
+  serverPage,
+  onServerPageChange,
+  serverPageSize,
+  onServerPageSizeChange,
+  onServerSearch,
+  onServerFilter,
+  searchValue: externalSearch,
+  printable = true,
+  printSubtitle,
 }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState(filterOptions[0])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(initialPageSize)
   const [columnsOpen, setColumnsOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [hiddenColumns, setHiddenColumns] = useState([])
   const { toast } = useToast()
+  const { company, print } = usePrint()
 
   const visibleColumns = useMemo(
     () => columns.filter((c) => !hiddenColumns.includes(c.key)),
     [columns, hiddenColumns],
   )
 
+  const activePage = serverMode ? (serverPage ?? 1) : page
+  const activePageSize = serverMode ? (serverPageSize ?? pageSize) : pageSize
+
   const filtered = useMemo(() => {
+    if (serverMode) return [...data]
     let rows = [...data]
     if (search.trim() && searchKeys.length) {
       const q = search.toLowerCase()
@@ -72,31 +100,57 @@ export default function ERPListPage({
       })
     }
     return rows
-  }, [data, search, filter, searchKeys, filterKey, filterFn, sortKey, defaultSortDir])
+  }, [data, search, filter, searchKeys, filterKey, filterFn, sortKey, defaultSortDir, serverMode])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const safePage = Math.min(page, totalPages)
+  const recordCount = serverMode ? serverTotal : filtered.length
+  const basePages = serverMode
+    ? Math.max(1, Math.ceil(Math.max(serverTotal, 1) / activePageSize))
+    : Math.max(1, Math.ceil(filtered.length / pageSize))
+  const totalPages = serverMode && serverHasMore
+    ? Math.max(basePages, activePage + 1)
+    : basePages
+  const safePage = Math.min(activePage, totalPages)
 
   const handleSearch = (v) => {
-    setSearch(v)
-    setPage(1)
+    if (serverMode) {
+      onServerSearch?.(v)
+    } else {
+      setSearch(v)
+      setPage(1)
+    }
   }
 
   const handleFilter = (v) => {
-    setFilter(v)
-    setPage(1)
+    if (serverMode) {
+      onServerFilter?.(v)
+    } else {
+      setFilter(v)
+      setPage(1)
+    }
   }
 
   const handlePageSize = (size) => {
-    setPageSize(size)
-    setPage(1)
+    if (serverMode) {
+      onServerPageSizeChange?.(size)
+    } else {
+      setPageSize(size)
+      setPage(1)
+    }
+  }
+
+  const handlePageChange = (p) => {
+    if (serverMode) onServerPageChange?.(p)
+    else setPage(p)
   }
 
   const handleRefresh = () => {
-    setSearch('')
-    setFilter(filterOptions[0])
-    setPage(1)
-    toast({ title: 'List refreshed', message: `${filtered.length} records loaded`, type: 'info' })
+    if (!serverMode) {
+      setSearch('')
+      setFilter(filterOptions[0])
+      setPage(1)
+    }
+    onRefreshExternal?.()
+    toast({ title: 'List refreshed', message: `${recordCount} records loaded`, type: 'info' })
   }
 
   const handleExport = () => {
@@ -108,6 +162,25 @@ export default function ERPListPage({
     }
   }
 
+  const handlePrintList = () => {
+    if (!filtered.length) {
+      toast({ title: 'Nothing to print', message: 'No records match current filters', type: 'warning' })
+      return
+    }
+    print(
+      <TablePrintFormat
+        company={company}
+        documentTitle={title}
+        documentSubtitle={printSubtitle ?? `${module ?? 'Report'} · Printed ${formatPrintDate(new Date())}`}
+        columns={visibleColumns}
+        rows={filtered}
+        summary={`${filtered.length.toLocaleString('en-IN')} record(s)`}
+      />,
+    )
+  }
+
+  const handleRowPrint = onPrint ?? undefined
+
   const toggleColumn = (key) => {
     setHiddenColumns((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
@@ -115,7 +188,7 @@ export default function ERPListPage({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="erp-list-page">
       <ERPPageTitle module={module} title={title} />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-primary/20 bg-white shadow-sm dark:bg-slate-900">
@@ -125,11 +198,12 @@ export default function ERPListPage({
           </div>
         )}
 
+        <div className="shrink-0">
         <ERPListToolbar
           addLabel={addLabel}
           onAdd={onAdd}
           showAdd={showAdd}
-          searchValue={search}
+          searchValue={serverMode ? (externalSearch ?? '') : search}
           onSearchChange={handleSearch}
           searchPlaceholder={searchPlaceholder}
           filterValue={filter}
@@ -138,23 +212,38 @@ export default function ERPListPage({
           onRefresh={handleRefresh}
           onManageColumns={() => setColumnsOpen(true)}
           onExport={handleExport}
-          recordCount={filtered.length}
+          onImport={importTemplate ? () => setImportOpen(true) : undefined}
+          onPrint={printable ? handlePrintList : undefined}
+          recordCount={recordCount}
           extra={filterRow}
         />
+        </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-x border-primary/20">
+        {error && (
+          <div className="border-x border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden border-x border-primary/20">
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/70">
+              <span className="text-sm text-slate-500">Loading records…</span>
+            </div>
+          )}
           <ERPDataTable
             fill
             columns={visibleColumns}
             data={filtered}
-            page={safePage}
-            pageSize={pageSize}
+            page={serverMode ? 1 : safePage}
+            pageSize={serverMode ? filtered.length || activePageSize : pageSize}
             showSerial={showSerial}
             showActions={showActions}
             onRowClick={onRowClick}
-            onPrint={onPrint}
+            onPrint={handleRowPrint}
             onEdit={onEdit}
             onDelete={onDelete}
+            printTitle={rowPrintTitle}
             sortKey={sortKey}
             sortDir={defaultSortDir}
           />
@@ -163,9 +252,11 @@ export default function ERPListPage({
         <TablePagination
           page={safePage}
           totalPages={totalPages}
-          totalRecords={filtered.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
+          totalRecords={recordCount}
+          pageSize={activePageSize}
+          hasMore={serverMode && serverHasMore}
+          totalIsApproximate={totalIsApproximate}
+          onPageChange={handlePageChange}
           onPageSizeChange={handlePageSize}
         />
       </div>
@@ -196,6 +287,18 @@ export default function ERPListPage({
           ))}
         </div>
       </Modal>
+
+      {importTemplate && (
+        <ImportModal
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          template={importTemplate}
+          onComplete={() => {
+            onRefreshExternal?.()
+            toast({ title: 'Import finished', message: 'List refreshed with imported records', type: 'success' })
+          }}
+        />
+      )}
     </div>
   )
 }

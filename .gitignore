@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Environment & build cache
+.env
+.env.local
+.build-cache/
+publish/
+backend/**/bin/
+backend/**/obj/
+backend/.vs/
+**/*.user
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,0 +1,21 @@
+# TMS Pro API — build from repository root:
+#   docker build -f deploy/Dockerfile.api -t tms-api .
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY backend/Tms.Api/Tms.Api.csproj backend/Tms.Api/
+COPY database/ database/
+RUN dotnet restore backend/Tms.Api/Tms.Api.csproj
+COPY backend/Tms.Api/ backend/Tms.Api/
+RUN dotnet publish backend/Tms.Api/Tms.Api.csproj -c Release -o /app/publish /p:StopRunningApiBeforeBuild=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app/publish .
+ENV ASPNETCORE_URLS=http://0.0.0.0:5000
+ENV ASPNETCORE_ENVIRONMENT=Production
+EXPOSE 5000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:5000/api/health || exit 1
+ENTRYPOINT ["dotnet", "Tms.Api.dll"]

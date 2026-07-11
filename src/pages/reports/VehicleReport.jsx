@@ -4,18 +4,19 @@ import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import Badge, { statusVariant } from '../../components/ui/Badge'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { vehicles } from '../../data/vehicles'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
+import { reportsApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 
 export default function VehicleReport() {
   const navigate = useNavigate()
-  const data = vehicles.map((v) => ({
-    number: v.number,
-    type: v.type,
-    trips: v.trips,
-    revenue: v.revenue,
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search }) => reportsApi.vehicles(buildListParams({ page, pageSize, search })),
+    [],
+  )
+  const rows = paged.items.map((v) => ({
+    ...v,
     utilization: Math.round((v.trips / 150) * 100),
-    status: v.status,
   }))
 
   const columns = [
@@ -32,15 +33,28 @@ export default function VehicleReport() {
       onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Reports"
       title="Vehicle Report"
-      statusCards={registerStatusCards('Total Vehicles', data.length, 'blue', 'Truck')}
-showActions={false}
+      statusCards={registerStatusCards('Total Vehicles', paged.total, 'blue', 'Truck')}
+      showActions={false}
       searchPlaceholder="Vehicle no., type..."
       searchKeys={['number', 'type']}
       columns={columns}
-      data={data}
+      data={rows}
       sortKey="number"
       defaultSortDir="asc"
+      loading={paged.loading}
+      error={paged.error}
+      onRefreshExternal={paged.refresh}
       filterRow={<ReportFilterRow />}
+      serverMode
+      serverTotal={paged.total}
+      serverHasMore={paged.hasMore}
+      totalIsApproximate={paged.totalIsApproximate}
+      serverPage={paged.page}
+      onServerPageChange={paged.setPage}
+      serverPageSize={paged.pageSize}
+      onServerPageSizeChange={paged.setPageSize}
+      onServerSearch={paged.setSearch}
+      searchValue={paged.search}
     />
   )
 }

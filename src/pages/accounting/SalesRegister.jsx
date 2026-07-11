@@ -3,11 +3,13 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { salesRegister } from '../../data/accounting'
+import { useApiResource } from '../../hooks/useApiResource'
+import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 
 export default function SalesRegister() {
   const navigate = useNavigate()
+  const { data, loading, error, refresh } = useApiResource(() => accountingApi.salesRegister())
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'lrNo', label: 'LR No.' },
@@ -23,14 +25,17 @@ export default function SalesRegister() {
       onAdd={() => navigate(addRecordRoutes.lr)}
       module="Accounting"
       title="Sales Register"
-      statusCards={registerStatusCards('Total Sales', salesRegister.length, 'green', 'TrendingUp')}
-showActions={false}
-      searchPlaceholder="LR No., customer, route..."
+      statusCards={registerStatusCards('Total Sales', data.length, 'green', 'TrendingUp')}
+      showActions={false}
+      searchPlaceholder="LR no., customer..."
       searchKeys={['lrNo', 'customer', 'route']}
       columns={columns}
-      data={salesRegister}
+      data={data}
       sortKey="date"
-      filterRow={<ReportFilterRow />}
+      loading={loading}
+      error={error}
+      onRefreshExternal={refresh}
+      filterRow={<ReportFilterRow showCustomer />}
     />
   )
 }

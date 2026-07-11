@@ -44,6 +44,15 @@ export default function AlertsPanel({ limit = 4 } = {}) {
           )
         })}
       </div>
+      {alerts.some((a) => a.path?.startsWith('/maintenance')) && (
+        <button
+          type="button"
+          onClick={() => navigate('/maintenance')}
+          className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+        >
+          Open Predictive Maintenance →
+        </button>
+      )}
     </div>
   )
 }

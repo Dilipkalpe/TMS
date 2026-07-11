@@ -3,11 +3,13 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { cashBook } from '../../data/accounting'
+import { useApiResource } from '../../hooks/useApiResource'
+import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 
 export default function CashBook() {
   const navigate = useNavigate()
+  const { data, loading, error, refresh } = useApiResource(() => accountingApi.cashBook())
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'particular', label: 'Particular' },
@@ -21,13 +23,16 @@ export default function CashBook() {
       onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Cash Book"
-      statusCards={registerStatusCards('Total Entries', cashBook.length, 'green', 'Banknote')}
-showActions={false}
+      statusCards={registerStatusCards('Total Entries', data.length, 'green', 'Banknote')}
+      showActions={false}
       searchPlaceholder="Particular..."
       searchKeys={['particular']}
       columns={columns}
-      data={cashBook}
+      data={data}
       sortKey="date"
+      loading={loading}
+      error={error}
+      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow />}
     />
   )

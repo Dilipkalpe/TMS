@@ -1,0 +1,3 @@
+flowchart LR
+  A[Share link<br/>/portal/shared/:bookingId] --> B[GET /api/portal/public/track]
+  B --> C[Show booking status + timeline]

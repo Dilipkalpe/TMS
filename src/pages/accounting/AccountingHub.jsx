@@ -2,13 +2,17 @@ import { Link } from 'react-router-dom'
 import * as Icons from 'lucide-react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
-import { accountingCards } from '../../data/accountingHub'
+import { accountingCards } from '../../config/accountingHub'
+import { useSubscription } from '../../context/SubscriptionContext'
 
 export default function AccountingHub() {
+  const { canAccessPath } = useSubscription()
+  const cards = accountingCards.filter((item) => canAccessPath(item.path))
+
   return (
     <ERPContentPage module="Accounting" title="Accounting Hub">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {accountingCards.map((item) => {
+        {cards.map((item) => {
           const Icon = Icons[item.icon] || Icons.Calculator
           return (
             <Link key={item.path} to={item.path}>

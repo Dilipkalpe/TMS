@@ -5,6 +5,8 @@ import { useSidebar } from '../../context/SidebarContext'
 import { useAuth } from '../../context/AuthContext'
 import { usePageTitle } from '../../context/PageTitleContext'
 import NotificationPanel from './NotificationPanel'
+import BranchSelector from './BranchSelector'
+import CompanySelector from './CompanySelector'
 
 export default function Navbar() {
   const { theme, toggleTheme } = useTheme()
@@ -19,7 +21,7 @@ export default function Navbar() {
   }
 
   return (
-    <header className="app-header z-30 shrink-0 border-b border-primary/25 bg-gradient-to-r from-primary/15 via-primary/10 to-blue-50/80 shadow-sm dark:border-primary/30 dark:from-primary/25 dark:via-slate-900 dark:to-slate-900">
+    <header className="app-header z-30 shrink-0 border-b border-primary/20 bg-gradient-to-r from-primary/12 via-white to-accent/5 shadow-sm dark:border-primary/25 dark:from-primary/20 dark:via-slate-900 dark:to-slate-900">
       <div className="flex h-12 items-center justify-between px-3 sm:h-14 sm:px-4 lg:px-6">
         <div className="flex min-w-0 flex-1 items-center space-x-2 sm:space-x-3">
           <button
@@ -42,6 +44,12 @@ export default function Navbar() {
         </div>
 
         <div className="flex shrink-0 items-center space-x-1 sm:space-x-2">
+          {user?.isPlatformAdmin ? <CompanySelector /> : user?.companyName ? (
+            <span className="hidden max-w-[160px] truncate text-xs font-medium text-slate-600 dark:text-slate-300 lg:inline" title={user.companyName}>
+              {user.companyName}
+            </span>
+          ) : null}
+          <BranchSelector />
           <button
             onClick={toggleTheme}
             className="rounded-xl p-2.5 text-primary transition-all hover:bg-primary/10 dark:text-blue-200 dark:hover:bg-primary/20"

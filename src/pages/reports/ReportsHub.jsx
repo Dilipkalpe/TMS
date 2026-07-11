@@ -2,13 +2,17 @@ import { Link } from 'react-router-dom'
 import * as Icons from 'lucide-react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
-import { reportCards } from '../../data/reports'
+import { reportCards } from '../../config/reportsHub'
+import { useSubscription } from '../../context/SubscriptionContext'
 
 export default function ReportsHub() {
+  const { canAccessPath } = useSubscription()
+  const cards = reportCards.filter((report) => canAccessPath(report.path))
+
   return (
     <ERPContentPage module="Reports" title="Reports Hub">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {reportCards.map((report) => {
+        {cards.map((report) => {
           const Icon = Icons[report.icon] || Icons.FileText
           return (
             <Link key={report.path} to={report.path}>

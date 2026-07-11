@@ -49,7 +49,7 @@ function getMax(data, keys = ['value']) {
 }
 
 /* ─── BAR CHART ─── */
-function BarChart({ data, color = '#2563eb', gradientId = 'barGrad' }) {
+function BarChart({ data, color = '#1e5a8a', gradientId = 'barGrad' }) {
   const max = getMax(data)
   return (
     <div className="flex h-full min-h-[140px] items-end gap-1.5 px-1 sm:gap-2">
@@ -77,7 +77,7 @@ function BarChart({ data, color = '#2563eb', gradientId = 'barGrad' }) {
 }
 
 /* ─── LINE / AREA CHART ─── */
-function LineAreaChart({ data, dataKey = 'value', color = '#2563eb', fill = true }) {
+function LineAreaChart({ data, dataKey = 'value', color = '#1e5a8a', fill = true }) {
   const max = getMax(data, [dataKey])
   const w = 100
   const h = 60
@@ -134,13 +134,13 @@ function MultiLineChart({ data }) {
   return (
     <div>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-full min-h-[120px] w-full" preserveAspectRatio="none">
-        {mkLine('revenue', '#2563eb')}
+        {mkLine('revenue', '#1e5a8a')}
         {mkLine('expense', '#ef4444')}
         {mkLine('profit', '#10b981')}
       </svg>
       <div className="mt-2 flex flex-wrap justify-center gap-3 text-[10px]">
         {[
-          { label: 'Revenue', color: '#2563eb' },
+          { label: 'Revenue', color: '#1e5a8a' },
           { label: 'Expense', color: '#ef4444' },
           { label: 'Profit', color: '#10b981' },
         ].map((l) => (
@@ -243,9 +243,9 @@ function DonutPieChart({ data, donut = true }) {
 }
 
 /* ─── HORIZONTAL BAR ─── */
-function HorizontalBarChart({ data, color = '#2563eb' }) {
+function HorizontalBarChart({ data, color = '#1e5a8a' }) {
   const max = getMax(data, ['utilization', 'value'])
-  const colors = ['#2563eb', '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b']
+  const colors = ['#1e5a8a', '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b']
   return (
     <div className="flex min-h-[140px] flex-col justify-center gap-2.5">
       {data.map((d, i) => {
@@ -303,7 +303,7 @@ function StackedBarChart({ data }) {
 }
 
 /* ─── GAUGE ─── */
-function GaugeChart({ value = 78, label = 'Fleet Utilization', color = '#2563eb' }) {
+function GaugeChart({ value = 78, label = 'Fleet Utilization', color = '#1e5a8a' }) {
   const pct = Math.min(100, Math.max(0, value))
   const angle = (pct / 100) * 180
   return (
@@ -311,7 +311,7 @@ function GaugeChart({ value = 78, label = 'Fleet Utilization', color = '#2563eb'
       <svg viewBox="0 0 120 70" className="h-28 w-44">
         <defs>
           <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#2563eb" />
+            <stop offset="0%" stopColor="#1e5a8a" />
             <stop offset="100%" stopColor="#06b6d4" />
           </linearGradient>
         </defs>
@@ -353,7 +353,7 @@ function RadarChart({ data }) {
     <div className="flex min-h-[140px] items-center justify-center">
       <svg viewBox="0 0 100 100" className="h-36 w-36">
         <polygon points={gridPts} fill="none" stroke="#e2e8f0" strokeWidth="0.5" className="dark:stroke-slate-700" />
-        <polygon points={pts} fill="rgba(37,99,235,0.2)" stroke="#2563eb" strokeWidth="1.5" />
+        <polygon points={pts} fill="rgba(30,90,138,0.2)" stroke="#1e5a8a" strokeWidth="1.5" />
         {data.map((d, i) => {
           const angle = (Math.PI * 2 * i) / n - Math.PI / 2
           const lx = cx + Math.cos(angle) * (r + 8)
@@ -376,7 +376,7 @@ export default function AnalyticsChart({
   data = [],
   badge,
   badgePositive = true,
-  color = '#2563eb',
+  color = '#1e5a8a',
   gaugeValue,
   className = '',
 }) {

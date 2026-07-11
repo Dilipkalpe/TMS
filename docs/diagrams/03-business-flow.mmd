@@ -1,0 +1,26 @@
+flowchart TB
+    subgraph Setup["Phase 1 — Master Data"]
+        S1[Company Settings]
+        S2[Customers & Vendors]
+        S3[Vehicles & Drivers]
+        S4[Ledger Accounts]
+        S1 --> S2 --> S3 --> S4
+    end
+    subgraph Ops["Phase 2 — Operations"]
+        B[Create Booking]
+        LR[Generate LR]
+        T[Trip Execution]
+        E[Record Expenses]
+        B --> LR --> T --> E
+    end
+    subgraph Fin["Phase 3 — Finance"]
+        R[Receipt Voucher]
+        P[Payment Voucher]
+        REP[Reports & Statements]
+        R --> REP
+        P --> REP
+    end
+    Setup --> Ops
+    Ops --> Fin
+    B -.->|freight| R
+    E -.->|vendor bills| P

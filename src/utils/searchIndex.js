@@ -1,86 +1,47 @@
-import { bookings } from '../data/bookings'
-import { lrList } from '../data/lr'
-import { vehicles } from '../data/vehicles'
-import { drivers } from '../data/drivers'
-import { customers } from '../data/customers'
-import { vendors } from '../data/vendors'
+import { bookingsApi, vehiclesApi, hrApi, customersApi, vendorsApi, lrApi } from '../services/api'
 
-function buildIndex() {
+let cachedIndex = null
+let cachePromise = null
+
+async function firstPage(api, pageSize = 25) {
+  const res = await api.list({ page: 1, pageSize }).catch(() => ({ items: [] }))
+  return Array.isArray(res) ? res : (res?.items ?? [])
+}
+
+async function buildIndex() {
+  const [bookings, vehicles, employees, customers, vendors, lrs] = await Promise.all([
+    firstPage(bookingsApi),
+    firstPage(vehiclesApi),
+    firstPage(hrApi.employees),
+    firstPage(customersApi),
+    firstPage(vendorsApi),
+    firstPage(lrApi),
+  ])
+
   const items = []
-
-  bookings.forEach((b) => {
-    items.push({
-      id: b.id,
-      type: 'Booking',
-      title: b.id,
-      subtitle: `${b.customer} · ${b.from} → ${b.to}`,
-      path: `/bookings/${b.id}`,
-      keywords: [b.id, b.customer, b.from, b.to, b.vehicle, b.driver, b.status].join(' ').toLowerCase(),
-    })
-  })
-
-  lrList.forEach((l) => {
-    items.push({
-      id: l.lrNumber,
-      type: 'LR',
-      title: l.lrNumber,
-      subtitle: `${l.from} → ${l.to} · ${l.vehicle}`,
-      path: '/lr',
-      keywords: [l.lrNumber, l.consignor, l.consignee, l.vehicle, l.driver].join(' ').toLowerCase(),
-    })
-  })
-
-  vehicles.forEach((v) => {
-    items.push({
-      id: v.id,
-      type: 'Vehicle',
-      title: v.number,
-      subtitle: `${v.type} · ${v.status}`,
-      path: `/vehicles/${v.id}`,
-      keywords: [v.id, v.number, v.type, v.model, v.status].join(' ').toLowerCase(),
-    })
-  })
-
-  drivers.forEach((d) => {
-    items.push({
-      id: d.id,
-      type: 'Driver',
-      title: d.name,
-      subtitle: `${d.phone} · ${d.status}`,
-      path: `/drivers/${d.id}`,
-      keywords: [d.id, d.name, d.phone, d.license, d.status].join(' ').toLowerCase(),
-    })
-  })
-
-  customers.forEach((c) => {
-    items.push({
-      id: c.id,
-      type: 'Customer',
-      title: c.name,
-      subtitle: c.address ?? '',
-      path: `/customers/${c.id}`,
-      keywords: [c.id, c.name, c.gst, c.phone, c.address].join(' ').toLowerCase(),
-    })
-  })
-
-  vendors.forEach((v) => {
-    items.push({
-      id: v.id,
-      type: 'Vendor',
-      title: v.name,
-      subtitle: v.category ?? '',
-      path: `/vendors/${v.id}`,
-      keywords: [v.id, v.name, v.category, v.phone].join(' ').toLowerCase(),
-    })
-  })
-
+  bookings.forEach((b) => items.push({ id: b.id, label: b.id, sub: b.customer, path: `/bookings/${b.id}`, keywords: `${b.id} ${b.customer} ${b.from} ${b.to}`.toLowerCase() }))
+  lrs.forEach((l) => items.push({ id: l.lrNumber, label: l.lrNumber, sub: `${l.from} → ${l.to}`, path: '/lr', keywords: `${l.lrNumber} ${l.consignor} ${l.consignee}`.toLowerCase() }))
+  vehicles.forEach((v) => items.push({ id: v.id, label: v.number, sub: v.type, path: `/vehicles/${v.id}`, keywords: `${v.number} ${v.type}`.toLowerCase() }))
+  employees.forEach((e) => items.push({ id: e.id, label: e.name, sub: e.employeeType, path: `/hr/employees/${e.id}`, keywords: `${e.name} ${e.employeeCode} ${e.employeeType}`.toLowerCase() }))
+  customers.forEach((c) => items.push({ id: c.id, label: c.name, sub: c.contact, path: `/customers/${c.id}`, keywords: `${c.name} ${c.contact}`.toLowerCase() }))
+  vendors.forEach((v) => items.push({ id: v.id, label: v.name, sub: v.category, path: `/vendors/${v.id}`, keywords: `${v.name} ${v.category}`.toLowerCase() }))
   return items
 }
 
-export const searchIndex = buildIndex()
+export async function ensureSearchIndex() {
+  if (cachedIndex) return cachedIndex
+  if (!cachePromise) cachePromise = buildIndex().then((idx) => { cachedIndex = idx; return idx })
+  return cachePromise
+}
 
-export function searchAll(query, limit = 8) {
+export async function searchAll(query, limit = 8) {
+  const index = await ensureSearchIndex()
   const q = query.trim().toLowerCase()
-  if (!q || q.length < 2) return []
-  return searchIndex.filter((item) => item.keywords.includes(q)).slice(0, limit)
+  if (!q) return []
+  return index.filter((item) => item.keywords.includes(q)).slice(0, limit)
+}
+
+export function invalidateSearchIndex() {
+  cachedIndex = null
+  cachePromise = null
 }

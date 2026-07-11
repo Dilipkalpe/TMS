@@ -8,15 +8,11 @@ import Badge, { statusVariant } from '../components/ui/Badge'
 import AnalyticsFilterBar from '../components/dashboard/AnalyticsFilterBar'
 import WidgetPickerModal from '../components/dashboard/WidgetPickerModal'
 import AlertsPanel from '../components/dashboard/AlertsPanel'
-import { useDashboardMetrics, DEFAULT_WIDGET_IDS } from '../hooks/useDashboardMetrics'
+import { useDashboardMetrics, useDashboardRecent, DEFAULT_WIDGET_IDS } from '../hooks/useDashboardMetrics'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useToast } from '../context/ToastContext'
 import { exportJson } from '../utils/export'
-import {
-  dashboardStats,
-  recentBookings,
-  recentTrips,
-} from '../data/dashboard'
+import { TMS_COLORS } from '../config/theme'
 
 const colorMap = {
   indigo: 'violet',
@@ -51,8 +47,9 @@ export default function Dashboard() {
   const { toast } = useToast()
 
   const metrics = useDashboardMetrics({ period, compare, refreshSeed })
+  const { bookings: recentBookings, trips: recentTrips } = useDashboardRecent(refreshSeed)
 
-  const overviewCards = dashboardStats.map((stat) => ({
+  const overviewCards = metrics.statsCards.map((stat) => ({
     label: stat.label,
     count: stat.value,
     color: colorMap[stat.color] || stat.color,
@@ -85,7 +82,7 @@ export default function Dashboard() {
         subtitle: `₹ Lakhs · ${metrics.periodLabel}${compareSuffix}`,
         type: 'bar',
         data: metrics.revSlice,
-        color: '#2563eb',
+        color: TMS_COLORS.primary,
         badge: metrics.revChange.text,
         badgePositive: metrics.revChange.positive,
       },
@@ -128,14 +125,13 @@ export default function Dashboard() {
     ...chartConfigs[w.id],
   }))
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     setLoading(true)
-    setTimeout(() => {
-      setRefreshSeed((s) => s + 1)
-      setLoading(false)
-      toast({ title: 'Dashboard refreshed', message: 'Analytics data updated', type: 'success' })
-    }, 800)
-  }, [toast])
+    await metrics.refresh()
+    setRefreshSeed((s) => s + 1)
+    setLoading(false)
+    toast({ title: 'Dashboard refreshed', message: 'Analytics data updated', type: 'success' })
+  }, [toast, metrics])
 
   const handleExport = useCallback(() => {
     exportJson(
@@ -166,7 +162,7 @@ export default function Dashboard() {
       id: 'overview',
       label: 'Overview',
       content: (
-        <div className="overflow-auto p-2 sm:p-3">
+        <div className="p-2 sm:p-3">
           <AlertsPanel limit={4} />
           <StatusSummaryCards cards={overviewCards} />
         </div>
@@ -176,7 +172,7 @@ export default function Dashboard() {
       id: 'analytics',
       label: 'Analytics',
       content: (
-        <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-3">
+        <div className="p-2 sm:p-3">
           <AnalyticsFilterBar
             period={period}
             onPeriodChange={setPeriod}
@@ -185,7 +181,7 @@ export default function Dashboard() {
             onRefresh={handleRefresh}
             onExport={handleExport}
             onCustomize={() => setWidgetOpen(true)}
-            loading={loading}
+            loading={loading || metrics.loading}
             periodLabel={metrics.periodLabel}
           />
           <div className="grid grid-cols-1 space-y-3 sm:grid-cols-2 sm:space-y-0 xl:grid-cols-3 2xl:grid-cols-4 [&>*]:mb-3">
@@ -205,8 +201,8 @@ export default function Dashboard() {
       id: 'bookings',
       label: 'Recent Bookings',
       content: (
-        <div className="flex h-full min-h-[280px] flex-col p-2 sm:p-3">
-          <ERPDataTable fill columns={bookingColumns} data={recentBookings} showActions={false} />
+        <div className="p-2 sm:p-3">
+          <ERPDataTable columns={bookingColumns} data={recentBookings} showActions={false} />
         </div>
       ),
     },
@@ -214,18 +210,18 @@ export default function Dashboard() {
       id: 'trips',
       label: 'Recent Trips',
       content: (
-        <div className="flex h-full min-h-[280px] flex-col p-2 sm:p-3">
-          <ERPDataTable fill columns={tripColumns} data={recentTrips} showActions={false} />
+        <div className="p-2 sm:p-3">
+          <ERPDataTable columns={tripColumns} data={recentTrips} showActions={false} />
         </div>
       ),
     },
   ]
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="flex min-h-full flex-col">
       <ERPPageTitle module="Dashboard" title="Overview" />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-primary/20 bg-white shadow-sm dark:bg-slate-900">
-        <Tabs fill tabs={tabs} defaultTab="overview" />
+      <div className="flex flex-col rounded-lg border border-primary/20 bg-white shadow-sm dark:bg-slate-900">
+        <Tabs tabs={tabs} defaultTab="overview" />
       </div>
       <WidgetPickerModal
         open={widgetOpen}

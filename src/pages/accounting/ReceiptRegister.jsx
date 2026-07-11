@@ -3,11 +3,13 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { receiptRegister } from '../../data/accounting'
+import { useApiResource } from '../../hooks/useApiResource'
+import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 
 export default function ReceiptRegister() {
   const navigate = useNavigate()
+  const { data, loading, error, refresh } = useApiResource(() => accountingApi.receiptRegister())
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'voucherNo', label: 'Voucher No.' },
@@ -22,13 +24,16 @@ export default function ReceiptRegister() {
       onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Receipt Register"
-      statusCards={registerStatusCards('Total Receipts', receiptRegister.length, 'green', 'ArrowDownLeft')}
-showActions={false}
-      searchPlaceholder="Voucher No., party..."
-      searchKeys={['voucherNo', 'party', 'narration']}
+      statusCards={registerStatusCards('Total Receipts', data.length, 'green', 'ArrowDownLeft')}
+      showActions={false}
+      searchPlaceholder="Party, voucher no..."
+      searchKeys={['party', 'voucherNo', 'narration']}
       columns={columns}
-      data={receiptRegister}
+      data={data}
       sortKey="date"
+      loading={loading}
+      error={error}
+      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow />}
     />
   )

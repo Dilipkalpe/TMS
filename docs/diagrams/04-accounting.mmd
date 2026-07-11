@@ -1,0 +1,25 @@
+flowchart TB
+    VE[Voucher Entry]
+    VE --> PV[Payment Voucher]
+    VE --> RV[Receipt Voucher]
+    VE --> JV[Journal Voucher]
+    VE --> CV[Contra Voucher]
+    PV --> DB[Day Book]
+    RV --> DB
+    JV --> DB
+    CV --> DB
+    DB --> CB[Cash Book]
+    DB --> BB[Bank Book]
+    DB --> JR[Journal Register]
+    DB --> PR[Payment Register]
+    DB --> RR[Receipt Register]
+    LR2[LR / Sales] --> SR[Sales Register]
+    EX[Expenses] --> PUR[Purchase Register]
+    CB --> TB[Trial Balance]
+    BB --> TB
+    SR --> TB
+    PUR --> TB
+    TB --> PL[Profit & Loss]
+    TB --> BS[Balance Sheet]
+    TB --> GST[GST Reports]
+    TB --> OUT[Outstanding Report]

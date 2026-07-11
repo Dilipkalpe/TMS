@@ -1,0 +1,24 @@
+flowchart TB
+  subgraph Users
+    SA[Super Admin]
+    BM[Branch Manager]
+    ACC[Accountant]
+    OPS[Operations Manager]
+    CUST[Customer]
+  end
+
+  subgraph Apps
+    WEB[TMSWebApp — Staff UI<br/>/TMSWebApp/]
+    API[TMSAPI — .NET 8 API<br/>/TMSAPI/api]
+    PORTAL[Customer Portal<br/>/TMSWebApp/portal]
+  end
+
+  subgraph Data
+    PG[(PostgreSQL tms_pro)]
+  end
+
+  SA & BM & ACC & OPS --> WEB
+  CUST --> PORTAL
+  WEB --> API
+  PORTAL --> API
+  API --> PG

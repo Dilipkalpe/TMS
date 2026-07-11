@@ -1,13 +1,19 @@
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useState } from 'react'
 import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { ledgerTransactions } from '../../data/accounting'
-import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { useApiResource } from '../../hooks/useApiResource'
+import { accountingApi } from '../../services/api'
+import { defaultReportFilters, toReportQuery } from '../../utils/reportQuery'
 
 export default function LedgerReport() {
-  const navigate = useNavigate()
+  const [filters, setFilters] = useState(defaultReportFilters)
+  const [query, setQuery] = useState(() => toReportQuery(defaultReportFilters()))
+
+  const load = useCallback(() => accountingApi.ledgerReport(query), [query])
+  const { data, loading, error, refresh } = useApiResource(load, [query])
+
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'voucherNo', label: 'Voucher No.' },
@@ -19,17 +25,25 @@ export default function LedgerReport() {
 
   return (
     <ERPListPage
-      onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Ledger Report"
-      statusCards={registerStatusCards('Total Transactions', ledgerTransactions.length, 'blue', 'BookOpen')}
-showActions={false}
-      searchPlaceholder="Voucher No., particular..."
-      searchKeys={['voucherNo', 'particular']}
+      statusCards={registerStatusCards('Total Entries', data.length, 'blue', 'BookOpen')}
+      showActions={false}
+      searchPlaceholder="Particular, voucher no..."
+      searchKeys={['particular', 'voucherNo']}
       columns={columns}
-      data={ledgerTransactions}
+      data={data}
       sortKey="date"
-      filterRow={<ReportFilterRow showLedger showCustomer showVendor />}
+      loading={loading}
+      error={error}
+      onRefreshExternal={refresh}
+      filterRow={(
+        <ReportFilterRow
+          value={filters}
+          onChange={setFilters}
+          onApply={() => setQuery(toReportQuery(filters))}
+        />
+      )}
     />
   )
 }

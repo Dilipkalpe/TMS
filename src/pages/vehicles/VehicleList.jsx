@@ -1,13 +1,21 @@
 import { useNavigate } from 'react-router-dom'
 import ERPListPage from '../../components/ui/ERPListPage'
 import Badge, { statusVariant } from '../../components/ui/Badge'
-import { vehicles } from '../../data/vehicles'
-import { vehicleStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
+import { vehiclesApi } from '../../services/api'
+import { useToast } from '../../context/ToastContext'
+import { importTemplates } from '../../config/importTemplates'
 
 export default function VehicleList() {
   const navigate = useNavigate()
+  const { toast } = useToast()
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search, filter }) =>
+      vehiclesApi.list(buildListParams({ page, pageSize, search, filter, filterKey: 'status' })),
+    [],
+  )
 
   const columns = [
     { key: 'number', label: 'Vehicle No.' },
@@ -24,17 +32,36 @@ export default function VehicleList() {
       onAdd={() => navigate(addRecordRoutes.vehicles)}
       module="Vehicles"
       title="Vehicle Management"
-      statusCards={vehicleStatusCards(vehicles)}
-      
+      statusCards={[{ label: 'Total Fleet', color: 'blue', icon: 'Layers', count: paged.total }]}
       searchPlaceholder="Vehicle no., type, model..."
-      searchKeys={['number', 'type', 'model']}
-      filterOptions={['(All)', 'Active', 'Maintenance', 'On Leave']}
+      filterOptions={['(All)', 'Active', 'Maintenance']}
       filterKey="status"
       columns={columns}
-      data={vehicles}
+      data={paged.items}
+      loading={paged.loading}
+      error={paged.error}
+      onRefreshExternal={paged.refresh}
       sortKey="number"
       onRowClick={(r) => navigate(`/vehicles/${r.id}`)}
       onEdit={(r) => navigate(`/vehicles/${r.id}`)}
+      onDelete={async (r) => {
+        if (!window.confirm(`Delete vehicle ${r.number}?`)) return
+        try { await vehiclesApi.remove(r.id); toast({ title: 'Deleted', type: 'success' }); paged.refresh() }
+        catch (err) { toast({ title: 'Delete failed', message: err.message, type: 'error' }) }
+      }}
+      exportFilename="vehicles-export.csv"
+      importTemplate={importTemplates.vehicles}
+      serverMode
+      serverTotal={paged.total}
+      serverHasMore={paged.hasMore}
+      totalIsApproximate={paged.totalIsApproximate}
+      serverPage={paged.page}
+      onServerPageChange={paged.setPage}
+      serverPageSize={paged.pageSize}
+      onServerPageSizeChange={paged.setPageSize}
+      onServerSearch={paged.setSearch}
+      onServerFilter={paged.setFilter}
+      searchValue={paged.search}
     />
   )
 }

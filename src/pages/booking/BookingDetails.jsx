@@ -3,14 +3,34 @@ import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Badge, { statusVariant } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import { bookings } from '../../data/bookings'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { ArrowLeft, FileText, Printer } from 'lucide-react'
+import { useApiItem } from '../../hooks/useApiResource'
+import { bookingsApi } from '../../services/api'
+import BookingFinancePanel from '../../components/booking/BookingFinancePanel'
+import { ArrowLeft, FileText, Pencil } from 'lucide-react'
+import PrintButton from '../../components/print/PrintButton'
 
 export default function BookingDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const booking = bookings.find((b) => b.id === id) || bookings[0]
+  const { item: booking, loading, error, setItem } = useApiItem(bookingsApi.get, id)
+
+  if (loading) {
+    return (
+      <ERPContentPage module="Booking" title="Loading…">
+        <p className="text-sm text-slate-500">Loading booking details…</p>
+      </ERPContentPage>
+    )
+  }
+
+  if (error || !booking) {
+    return (
+      <ERPContentPage module="Booking" title="Not found">
+        <p className="text-sm text-red-600">{error || 'Booking not found.'}</p>
+        <Button className="mt-4" variant="outline" onClick={() => navigate('/bookings')}>Back to list</Button>
+      </ERPContentPage>
+    )
+  }
 
   const fields = [
     { label: 'Booking ID', value: booking.id },
@@ -38,8 +58,14 @@ export default function BookingDetails() {
           <div className="flex flex-wrap gap-2">
             <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
             <Badge variant={statusVariant(booking.payment)}>Payment: {booking.payment}</Badge>
-            <Button variant="outline" icon={FileText} onClick={() => navigate('/lr/generate')}>Generate LR</Button>
-            <Button icon={Printer}>Print</Button>
+            <Button variant="outline" icon={Pencil} onClick={() => navigate(`/bookings/${booking.id}/edit`)}>Edit</Button>
+            <Button variant="outline" icon={FileText} onClick={() => navigate(`/lr/generate?bookingId=${encodeURIComponent(booking.id)}`)}>Generate LR</Button>
+            <PrintButton
+              title="Booking Confirmation"
+              subtitle={`Booking ${booking.id}`}
+              badges={[`Status: ${booking.status}`, `Payment: ${booking.payment}`]}
+              fields={fields}
+            />
           </div>
         </div>
       }
@@ -50,11 +76,15 @@ export default function BookingDetails() {
           {fields.map((f) => (
             <div key={f.label}>
               <p className="text-xs font-medium uppercase text-slate-500">{f.label}</p>
-              <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">{f.value}</p>
+              <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">{f.value ?? '—'}</p>
             </div>
           ))}
         </div>
       </Card>
+
+      <div className="mt-4">
+        <BookingFinancePanel bookingId={booking.id} booking={booking} onBookingChange={setItem} />
+      </div>
     </ERPContentPage>
   )
 }

@@ -4,14 +4,17 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import ERPDataTable from '../../components/ui/ERPDataTable'
 import Tabs from '../../components/ui/Tabs'
-import { customers, customerLedger } from '../../data/customers'
 import { formatCurrency } from '../../components/ui/ReportFilters'
+import { useApiItem, useApiResource } from '../../hooks/useApiResource'
+import { customersApi, accountingApi } from '../../services/api'
 import { ArrowLeft } from 'lucide-react'
+import PrintButton from '../../components/print/PrintButton'
 
 export default function CustomerDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const customer = customers.find((c) => c.id === id) || customers[0]
+  const { item: customer, loading, error } = useApiItem(customersApi.get, id, [id])
+  const { data: ledger } = useApiResource(() => accountingApi.customerLedger(id), [id])
 
   const ledgerColumns = [
     { key: 'date', label: 'Date' },
@@ -20,6 +23,35 @@ export default function CustomerDetails() {
     { key: 'debit', label: 'Debit', render: (r) => (r.debit ? formatCurrency(r.debit) : '-') },
     { key: 'credit', label: 'Credit', render: (r) => (r.credit ? formatCurrency(r.credit) : '-') },
     { key: 'balance', label: 'Balance', render: (r) => formatCurrency(r.balance) },
+  ]
+
+  if (loading) {
+    return (
+      <ERPContentPage module="Customers" title="Customer Details">
+        <p className="text-sm text-slate-500">Loading…</p>
+      </ERPContentPage>
+    )
+  }
+
+  if (error || !customer) {
+    return (
+      <ERPContentPage module="Customers" title="Customer Details">
+        <p className="text-sm text-red-500">{error || 'Customer not found'}</p>
+        <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/customers')}>Back</Button>
+      </ERPContentPage>
+    )
+  }
+
+  const printFields = [
+    { label: 'Customer Name', value: customer.name },
+    { label: 'Contact Person', value: customer.contact },
+    { label: 'Phone', value: customer.phone },
+    { label: 'Email', value: customer.email },
+    { label: 'GST', value: customer.gst },
+    { label: 'Address', value: customer.address },
+    { label: 'Credit Limit', value: formatCurrency(customer.creditLimit) },
+    { label: 'Outstanding', value: formatCurrency(customer.outstanding) },
+    { label: 'Total Trips', value: customer.totalTrips },
   ]
 
   const tabs = [
@@ -47,7 +79,7 @@ export default function CustomerDetails() {
     {
       id: 'ledger',
       label: 'Ledger',
-      content: <ERPDataTable fill columns={ledgerColumns} data={customerLedger} showActions={false} />,
+      content: <ERPDataTable columns={ledgerColumns} data={ledger} showActions={false} />,
     },
     {
       id: 'outstanding',
@@ -68,12 +100,15 @@ export default function CustomerDetails() {
       toolbar={
         <div className="flex items-center justify-between gap-2">
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/customers')}>Back</Button>
-          <span className="text-sm text-slate-500">{customer.totalTrips} trips completed</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500">{customer.totalTrips} trips completed</span>
+            <PrintButton title="Customer Profile" subtitle={customer.name} fields={printFields} />
+          </div>
         </div>
       }
     >
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden !p-2.5 sm:!p-3">
-        <Tabs fill tabs={tabs} />
+      <Card className="!p-2.5 sm:!p-3">
+        <Tabs tabs={tabs} />
       </Card>
     </ERPContentPage>
   )

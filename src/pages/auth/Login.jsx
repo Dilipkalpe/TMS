@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   ArrowRight,
   Eye,
@@ -19,8 +19,8 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
-  const [username, setUsername] = useState('admin')
-  const [password, setPassword] = useState('admin123')
+  const [username, setUsername] = useState(import.meta.env.PROD ? '' : 'admin')
+  const [password, setPassword] = useState(import.meta.env.PROD ? '' : 'admin123')
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
@@ -28,16 +28,14 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      const result = login(username, password)
-      setLoading(false)
-      if (result.ok) navigate(from, { replace: true })
-      else setError(result.error)
-    }, 500)
+    const result = await login(username, password)
+    setLoading(false)
+    if (result.ok) navigate(from, { replace: true })
+    else setError(result.error)
   }
 
   return (
@@ -47,12 +45,12 @@ export default function Login() {
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-4 py-4 sm:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/30">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark shadow-lg shadow-primary/30 ring-2 ring-accent/30">
             <Truck className="h-6 w-6 text-white" />
           </div>
           <div>
             <p className="text-lg font-bold text-slate-800 dark:text-white">TMS Pro</p>
-            <p className="text-xs font-medium text-primary">Transport & Logistics ERP</p>
+            <p className="text-xs font-medium text-primary">Transport · Freight · Fleet ERP</p>
           </div>
         </div>
         <div className="hidden items-center gap-6 text-sm text-slate-600 dark:text-slate-400 md:flex">
@@ -72,7 +70,7 @@ export default function Login() {
         <div className="w-full max-w-[420px] animate-fade-in">
           <div className="overflow-hidden rounded-2xl border border-white/60 bg-white/85 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-900/90">
             {/* Card accent strip */}
-            <div className="h-1.5 bg-gradient-to-r from-primary via-blue-400 to-cyan-400" />
+            <div className="h-1.5 bg-gradient-to-r from-primary via-accent to-primary" />
 
             <div className="p-6 sm:p-8">
               <div className="mb-6 text-center">
@@ -187,6 +185,8 @@ export default function Login() {
 
       <footer className="relative z-10 px-4 py-4 text-center text-xs text-slate-500 dark:text-slate-500">
         © 2026 TMS Pro · Enterprise Transport Management · India
+        {' · '}
+        <Link to="/portal/login" className="text-primary hover:underline">Customer portal</Link>
       </footer>
     </div>
   )

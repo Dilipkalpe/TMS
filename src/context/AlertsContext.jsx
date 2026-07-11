@@ -1,98 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { bookings } from '../data/bookings'
-import { vehicles } from '../data/vehicles'
-import { lrList } from '../data/lr'
-import { customers } from '../data/customers'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { dashboardApi, getToken } from '../services/api'
+import { useAuth } from './AuthContext'
 
 const AlertsContext = createContext(null)
 const DISMISS_KEY = 'tms-dismissed-alerts'
 
-function buildAlerts() {
-  const alerts = []
-  const now = new Date('2026-06-18')
-
-  bookings
-    .filter((b) => b.payment === 'Unpaid')
-    .forEach((b) => {
-      alerts.push({
-        id: `unpaid-${b.id}`,
-        type: 'warning',
-        title: `Unpaid booking ${b.id}`,
-        message: `${b.customer} · ₹${b.balance?.toLocaleString('en-IN')} pending`,
-        path: '/bookings',
-        time: b.date,
-      })
-    })
-
-  bookings
-    .filter((b) => b.status === 'Pending')
-    .forEach((b) => {
-      alerts.push({
-        id: `pending-${b.id}`,
-        type: 'info',
-        title: `Pending booking ${b.id}`,
-        message: `${b.from} → ${b.to} awaiting confirmation`,
-        path: '/bookings',
-        time: b.date,
-      })
-    })
-
-  vehicles
-    .filter((v) => v.status === 'Maintenance')
-    .forEach((v) => {
-      alerts.push({
-        id: `maint-${v.id}`,
-        type: 'error',
-        title: 'Vehicle in maintenance',
-        message: `${v.number} is unavailable for trips`,
-        path: `/vehicles/${v.id}`,
-        time: v.lastMaintenance,
-      })
-    })
-
-  vehicles.forEach((v) => {
-    const ins = new Date(v.insurance)
-    const days = Math.ceil((ins - now) / (1000 * 60 * 60 * 24))
-    if (days > 0 && days <= 60) {
-      alerts.push({
-        id: `ins-${v.id}`,
-        type: 'warning',
-        title: 'Insurance expiring soon',
-        message: `${v.number} expires in ${days} days`,
-        path: `/vehicles/${v.id}`,
-        time: v.insurance,
-      })
-    }
-  })
-
-  customers
-    .filter((c) => c.outstanding > 50000)
-    .forEach((c) => {
-      alerts.push({
-        id: `out-${c.id}`,
-        type: 'warning',
-        title: 'High receivable',
-        message: `${c.name} · ₹${c.outstanding.toLocaleString('en-IN')}`,
-        path: `/customers/${c.id}`,
-        time: '2026-06-18',
-      })
-    })
-
-  if (lrList.length < bookings.filter((b) => b.status !== 'Cancelled').length) {
-    alerts.push({
-      id: 'lr-pending',
-      type: 'info',
-      title: 'LR generation pending',
-      message: `${bookings.length - lrList.length} booking(s) without LR`,
-      path: '/lr',
-      time: '2026-06-18',
-    })
-  }
-
-  return alerts.sort((a, b) => (b.time > a.time ? 1 : -1))
-}
-
 export function AlertsProvider({ children } = {}) {
+  const { isAuthenticated, booting } = useAuth()
+  const [allAlerts, setAllAlerts] = useState([])
   const [dismissed, setDismissed] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? '[]')
@@ -101,7 +16,16 @@ export function AlertsProvider({ children } = {}) {
     }
   })
 
-  const allAlerts = useMemo(() => buildAlerts(), [])
+  useEffect(() => {
+    if (booting || !isAuthenticated || !getToken()) {
+      if (!isAuthenticated) setAllAlerts([])
+      return
+    }
+    dashboardApi.alerts()
+      .then((alerts) => setAllAlerts(Array.isArray(alerts) ? alerts : []))
+      .catch(() => setAllAlerts([]))
+  }, [booting, isAuthenticated])
+
   const alerts = useMemo(() => allAlerts.filter((a) => !dismissed.includes(a.id)), [allAlerts, dismissed])
   const unreadCount = alerts.length
 
@@ -132,10 +56,7 @@ export function AlertsProvider({ children } = {}) {
 export function useAlerts() {
   const ctx = useContext(AlertsContext)
   if (!ctx) {
-    const fallback = buildAlerts()
-    return { alerts: fallback, allAlerts: fallback, unreadCount: fallback.length, dismissAlert: () => {}, dismissAll: () => {} }
+    return { alerts: [], allAlerts: [], unreadCount: 0, dismissAlert: () => {}, dismissAll: () => {} }
   }
   return ctx
 }
-
-export { buildAlerts }

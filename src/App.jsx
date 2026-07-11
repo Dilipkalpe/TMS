@@ -1,84 +1,98 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense } from 'react'
+import { Navigate, Routes, Route } from 'react-router-dom'
 import MainLayout from './components/layout/MainLayout'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import TenantGuard from './components/auth/TenantGuard'
 import LoginRoute from './components/auth/LoginRoute'
-import Dashboard from './pages/Dashboard'
-import BookingList from './pages/booking/BookingList'
-import NewBooking from './pages/booking/NewBooking'
-import BookingDetails from './pages/booking/BookingDetails'
-import GenerateLR from './pages/lr/GenerateLR'
-import LRList from './pages/lr/LRList'
-import VehicleList from './pages/vehicles/VehicleList'
-import VehicleDetails from './pages/vehicles/VehicleDetails'
-import NewVehicle from './pages/vehicles/NewVehicle'
-import DriverList from './pages/drivers/DriverList'
-import DriverDetails from './pages/drivers/DriverDetails'
-import NewDriver from './pages/drivers/NewDriver'
-import CustomerList from './pages/customers/CustomerList'
-import CustomerDetails from './pages/customers/CustomerDetails'
-import NewCustomer from './pages/customers/NewCustomer'
-import VendorList from './pages/vendors/VendorList'
-import VendorDetails from './pages/vendors/VendorDetails'
-import NewVendor from './pages/vendors/NewVendor'
-import ExpenseList from './pages/expenses/ExpenseList'
-import NewExpense from './pages/expenses/NewExpense'
-import AccountingHub from './pages/accounting/AccountingHub'
-import ChartOfAccounts from './pages/accounting/ChartOfAccounts'
-import LedgerMaster from './pages/accounting/LedgerMaster'
-import NewLedger from './pages/accounting/NewLedger'
-import VoucherEntry from './pages/accounting/VoucherEntry'
-import LedgerReport from './pages/accounting/LedgerReport'
-import CustomerLedgerReport from './pages/accounting/CustomerLedgerReport'
-import VendorLedgerReport from './pages/accounting/VendorLedgerReport'
-import DriverLedgerReport from './pages/accounting/DriverLedgerReport'
-import VehicleLedgerReport from './pages/accounting/VehicleLedgerReport'
-import CashBook from './pages/accounting/CashBook'
-import BankBook from './pages/accounting/BankBook'
-import DayBook from './pages/accounting/DayBook'
-import JournalRegister from './pages/accounting/JournalRegister'
-import ReceiptRegister from './pages/accounting/ReceiptRegister'
-import PaymentRegister from './pages/accounting/PaymentRegister'
-import PurchaseRegister from './pages/accounting/PurchaseRegister'
-import SalesRegister from './pages/accounting/SalesRegister'
-import TrialBalance from './pages/accounting/TrialBalance'
-import ProfitLoss from './pages/accounting/ProfitLoss'
-import BalanceSheet from './pages/accounting/BalanceSheet'
-import OutstandingReport from './pages/accounting/OutstandingReport'
-import GSTReports from './pages/accounting/GSTReports'
-import ReportsHub from './pages/reports/ReportsHub'
-import TripReport from './pages/reports/TripReport'
-import VehicleReport from './pages/reports/VehicleReport'
-import DriverReport from './pages/reports/DriverReport'
-import IncomeReport from './pages/reports/IncomeReport'
-import ExpenseReportPage from './pages/reports/ExpenseReportPage'
-import CustomerReport from './pages/reports/CustomerReport'
-import VendorReport from './pages/reports/VendorReport'
-import CashFlowReport from './pages/reports/CashFlowReport'
-import Settings from './pages/settings/Settings'
+import PageFallback from './components/ui/PageFallback'
+import {
+  Dashboard, BookingList, NewBooking, BookingDetails, EditBooking,
+  GenerateLR, LRList, EditLR,
+  VehicleList, VehicleDetails, NewVehicle,
+  CustomerList, CustomerDetails, NewCustomer,
+  VendorList, VendorDetails, NewVendor,
+  ExpenseList, NewExpense,
+  Settings, BranchesPage, PortalUsersPage, NotificationSettings,
+  PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
+  PortalInvoices, PortalInvoiceView, PortalPublicTrack,
+  AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry,
+  LedgerReport, CustomerLedgerReport, VendorLedgerReport, DriverLedgerReport,
+  VehicleLedgerReport, CashBook, BankBook, DayBook, JournalRegister,
+  ReceiptRegister, PaymentRegister, PurchaseRegister, SalesRegister,
+  TrialBalance, ProfitLoss, BalanceSheet, BookingPaymentAdjustment,
+  ProvisionsPage, OutstandingReport, GSTReports,
+  ReportsHub, TripReport, VehicleReport, DriverReport, IncomeReport,
+  ExpenseReportPage, CustomerReport, BookingPlReport, BrokerOutstandingReport,
+  VendorReport, CashFlowReport,
+  PayrollHub, PayrollList, ProcessPayroll, PayrollDetails, PayslipList,
+  PayslipView, PayrollSettings, SalaryRegister,
+  HrHub, EmployeeList, EmployeeDetails, DepartmentList, AttendancePage,
+  LeaveManagement, HolidaysPage, HrTmsNorms,
+  MaintenancePage, OperationsHub, FleetMapPage, RouteOptimizerPage,
+  VehicleHistoryPage, GeofenceManagerPage, GeofenceAlertsPage,
+  FuelPage, EpodPage, CustomerPortalPage, TripsPage, ShipmentsPage,
+  FinanceModulePage, DocumentsPage, NotificationsPage, AnalyticsPage,
+  MarketplacePage, WarehousePage, IotPage, AiPage, PlatformHub,
+} from './routes/lazyPages'
+import { PortalAuthProvider } from './context/PortalAuthContext'
+import PortalProtectedRoute from './components/portal/PortalProtectedRoute'
 
 export default function App() {
   return (
+    <Suspense fallback={<PageFallback />}>
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/portal/login" element={<PortalAuthProvider><PortalLogin /></PortalAuthProvider>} />
+      <Route path="/portal/shared/:bookingId" element={<PortalPublicTrack />} />
+      <Route path="/portal" element={<PortalAuthProvider><PortalProtectedRoute><PortalLayout /></PortalProtectedRoute></PortalAuthProvider>}>
+        <Route index element={<PortalDashboard />} />
+        <Route path="track/:id" element={<PortalTrackPage />} />
+        <Route path="invoices" element={<PortalInvoices />} />
+        <Route path="invoices/:id" element={<PortalInvoiceView />} />
+      </Route>
       <Route
         element={
           <ProtectedRoute>
-            <MainLayout />
+            <TenantGuard>
+              <MainLayout />
+            </TenantGuard>
           </ProtectedRoute>
         }
       >
         <Route index element={<Dashboard />} />
         <Route path="bookings" element={<BookingList />} />
         <Route path="bookings/new" element={<NewBooking />} />
+        <Route path="bookings/:id/edit" element={<EditBooking />} />
         <Route path="bookings/:id" element={<BookingDetails />} />
         <Route path="lr" element={<LRList />} />
         <Route path="lr/generate" element={<GenerateLR />} />
+        <Route path="lr/:lrNumber/edit" element={<EditLR />} />
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="vehicles/new" element={<NewVehicle />} />
         <Route path="vehicles/:id" element={<VehicleDetails />} />
-        <Route path="drivers" element={<DriverList />} />
-        <Route path="drivers/new" element={<NewDriver />} />
-        <Route path="drivers/:id" element={<DriverDetails />} />
+        <Route path="maintenance" element={<MaintenancePage />} />
+        <Route path="operations" element={<OperationsHub />} />
+        <Route path="operations/fuel" element={<FuelPage />} />
+        <Route path="operations/gps" element={<FleetMapPage />} />
+        <Route path="operations/gps/geofences" element={<GeofenceManagerPage />} />
+        <Route path="operations/gps/alerts" element={<GeofenceAlertsPage />} />
+        <Route path="operations/gps/vehicles/:vehicleId" element={<VehicleHistoryPage />} />
+        <Route path="operations/epod" element={<EpodPage />} />
+        <Route path="operations/customer-portal" element={<CustomerPortalPage />} />
+        <Route path="operations/trips" element={<TripsPage />} />
+        <Route path="operations/routing" element={<RouteOptimizerPage />} />
+        <Route path="operations/shipments" element={<ShipmentsPage />} />
+        <Route path="operations/finance" element={<FinanceModulePage />} />
+        <Route path="operations/documents" element={<DocumentsPage />} />
+        <Route path="operations/notifications" element={<NotificationsPage />} />
+        <Route path="operations/analytics" element={<AnalyticsPage />} />
+        <Route path="operations/marketplace" element={<MarketplacePage />} />
+        <Route path="operations/warehouse" element={<WarehousePage />} />
+        <Route path="operations/iot" element={<IotPage />} />
+        <Route path="operations/ai" element={<AiPage />} />
+        <Route path="drivers" element={<Navigate to="/hr/employees" replace />} />
+        <Route path="drivers/new" element={<Navigate to="/hr/employees/new" replace />} />
+        <Route path="drivers/:id" element={<Navigate to="/hr/employees" replace />} />
         <Route path="customers" element={<CustomerList />} />
         <Route path="customers/new" element={<NewCustomer />} />
         <Route path="customers/:id" element={<CustomerDetails />} />
@@ -87,6 +101,23 @@ export default function App() {
         <Route path="vendors/:id" element={<VendorDetails />} />
         <Route path="expenses" element={<ExpenseList />} />
         <Route path="expenses/new" element={<NewExpense />} />
+        <Route path="payroll" element={<PayrollHub />} />
+        <Route path="payroll/runs" element={<PayrollList />} />
+        <Route path="payroll/runs/:id" element={<PayrollDetails />} />
+        <Route path="payroll/generate" element={<ProcessPayroll />} />
+        <Route path="payroll/payslips" element={<PayslipList />} />
+        <Route path="payroll/payslips/:entryId" element={<PayslipView />} />
+        <Route path="payroll/settings" element={<PayrollSettings />} />
+        <Route path="payroll/salary-register" element={<SalaryRegister />} />
+        <Route path="hr" element={<HrHub />} />
+        <Route path="hr/employees" element={<EmployeeList />} />
+        <Route path="hr/employees/new" element={<EmployeeDetails />} />
+        <Route path="hr/employees/:id" element={<EmployeeDetails />} />
+        <Route path="hr/departments" element={<DepartmentList />} />
+        <Route path="hr/attendance" element={<AttendancePage />} />
+        <Route path="hr/leaves" element={<LeaveManagement />} />
+        <Route path="hr/holidays" element={<HolidaysPage />} />
+        <Route path="hr/tms-norms" element={<HrTmsNorms />} />
         <Route path="accounting" element={<AccountingHub />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/ledger-master" element={<LedgerMaster />} />
@@ -108,6 +139,8 @@ export default function App() {
         <Route path="accounting/trial-balance" element={<TrialBalance />} />
         <Route path="accounting/profit-loss" element={<ProfitLoss />} />
         <Route path="accounting/balance-sheet" element={<BalanceSheet />} />
+        <Route path="accounting/payment-adjustment" element={<BookingPaymentAdjustment />} />
+        <Route path="accounting/provisions" element={<ProvisionsPage />} />
         <Route path="accounting/outstanding" element={<OutstandingReport />} />
         <Route path="accounting/gst" element={<GSTReports />} />
         <Route path="reports" element={<ReportsHub />} />
@@ -117,11 +150,18 @@ export default function App() {
         <Route path="reports/income" element={<IncomeReport />} />
         <Route path="reports/expenses" element={<ExpenseReportPage />} />
         <Route path="reports/customers" element={<CustomerReport />} />
+        <Route path="reports/booking-pl" element={<BookingPlReport />} />
+        <Route path="reports/broker-outstanding" element={<BrokerOutstandingReport />} />
         <Route path="reports/vendors" element={<VendorReport />} />
         <Route path="reports/cash-flow" element={<CashFlowReport />} />
+        <Route path="platform" element={<PlatformHub />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/branches" element={<BranchesPage />} />
+        <Route path="settings/portal-users" element={<PortalUsersPage />} />
+        <Route path="settings/notifications" element={<NotificationSettings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </Suspense>
   )
 }

@@ -3,14 +3,46 @@ import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Badge, { statusVariant } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import { drivers } from '../../data/drivers'
 import { formatCurrency } from '../../components/ui/ReportFilters'
+import { useApiItem } from '../../hooks/useApiResource'
+import { driversApi } from '../../services/api'
 import { ArrowLeft } from 'lucide-react'
+import PrintButton from '../../components/print/PrintButton'
 
 export default function DriverDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const driver = drivers.find((d) => d.id === id) || drivers[0]
+  const { item: driver, loading, error } = useApiItem(driversApi.get, id, [id])
+
+  if (loading) {
+    return (
+      <ERPContentPage module="Drivers" title="Driver Details">
+        <p className="text-sm text-slate-500">Loading…</p>
+      </ERPContentPage>
+    )
+  }
+
+  if (error || !driver) {
+    return (
+      <ERPContentPage module="Drivers" title="Driver Details">
+        <p className="text-sm text-red-500">{error || 'Driver not found'}</p>
+        <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/drivers')}>Back</Button>
+      </ERPContentPage>
+    )
+  }
+
+  const printFields = [
+    { label: 'Driver Name', value: driver.name },
+    { label: 'Status', value: driver.status },
+    { label: 'Phone', value: driver.phone },
+    { label: 'Email', value: driver.email },
+    { label: 'Address', value: driver.address },
+    { label: 'License Expiry', value: driver.licenseExpiry },
+    { label: 'Monthly Salary', value: formatCurrency(driver.salary) },
+    { label: 'Advance Balance', value: formatCurrency(driver.advance) },
+    { label: 'Total Trips', value: driver.trips },
+    { label: 'Rating', value: driver.rating },
+  ]
 
   return (
     <ERPContentPage
@@ -19,7 +51,10 @@ export default function DriverDetails() {
       toolbar={
         <div className="flex items-center justify-between gap-2">
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/drivers')}>Back</Button>
-          <Badge variant={statusVariant(driver.status)}>{driver.status}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={statusVariant(driver.status)}>{driver.status}</Badge>
+            <PrintButton title="Driver Profile" subtitle={driver.name} fields={printFields} />
+          </div>
         </div>
       }
     >

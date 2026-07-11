@@ -1,0 +1,17 @@
+sequenceDiagram
+  participant U as User
+  participant UI as TMSWebApp
+  participant API as POST /api/auth/login
+  participant DB as users table
+
+  U->>UI: Enter username + password
+  UI->>API: LoginRequest
+  API->>DB: Find user + BCrypt verify
+  alt Valid
+    API-->>UI: JWT token + role + branch
+    UI->>UI: Store token (localStorage)
+    UI-->>U: Redirect to Dashboard
+  else Invalid
+    API-->>UI: 401 Unauthorized
+    UI-->>U: Show error message
+  end

@@ -1,0 +1,44 @@
+# TMS Pro — Coolify / Docker Compose stack
+# Set env vars in Coolify UI or copy deploy/.env.production.example → .env
+services:
+  tms-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      TMS_CONNECTION_STRING: ${TMS_CONNECTION_STRING}
+      TMS_JWT_KEY: ${TMS_JWT_KEY}
+      Database__RunStartupMigrations: ${Database__RunStartupMigrations:-true}
+      Database__FailOnMigrationError: ${Database__FailOnMigrationError:-false}
+      DemoData__Enabled: ${DemoData__Enabled:-false}
+      Gps__AllowSimulator: ${Gps__AllowSimulator:-false}
+      Cors__Origins__0: ${Cors__Origins__0:-http://144.91.98.218}
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  tms-web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      tms-api:
+        condition: service_healthy
+    ports:
+      - "${TMS_WEB_PORT:-80}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

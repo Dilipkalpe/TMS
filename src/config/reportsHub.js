@@ -1,0 +1,16 @@
+export const reportCards = [
+  { title: 'Trip Report', path: '/reports/trips', icon: 'Route', description: 'Trip-wise freight, expense & profit analysis' },
+  { title: 'Vehicle Report', path: '/reports/vehicles', icon: 'Truck', description: 'Vehicle utilization and performance' },
+  { title: 'Driver Report', path: '/reports/drivers', icon: 'UserCircle', description: 'Driver trips, salary and advances' },
+  { title: 'Income Report', path: '/reports/income', icon: 'TrendingUp', description: 'Monthly income breakdown' },
+  { title: 'Expense Report', path: '/reports/expenses', icon: 'TrendingDown', description: 'Category-wise expense analysis' },
+  { title: 'Customer Report', path: '/reports/customers', icon: 'Users', description: 'Customer trips and outstanding' },
+  { title: 'Booking P&L', path: '/reports/booking-pl', icon: 'PieChart', description: 'Profit and loss per booking' },
+  { title: 'Broker Outstanding', path: '/reports/broker-outstanding', icon: 'Handshake', description: 'Pending broker charges' },
+  { title: 'Vendor Report', path: '/reports/vendors', icon: 'Building2', description: 'Vendor bills and payments' },
+  { title: 'Ledger Report', path: '/accounting/ledger-report', icon: 'BookOpen', description: 'Account-wise ledger transactions' },
+  { title: 'Cash Flow', path: '/reports/cash-flow', icon: 'ArrowLeftRight', description: 'Monthly cash flow statement' },
+  { title: 'Balance Sheet', path: '/accounting/balance-sheet', icon: 'Scale', description: 'Assets, liabilities and capital' },
+  { title: 'Profit & Loss', path: '/accounting/profit-loss', icon: 'PieChart', description: 'Income and expense statement' },
+  { title: 'Trial Balance', path: '/accounting/trial-balance', icon: 'Calculator', description: 'Debit and credit trial balance' },
+]

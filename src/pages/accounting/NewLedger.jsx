@@ -1,4 +1,5 @@
 import NewRecordForm from '../../components/forms/NewRecordForm'
+import { accountingApi } from '../../services/api'
 
 export default function NewLedger() {
   return (
@@ -8,12 +9,13 @@ export default function NewLedger() {
       listPath="/accounting/ledger-master"
       saveLabel="Save Ledger"
       fields={[
-        { label: 'Ledger Code', placeholder: 'LED-001' },
-        { label: 'Ledger Name', placeholder: 'Ledger name' },
-        { label: 'Type', type: 'select', options: ['Asset', 'Liability', 'Income', 'Expense'] },
-        { label: 'Opening Balance (₹)', type: 'number', placeholder: '0' },
-        { label: 'Group', type: 'select', options: ['Cash', 'Bank', 'Customer', 'Vendor', 'Driver', 'Vehicle'] },
+        { name: 'code', label: 'Ledger Code', placeholder: 'LED-001' },
+        { name: 'name', label: 'Ledger Name', placeholder: 'Ledger name' },
+        { name: 'type', label: 'Type', type: 'select', options: ['Asset', 'Liability', 'Income', 'Expense'] },
+        { name: 'balance', label: 'Opening Balance (₹)', type: 'number', placeholder: '0' },
+        { name: 'group', label: 'Group', type: 'select', options: ['Cash', 'Bank', 'Customer', 'Vendor', 'Driver', 'Vehicle'] },
       ]}
+      onSubmit={(form) => accountingApi.createLedger(form)}
     />
   )
 }

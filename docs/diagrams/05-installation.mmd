@@ -1,0 +1,11 @@
+flowchart TD
+    A[Install Prerequisites] --> B[Node.js + .NET 8 + PostgreSQL]
+    B --> C[Create database tms_pro]
+    C --> D[Run schema.sql]
+    D --> E[Run seed.sql]
+    E --> F[Run seed_accounting.sql]
+    F --> G[Configure appsettings.json]
+    G --> H[dotnet run — Backend :5000]
+    H --> I[npm run dev — Frontend :5173]
+    I --> J[Login admin / admin123]
+    J --> K([System Ready])

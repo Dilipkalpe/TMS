@@ -1,0 +1,474 @@
+using System.Data;
+using Npgsql;
+using Tms.Api.DTOs;
+
+namespace Tms.Api.Services;
+
+public class HrService(IConfiguration config, ITenantContext tenants)
+{
+    private string ConnectionString => AppConfiguration.ResolveConnectionString(config);
+    private Guid CompanyId => TenantScope.ResolveCompanyId(tenants);
+
+    public async Task<HrSummaryDto> GetSummaryAsync(CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT * FROM sp_hr_summary(@p_company_id)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        if (!await r.ReadAsync(ct)) return new HrSummaryDto();
+        return new HrSummaryDto(
+            DataReaderCols.ColInt64(r, "total_employees"),
+            DataReaderCols.ColInt64(r, "active_employees"),
+            DataReaderCols.ColInt64(r, "on_leave"),
+            DataReaderCols.ColInt64(r, "departments"),
+            DataReaderCols.ColInt64(r, "pending_leaves"),
+            DataReaderCols.ColInt64(r, "today_present"),
+            DataReaderCols.ColInt64(r, "today_absent"));
+    }
+
+    public async Task<List<HrDepartmentDto>> ListDepartmentsAsync(CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT * FROM sp_hr_list_departments(@p_company_id)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        var list = new List<HrDepartmentDto>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new HrDepartmentDto(
+                DataReaderCols.ColGuid(r, "id"),
+                DataReaderCols.ColString(r, "code"),
+                DataReaderCols.ColString(r, "name"),
+                DataReaderCols.ColStringN(r, "description"),
+                DataReaderCols.ColString(r, "status"),
+                DataReaderCols.ColInt64(r, "employee_count"),
+                DataReaderCols.ColDateTimeN(r, "created_at") ?? DateTime.UtcNow));
+        return list;
+    }
+
+    public async Task<Guid> SaveDepartmentAsync(SaveDepartmentRequest body, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            "SELECT sp_hr_save_department(@p_company_id, @p_id, @p_code, @p_name, @p_desc, @p_status)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_id", (object?)body.Id ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_code", body.Code);
+        cmd.Parameters.AddWithValue("p_name", body.Name);
+        cmd.Parameters.AddWithValue("p_desc", (object?)body.Description ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_status", body.Status ?? "Active");
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return result is Guid g ? g : Guid.Parse(result!.ToString()!);
+    }
+
+    public async Task<List<HrDesignationDto>> ListDesignationsAsync(CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT * FROM sp_hr_list_designations(@p_company_id)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        var list = new List<HrDesignationDto>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new HrDesignationDto(
+                r.GetGuid(0), r.GetString(1), r.GetString(2),
+                r.IsDBNull(3) ? null : r.GetGuid(3),
+                r.IsDBNull(4) ? null : r.GetString(4),
+                r.GetInt32(5), r.GetString(6)));
+        return list;
+    }
+
+    public async Task<List<HrEmployeeDto>> ListEmployeesAsync(
+        Guid? departmentId, string? employeeType, string? status, string? employmentType, CancellationToken ct = default)
+    {
+        var (items, _) = await ListEmployeesPagedAsync(
+            1, QueryExtensions.MaxPageSize, null, departmentId, employeeType, status, employmentType, ct);
+        return items;
+    }
+
+    public async Task<(List<HrEmployeeDto> Items, int Total)> ListEmployeesPagedAsync(
+        int page, int pageSize, string? search,
+        Guid? departmentId, string? employeeType, string? status, string? employmentType,
+        CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            @"SELECT * FROM sp_hr_list_employees_paged(
+                @p_company_id, @p_page, @p_page_size, @p_search,
+                @p_dept, @p_type, @p_status, @p_emp_type)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_page", page);
+        cmd.Parameters.AddWithValue("p_page_size", pageSize);
+        cmd.Parameters.AddWithValue("p_search", (object?)search ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_dept", (object?)departmentId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_type", (object?)employeeType ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_status", (object?)status ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_emp_type", (object?)employmentType ?? DBNull.Value);
+
+        var list = new List<HrEmployeeDto>();
+        var total = 0;
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+        {
+            if (total == 0 && DataReaderCols.HasColumn(r, "total_count"))
+                total = (int)DataReaderCols.ColInt64(r, "total_count");
+            list.Add(ReadEmployeeList(r));
+        }
+        return (list, total);
+    }
+
+    public async Task<List<string>> ListEmployeeNamesAsync(
+        string? employeeType, string? search, int limit, CancellationToken ct = default)
+    {
+        var (items, _) = await ListEmployeesPagedAsync(
+            1, limit, search, null, employeeType, "Active", null, ct);
+        return items.Select(e => e.Name).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+    }
+
+    public async Task<HrEmployeeDetailDto?> GetEmployeeAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT * FROM sp_hr_get_employee(@p_company_id, @p_id)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_id", id);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        return await r.ReadAsync(ct) ? ReadEmployeeDetail(r) : null;
+    }
+
+    public async Task<Guid> SaveEmployeeAsync(SaveEmployeeRequest body, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        if (body.Id.HasValue)
+            await EnsureEmployeeAsync(conn, body.Id.Value, ct);
+        if (body.DepartmentId.HasValue)
+            await EnsureDepartmentAsync(conn, body.DepartmentId.Value, ct);
+        await using var cmd = new NpgsqlCommand(
+            @"SELECT sp_hr_save_employee(
+                @p_company_id, @p_id, @p_code, @p_name, @p_type, @p_emp_type, @p_dept, @p_desig, @p_driver,
+                @p_email, @p_phone, @p_doj, @p_dob, @p_gender, @p_address,
+                @p_bank, @p_ifsc, @p_pan, @p_basic, @p_daily, @p_hra, @p_da, @p_conv,
+                @p_other, @p_advance, @p_pf, @p_esi, @p_ins, @p_ins_amt, @p_contract_end,
+                @p_license, @p_license_exp, @p_vehicle, @p_route, @p_fuel, @p_load, @p_halt, @p_bhatta, @p_status)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_id", (object?)body.Id ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_code", body.EmployeeCode);
+        cmd.Parameters.AddWithValue("p_name", body.Name);
+        cmd.Parameters.AddWithValue("p_type", body.EmployeeType ?? "Staff");
+        cmd.Parameters.AddWithValue("p_emp_type", body.EmploymentType ?? "Permanent");
+        cmd.Parameters.AddWithValue("p_dept", (object?)body.DepartmentId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_desig", (object?)body.DesignationId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_driver", (object?)body.DriverId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_email", (object?)body.Email ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_phone", (object?)body.Phone ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_doj", (object?)body.DateOfJoining ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_dob", (object?)body.DateOfBirth ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_gender", (object?)body.Gender ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_address", (object?)body.Address ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_bank", (object?)body.BankAccount ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_ifsc", (object?)body.BankIfsc ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_pan", (object?)body.Pan ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_basic", body.BasicSalary);
+        cmd.Parameters.AddWithValue("p_daily", body.DailyWage);
+        cmd.Parameters.AddWithValue("p_hra", body.Hra);
+        cmd.Parameters.AddWithValue("p_da", body.Da);
+        cmd.Parameters.AddWithValue("p_conv", body.Conveyance);
+        cmd.Parameters.AddWithValue("p_other", body.OtherAllowance);
+        cmd.Parameters.AddWithValue("p_advance", body.Advance);
+        cmd.Parameters.AddWithValue("p_pf", body.PfApplicable);
+        cmd.Parameters.AddWithValue("p_esi", body.EsiApplicable);
+        cmd.Parameters.AddWithValue("p_ins", body.InsuranceApplicable);
+        cmd.Parameters.AddWithValue("p_ins_amt", body.InsuranceAmount);
+        cmd.Parameters.AddWithValue("p_contract_end", (object?)body.ContractEndDate ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_license", (object?)body.LicenseNumber ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_license_exp", (object?)body.LicenseExpiry ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_vehicle", (object?)body.AssignedVehicleId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_route", body.RouteAllowance);
+        cmd.Parameters.AddWithValue("p_fuel", body.FuelAllowance);
+        cmd.Parameters.AddWithValue("p_load", body.LoadingAllowance);
+        cmd.Parameters.AddWithValue("p_halt", body.HaltingAllowance);
+        cmd.Parameters.AddWithValue("p_bhatta", body.DriverBhatta);
+        cmd.Parameters.AddWithValue("p_status", body.Status ?? "Active");
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return result is Guid g ? g : Guid.Parse(result!.ToString()!);
+    }
+
+    public async Task DeleteEmployeeAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT sp_hr_delete_employee(@p_company_id, @p_id)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_id", id);
+        await cmd.ExecuteScalarAsync(ct);
+    }
+
+    public async Task<List<HrAttendanceDto>> ListAttendanceAsync(
+        DateOnly? date, Guid? employeeId, int? month, int? year, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            "SELECT * FROM sp_hr_list_attendance(@p_company_id, @p_date, @p_emp, @p_month, @p_year)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_date", date.HasValue ? date.Value : DBNull.Value);
+        cmd.Parameters.AddWithValue("p_emp", (object?)employeeId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_month", (object?)month ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_year", (object?)year ?? DBNull.Value);
+
+        var list = new List<HrAttendanceDto>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new HrAttendanceDto(
+                r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3),
+                r.GetDateTime(4).Date, r.GetString(5),
+                ReadTime(r, 6), ReadTime(r, 7),
+                r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetString(9)));
+        return list;
+    }
+
+    public async Task<Guid> MarkAttendanceAsync(MarkAttendanceRequest body, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await EnsureEmployeeAsync(conn, body.EmployeeId, ct);
+        return await UpsertAttendanceAsync(conn, body.EmployeeId, body.Date, body.Status,
+            body.CheckIn, body.CheckOut, body.OvertimeHours, body.Remarks, ct);
+    }
+
+    public async Task<int> BulkAttendanceAsync(BulkAttendanceRequest body, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        var count = 0;
+        foreach (var empId in body.EmployeeIds)
+        {
+            await EnsureEmployeeAsync(conn, empId, ct);
+            await UpsertAttendanceAsync(conn, empId, body.Date, body.Status ?? "Present",
+                null, null, 0, null, ct);
+            count++;
+        }
+        return count;
+    }
+
+    public async Task<List<HrLeaveTypeDto>> ListLeaveTypesAsync(CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT * FROM sp_hr_list_leave_types(@p_company_id)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        var list = new List<HrLeaveTypeDto>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new HrLeaveTypeDto(
+                r.GetGuid(0), r.GetString(1), r.GetString(2),
+                r.GetInt32(3), r.GetBoolean(4), r.GetString(5)));
+        return list;
+    }
+
+    public async Task<List<HrLeaveRequestDto>> ListLeaveRequestsAsync(
+        string? status, Guid? employeeId, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            "SELECT * FROM sp_hr_list_leave_requests(@p_company_id, @p_status, @p_emp)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_status", (object?)status ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("p_emp", (object?)employeeId ?? DBNull.Value);
+
+        var list = new List<HrLeaveRequestDto>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new HrLeaveRequestDto(
+                r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3),
+                r.GetGuid(4), r.GetString(5),
+                r.GetDateTime(6).Date, r.GetDateTime(7).Date, r.GetDecimal(8),
+                r.IsDBNull(9) ? null : r.GetString(9), r.GetString(10),
+                r.IsDBNull(11) ? null : r.GetString(11),
+                r.IsDBNull(12) ? null : r.GetDateTime(12),
+                r.GetDateTime(13)));
+        return list;
+    }
+
+    public async Task<Guid> ApplyLeaveAsync(ApplyLeaveRequest body, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await EnsureEmployeeAsync(conn, body.EmployeeId, ct);
+        await using var cmd = new NpgsqlCommand(
+            "SELECT sp_hr_apply_leave(@cid, @emp, @type, @from, @to, @days, @reason)", conn);
+        cmd.Parameters.AddWithValue("cid", CompanyId);
+        cmd.Parameters.AddWithValue("emp", body.EmployeeId);
+        cmd.Parameters.AddWithValue("type", body.LeaveTypeId);
+        cmd.Parameters.AddWithValue("from", PgDate(body.FromDate));
+        cmd.Parameters.AddWithValue("to", PgDate(body.ToDate));
+        cmd.Parameters.AddWithValue("days", body.Days);
+        cmd.Parameters.AddWithValue("reason", (object?)body.Reason ?? DBNull.Value);
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return result is Guid g ? g : Guid.Parse(result!.ToString()!);
+    }
+
+    public async Task ApproveLeaveAsync(Guid id, string? approvedBy, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await EnsureLeaveRequestAsync(conn, id, ct);
+        await using var cmd = new NpgsqlCommand("SELECT sp_hr_approve_leave(@p_id, @p_by)", conn);
+        cmd.Parameters.AddWithValue("p_id", id);
+        cmd.Parameters.AddWithValue("p_by", approvedBy ?? "admin");
+        await cmd.ExecuteScalarAsync(ct);
+    }
+
+    public async Task RejectLeaveAsync(Guid id, string? approvedBy, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await EnsureLeaveRequestAsync(conn, id, ct);
+        await using var cmd = new NpgsqlCommand("SELECT sp_hr_reject_leave(@p_id, @p_by)", conn);
+        cmd.Parameters.AddWithValue("p_id", id);
+        cmd.Parameters.AddWithValue("p_by", approvedBy ?? "admin");
+        await cmd.ExecuteScalarAsync(ct);
+    }
+
+    public async Task<List<HrHolidayDto>> ListHolidaysAsync(int? year, CancellationToken ct = default)
+    {
+        await using var conn = await OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT * FROM sp_hr_list_holidays(@p_company_id, @p_year)", conn);
+        cmd.Parameters.AddWithValue("p_company_id", CompanyId);
+        cmd.Parameters.AddWithValue("p_year", (object?)year ?? DBNull.Value);
+        var list = new List<HrHolidayDto>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new HrHolidayDto(
+                r.GetGuid(0), r.GetDateTime(1).Date, r.GetString(2), r.GetInt32(3)));
+        return list;
+    }
+
+    private static HrEmployeeDto ReadEmployeeList(IDataReader r) => new(
+        DataReaderCols.ColGuid(r, "id"),
+        DataReaderCols.ColString(r, "employee_code"),
+        DataReaderCols.ColString(r, "name"),
+        DataReaderCols.ColString(r, "employee_type"),
+        DataReaderCols.ColString(r, "employment_type"),
+        DataReaderCols.ColGuidN(r, "department_id"),
+        DataReaderCols.ColStringN(r, "department_name"),
+        DataReaderCols.ColGuidN(r, "designation_id"),
+        DataReaderCols.ColStringN(r, "designation_name"),
+        DataReaderCols.ColStringN(r, "driver_id"),
+        DataReaderCols.ColStringN(r, "email"),
+        DataReaderCols.ColStringN(r, "phone"),
+        DataReaderCols.ColDateOnlyN(r, "date_of_joining"),
+        DataReaderCols.ColDecimal(r, "basic_salary"),
+        DataReaderCols.ColDecimalN(r, "daily_wage"),
+        DataReaderCols.ColDecimal(r, "hra"),
+        DataReaderCols.ColDecimal(r, "da"),
+        DataReaderCols.ColDecimal(r, "conveyance"),
+        DataReaderCols.ColDecimal(r, "other_allowance"),
+        DataReaderCols.ColDecimal(r, "advance"),
+        DataReaderCols.ColBool(r, "pf_applicable"),
+        DataReaderCols.ColBool(r, "esi_applicable"),
+        DataReaderCols.ColBool(r, "insurance_applicable"),
+        DataReaderCols.ColDecimal(r, "insurance_amount"),
+        DataReaderCols.ColDateOnlyN(r, "contract_end_date"),
+        DataReaderCols.ColString(r, "status"),
+        DataReaderCols.ColDateTimeN(r, "created_at") ?? DateTime.UtcNow);
+
+    private static HrEmployeeDetailDto ReadEmployeeDetail(IDataReader r) => new(
+        DataReaderCols.ColGuid(r, "id"),
+        DataReaderCols.ColString(r, "employee_code"),
+        DataReaderCols.ColString(r, "name"),
+        DataReaderCols.ColString(r, "employee_type"),
+        DataReaderCols.ColString(r, "employment_type"),
+        DataReaderCols.ColGuidN(r, "department_id"),
+        DataReaderCols.ColStringN(r, "department_name"),
+        DataReaderCols.ColGuidN(r, "designation_id"),
+        DataReaderCols.ColStringN(r, "designation_name"),
+        DataReaderCols.ColStringN(r, "driver_id"),
+        DataReaderCols.ColStringN(r, "email"),
+        DataReaderCols.ColStringN(r, "phone"),
+        DataReaderCols.ColDateOnlyN(r, "date_of_joining"),
+        DataReaderCols.ColDateOnlyN(r, "date_of_birth"),
+        DataReaderCols.ColStringN(r, "gender"),
+        DataReaderCols.ColStringN(r, "address"),
+        DataReaderCols.ColStringN(r, "bank_account"),
+        DataReaderCols.ColStringN(r, "bank_ifsc"),
+        DataReaderCols.ColStringN(r, "pan"),
+        DataReaderCols.ColDecimal(r, "basic_salary"),
+        DataReaderCols.ColDecimalN(r, "daily_wage"),
+        DataReaderCols.ColDecimal(r, "hra"),
+        DataReaderCols.ColDecimal(r, "da"),
+        DataReaderCols.ColDecimal(r, "conveyance"),
+        DataReaderCols.ColDecimal(r, "other_allowance"),
+        DataReaderCols.ColDecimal(r, "advance"),
+        DataReaderCols.ColBool(r, "pf_applicable"),
+        DataReaderCols.ColBool(r, "esi_applicable"),
+        DataReaderCols.ColBool(r, "insurance_applicable"),
+        DataReaderCols.ColDecimal(r, "insurance_amount"),
+        DataReaderCols.ColDateOnlyN(r, "contract_end_date"),
+        DataReaderCols.ColStringN(r, "license_number"),
+        DataReaderCols.ColDateOnlyN(r, "license_expiry"),
+        DataReaderCols.ColStringN(r, "assigned_vehicle_id"),
+        DataReaderCols.ColDecimalN(r, "route_allowance"),
+        DataReaderCols.ColDecimalN(r, "fuel_allowance"),
+        DataReaderCols.ColDecimalN(r, "loading_allowance"),
+        DataReaderCols.ColDecimalN(r, "halting_allowance"),
+        DataReaderCols.ColDecimalN(r, "driver_bhatta"),
+        DataReaderCols.ColString(r, "status"),
+        DataReaderCols.ColDateTimeN(r, "created_at") ?? DateTime.UtcNow);
+
+    private async Task<NpgsqlConnection> OpenAsync(CancellationToken ct)
+    {
+        var conn = new NpgsqlConnection(ConnectionString);
+        await conn.OpenAsync(ct);
+        return conn;
+    }
+
+    private async Task EnsureEmployeeAsync(NpgsqlConnection conn, Guid employeeId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand("SELECT sp_hr_ensure_employee(@cid, @id)", conn);
+        cmd.Parameters.AddWithValue("id", employeeId);
+        cmd.Parameters.AddWithValue("cid", CompanyId);
+        if (await cmd.ExecuteScalarAsync(ct) is not true)
+            throw new InvalidOperationException("Employee not found.");
+    }
+
+    private async Task EnsureDepartmentAsync(NpgsqlConnection conn, Guid departmentId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand("SELECT sp_hr_ensure_department(@cid, @id)", conn);
+        cmd.Parameters.AddWithValue("id", departmentId);
+        cmd.Parameters.AddWithValue("cid", CompanyId);
+        if (await cmd.ExecuteScalarAsync(ct) is not true)
+            throw new InvalidOperationException("Department not found.");
+    }
+
+    private async Task EnsureLeaveRequestAsync(NpgsqlConnection conn, Guid leaveId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand("SELECT sp_hr_ensure_leave_request(@cid, @id)", conn);
+        cmd.Parameters.AddWithValue("id", leaveId);
+        cmd.Parameters.AddWithValue("cid", CompanyId);
+        if (await cmd.ExecuteScalarAsync(ct) is not true)
+            throw new InvalidOperationException("Leave request not found.");
+    }
+
+    private async Task<Guid> UpsertAttendanceAsync(
+        NpgsqlConnection conn, Guid employeeId, DateOnly date, string status,
+        TimeSpan? checkIn, TimeSpan? checkOut, decimal overtimeHours, string? remarks,
+        CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand(
+            "SELECT sp_hr_upsert_attendance(@cid, @emp, @date, @status, @in, @out, @ot, @remarks)", conn);
+        cmd.Parameters.AddWithValue("cid", CompanyId);
+        cmd.Parameters.AddWithValue("emp", employeeId);
+        cmd.Parameters.AddWithValue("date", PgDate(date));
+        cmd.Parameters.AddWithValue("status", status);
+        cmd.Parameters.AddWithValue("in", (object?)checkIn ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("out", (object?)checkOut ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("ot", overtimeHours);
+        cmd.Parameters.AddWithValue("remarks", (object?)remarks ?? DBNull.Value);
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return result is Guid g ? g : Guid.Parse(result!.ToString()!);
+    }
+
+    private static object PgDate(DateOnly? value) => value.HasValue ? value.Value : DBNull.Value;
+
+    private static TimeSpan? ReadTime(IDataReader r, int ord)
+    {
+        if (r.IsDBNull(ord)) return null;
+        return r.GetValue(ord) switch
+        {
+            TimeSpan ts => ts,
+            TimeOnly t => t.ToTimeSpan(),
+            string s => TimeSpan.Parse(s),
+            _ => null,
+        };
+    }
+}

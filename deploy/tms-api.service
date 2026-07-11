@@ -1,0 +1,21 @@
+[Unit]
+Description=TMS Pro API (.NET 8)
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+User=www-data
+WorkingDirectory=/var/www/tms/api
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+Environment=TMS_CONNECTION_STRING=Host=127.0.0.1;Port=5432;Database=tms_pro;Username=tms;Password=CHANGE_ME;Maximum Pool Size=50;Minimum Pool Size=5;Connection Idle Lifetime=300;Timeout=30
+Environment=TMS_JWT_KEY=CHANGE_ME_MIN_32_CHARS
+ExecStart=/usr/bin/dotnet /var/www/tms/api/Tms.Api.dll
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=tms-api
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

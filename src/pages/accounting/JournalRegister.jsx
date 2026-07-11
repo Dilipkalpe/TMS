@@ -3,11 +3,13 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { journalRegister } from '../../data/accounting'
+import { useApiResource } from '../../hooks/useApiResource'
+import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 
 export default function JournalRegister() {
   const navigate = useNavigate()
+  const { data, loading, error, refresh } = useApiResource(() => accountingApi.journalRegister())
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'voucherNo', label: 'Voucher No.' },
@@ -22,13 +24,16 @@ export default function JournalRegister() {
       onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Journal Register"
-      statusCards={registerStatusCards('Total Journals', journalRegister.length, 'violet', 'BookOpen')}
+      statusCards={registerStatusCards('Total Entries', data.length, 'orange', 'FileText')}
       showActions={false}
-      searchPlaceholder="Voucher No., ledger, narration..."
-      searchKeys={['voucherNo', 'debitLedger', 'creditLedger', 'narration']}
+      searchPlaceholder="Voucher no., narration..."
+      searchKeys={['voucherNo', 'narration', 'debitLedger']}
       columns={columns}
-      data={journalRegister}
+      data={data}
       sortKey="date"
+      loading={loading}
+      error={error}
+      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow />}
     />
   )
