@@ -18,7 +18,7 @@ export default function BrokerOutstandingReport() {
   const totalPayable = items.reduce((s, r) => s + (r.payable ?? 0), 0)
 
   return (
-    <ERPContentPage module="Reports" title="Broker-wise Outstanding">
+    <ERPContentPage module="Reports" title="Broker-wise Outstanding" report>
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
         Amount you owe brokers from booking charges. Broker payment recording is not yet available — full charge shows as payable.
       </p>

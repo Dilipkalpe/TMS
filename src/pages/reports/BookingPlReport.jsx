@@ -62,7 +62,7 @@ export default function BookingPlReport() {
   const rangeLabel = `${formatGridDate(applied.fromDate)} – ${formatGridDate(applied.toDate)}`
 
   return (
-    <ERPContentPage module="Reports" title="Booking-wise Profit & Loss">
+    <ERPContentPage module="Reports" title="Booking-wise Profit & Loss" report>
       <Card className="mb-4 px-4 py-3">
         <ReportFilterRow
           inline

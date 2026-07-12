@@ -188,7 +188,7 @@ export default function ERPListPage({
   }
 
   return (
-    <div className="erp-list-page">
+    <div className="erp-list-page h-full min-h-0">
       <ERPPageTitle module={module} title={title} />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-primary/20 bg-white shadow-sm dark:bg-slate-900">

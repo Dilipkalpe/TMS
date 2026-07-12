@@ -46,7 +46,12 @@ do
 done
 
 echo ""
-echo "==> Verify procedures:"
+echo "==> Verify sp_hr_save_employee:"
+docker exec -i "$PG" psql -U "$DB_USER" -d "$DB_NAME" -tAc \
+  "SELECT p.proname || '(' || p.pronargs || ' args)' FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'sp_hr_save_employee'"
+
+echo ""
+echo "==> Verify other HR procedures:"
 docker exec -i "$PG" psql -U "$DB_USER" -d "$DB_NAME" -tAc \
   "SELECT proname || '(' || pronargs || ')' FROM pg_proc WHERE proname IN ('sp_hr_summary','sp_hr_list_employees_paged','sp_payroll_summary','sp_payroll_list_settings') ORDER BY 1"
 

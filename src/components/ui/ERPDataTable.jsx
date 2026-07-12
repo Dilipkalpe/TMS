@@ -39,8 +39,12 @@ export default function ERPDataTable({
   ]
 
   return (
-    <div className={fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : ''}>
-      <div className={`overflow-auto ${fill ? 'min-h-0 flex-1' : ''}`}>
+    <div className={fill ? 'scroll-hint-x flex min-h-0 flex-1 flex-col overflow-hidden' : 'report-table-shell scroll-hint-x'}>
+      <div
+        className={`mobile-scroll-x mobile-scroll-y overflow-auto ${
+          fill ? 'min-h-0 flex-1' : 'report-table-scroll'
+        }`}
+      >
         <table className="w-full min-w-[640px] border-collapse text-left text-xs sm:text-sm">
           <thead className={sticky ? 'sticky top-0 z-10' : ''}>
             <tr className="border border-primary/30 bg-primary text-white">

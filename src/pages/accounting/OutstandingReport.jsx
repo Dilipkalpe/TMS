@@ -46,7 +46,7 @@ export default function OutstandingReport() {
   ]
 
   return (
-    <ERPContentPage module="Accounting" title="Outstanding Report">
+    <ERPContentPage module="Accounting" title="Outstanding Report" report>
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
         Filter by date range, customer, or vendor. Customer outstanding is based on unpaid booking balances.
       </p>
@@ -61,7 +61,7 @@ export default function OutstandingReport() {
           onApply={() => setQuery(toReportQuery(filters))}
         />
         <Card className="!p-2.5 sm:!p-3">
-          {loading ? <p className="p-4 text-sm text-slate-500">Loading…</p> : <Tabs tabs={tabs} />}
+          {loading ? <p className="p-4 text-sm text-slate-500">Loading…</p> : <Tabs tabs={tabs} fill />}
         </Card>
       </div>
     </ERPContentPage>

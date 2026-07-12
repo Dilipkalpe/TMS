@@ -115,7 +115,7 @@ export default function Sidebar() {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className="app-scroll mobile-scroll-y flex-1 space-y-1 overflow-y-auto p-3">
           {platformItems.map((item) => (
             <NavItem key={item.title} item={item} collapsed={collapsed} onNavigate={closeMobile} />
           ))}

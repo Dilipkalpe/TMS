@@ -40,7 +40,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-auto mobile-scroll-y px-4 py-4 sm:px-5">{children}</div>
         {footer && (
           <div className="shrink-0 border-t border-slate-200 px-4 py-3 dark:border-slate-800 sm:px-5">{footer}</div>
         )}

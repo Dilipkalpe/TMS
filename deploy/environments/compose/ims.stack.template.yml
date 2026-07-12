@@ -1,0 +1,66 @@
+# IMS stack template — copy to ims.stack.yml when IMS repo is available
+# Replace Dockerfile paths and environment variable names for IMS.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:?Set DB_NAME}
+      POSTGRES_USER: ${DB_USER:?Set DB_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ${BACKUP_DIR:?Set BACKUP_DIR}:/backups
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  ims-api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.api
+    image: ${API_IMAGE:-local/ims-api}:${RELEASE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      IMS_CONNECTION_STRING: Host=postgres;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${POSTGRES_PASSWORD}
+      IMS_JWT_KEY: ${IMS_JWT_KEY:?Set IMS_JWT_KEY}
+    volumes:
+      - ${UPLOADS_DIR:?Set UPLOADS_DIR}:/app/wwwroot/uploads
+      - ${LOGS_DIR:?Set LOGS_DIR}:/app/logs
+    expose:
+      - "5000"
+    ports:
+      - "${API_HOST_PORT:?Set API_HOST_PORT}:5000"
+    networks:
+      - internal
+
+  ims-web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    image: ${WEB_IMAGE:-local/ims-web}:${RELEASE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - ims-api
+    ports:
+      - "${WEB_HOST_PORT:?Set WEB_HOST_PORT}:80"
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pg_data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}_pg_data

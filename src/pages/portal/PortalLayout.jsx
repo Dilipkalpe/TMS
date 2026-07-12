@@ -13,7 +13,7 @@ export default function PortalLayout() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    <div className="flex h-dvh flex-col overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       <header className="shrink-0 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
           <div className="flex items-center gap-2 font-semibold text-primary">
@@ -38,7 +38,7 @@ export default function PortalLayout() {
           </div>
         </div>
       </header>
-      <main className="app-scroll mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-y-auto overflow-x-hidden px-4 py-6">
+      <main className="app-scroll mobile-scroll-y mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-y-auto overflow-x-hidden px-4 py-6">
         <Outlet />
       </main>
       <AppFooter />

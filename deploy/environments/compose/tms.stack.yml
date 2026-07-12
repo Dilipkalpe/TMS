@@ -1,0 +1,86 @@
+# TMS stack — one isolated environment (Production OR Demo)
+# Usage (from repo root):
+#   docker compose -p prod-tms -f deploy/environments/compose/tms.stack.yml --env-file /var/www/prod/tms/.env up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:?Set DB_NAME}
+      POSTGRES_USER: ${DB_USER:?Set DB_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ${BACKUP_DIR:?Set BACKUP_DIR}:/backups
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  tms-api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.api
+    image: ${API_IMAGE:-local/tms-api}:${RELEASE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      TMS_CONNECTION_STRING: Host=postgres;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${POSTGRES_PASSWORD}
+      TMS_JWT_KEY: ${TMS_JWT_KEY:?Set TMS_JWT_KEY}
+      Database__RunStartupMigrations: ${Database__RunStartupMigrations:-true}
+      Database__FailOnMigrationError: ${Database__FailOnMigrationError:-false}
+      DemoData__Enabled: ${DemoData__Enabled:-false}
+      Gps__AllowSimulator: ${Gps__AllowSimulator:-false}
+      Cors__Origins__0: ${APP_URL:?Set APP_URL}
+    volumes:
+      - ${UPLOADS_DIR:?Set UPLOADS_DIR}:/app/wwwroot/uploads
+      - ${LOGS_DIR:?Set LOGS_DIR}:/app/logs
+    expose:
+      - "5000"
+    ports:
+      - "${API_HOST_PORT:?Set API_HOST_PORT}:5000"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
+
+  tms-web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_API_URL: /api
+    image: ${WEB_IMAGE:-local/tms-web}:${RELEASE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      tms-api:
+        condition: service_healthy
+    ports:
+      - "${WEB_HOST_PORT:?Set WEB_HOST_PORT}:80"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pg_data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}_pg_data
