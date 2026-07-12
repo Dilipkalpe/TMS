@@ -96,8 +96,8 @@ public class HrController(HrService hr, DriverSyncService driverSync) : Controll
         }
         catch (PostgresException ex)
         {
-            if (ex.SqlState == "42883" && ex.MessageText.Contains("sp_hr_save_employee", StringComparison.OrdinalIgnoreCase))
-                return BadRequest(new ApiError("HR employee save is not configured on the database. Run: bash deploy/fix-employee-save.sh on the server, then restart the API."));
+            if (ex.SqlState == "42883" && ex.MessageText.Contains("sp_hr_", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new ApiError("HR database procedures are missing or outdated. On the server run: bash deploy/fix-employee-save.sh then retry."));
             return BadRequest(new ApiError(ex.MessageText));
         }
     }
