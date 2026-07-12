@@ -6,7 +6,7 @@ git pull --ff-only
 docker compose -f deploy/docker-compose.vps.yml build --no-cache tms-api tms-web
 docker compose -f deploy/docker-compose.vps.yml up -d tms-api tms-web
 echo ""
-echo "==> Health check (build tag must be 2026-07-12-hr-employee-save):"
+echo "==> Health check (build tag must be 2026-07-12-hr-tenant-procs-v2):"
 sleep 5
 curl -s http://127.0.0.1:8080/api/health || true
 echo ""

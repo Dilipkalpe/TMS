@@ -20,6 +20,11 @@ public static class TenantSchemaMigrator
                 logger?.LogInformation("SaaS tenant schema: installing tenant HR/payroll procedures…");
                 await PsqlFileRunner.RunSqlFileAsync(db, "database/saas/tenant_hr_payroll_procs.sql", ct);
             }
+            else if (!await TenantHrPayrollInstallGuard.IsTenantHrEmployeeProcsInstalledAsync(db, ct))
+            {
+                logger?.LogInformation("SaaS tenant schema: installing tenant HR employee procedures…");
+                await PsqlFileRunner.RunSqlFileAsync(db, "database/hr/install_tenant_hr_employee_procs.sql", ct);
+            }
             logger?.LogInformation("SaaS tenant schema: complete.");
             return;
         }
@@ -40,6 +45,11 @@ public static class TenantSchemaMigrator
         {
             logger?.LogInformation("SaaS tenant schema: installing tenant HR/payroll procedures…");
             await PsqlFileRunner.RunSqlFileAsync(db, "database/saas/tenant_hr_payroll_procs.sql", ct);
+        }
+        else if (!await TenantHrPayrollInstallGuard.IsTenantHrEmployeeProcsInstalledAsync(db, ct))
+        {
+            logger?.LogInformation("SaaS tenant schema: installing tenant HR employee procedures…");
+            await PsqlFileRunner.RunSqlFileAsync(db, "database/hr/install_tenant_hr_employee_procs.sql", ct);
         }
         else
             logger?.LogInformation("SaaS tenant schema: HR/payroll procedures already installed.");

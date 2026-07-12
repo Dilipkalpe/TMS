@@ -50,7 +50,11 @@ public static class HrPayrollSchemaMigrator
         if (!await TenantHrPayrollInstallGuard.IsTenantProcsInstalledAsync(db, ct))
             await PsqlFileRunner.RunSqlFileAsync(db, "database/saas/tenant_hr_payroll_procs.sql", ct);
         else if (!await TenantHrPayrollInstallGuard.IsTenantHrEmployeeProcsInstalledAsync(db, ct))
-            await PsqlFileRunner.RunSqlFileAsync(db, "database/saas/tenant_hr_payroll_procs.sql", ct);
+        {
+            await PsqlFileRunner.RunSqlFileAsync(db, "database/hr/install_tenant_hr_employee_procs.sql", ct);
+            if (!await TenantHrPayrollInstallGuard.IsTenantHrEmployeeProcsInstalledAsync(db, ct))
+                await PsqlFileRunner.RunSqlFileAsync(db, "database/saas/tenant_hr_payroll_procs.sql", ct);
+        }
     }
 
     static async Task<bool> IsInstalledAsync(TmsDbContext db, CancellationToken ct)
