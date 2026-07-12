@@ -70,6 +70,7 @@
     <None Include="..\..\database\saas\tenant_modules.sql" Link="database\saas\tenant_modules.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\saas\tenant_hr_payroll_columns.sql" Link="database\saas\tenant_hr_payroll_columns.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\saas\tenant_hr_payroll_procs.sql" Link="database\saas\tenant_hr_payroll_procs.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hr\install_sp_hr_save_employee.sql" Link="database\hr\install_sp_hr_save_employee.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

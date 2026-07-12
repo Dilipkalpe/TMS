@@ -49,6 +49,10 @@ public static class HrPayrollSchemaMigrator
         await PsqlFileRunner.RunSqlFileAsync(db, "database/saas/tenant_hr_payroll_columns.sql", ct);
         if (!await TenantHrPayrollInstallGuard.IsTenantProcsInstalledAsync(db, ct))
             await PsqlFileRunner.RunSqlFileAsync(db, "database/saas/tenant_hr_payroll_procs.sql", ct);
+
+        // Always ensure tenant-aware employee save (38-param legacy versions break the API).
+        if (!await TenantHrPayrollInstallGuard.IsSaveEmployeeProcInstalledAsync(db, ct))
+            await PsqlFileRunner.RunSqlFileAsync(db, "database/hr/install_sp_hr_save_employee.sql", ct);
     }
 
     static async Task<bool> IsInstalledAsync(TmsDbContext db, CancellationToken ct)

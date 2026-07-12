@@ -94,7 +94,12 @@ public class HrController(HrService hr, DriverSyncService driverSync) : Controll
             }
             return Ok(new { id });
         }
-        catch (PostgresException ex) { return BadRequest(new ApiError(ex.MessageText)); }
+        catch (PostgresException ex)
+        {
+            if (ex.SqlState == "42883" && ex.MessageText.Contains("sp_hr_save_employee", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new ApiError("HR employee save is not configured on the database. Run: bash deploy/fix-employee-save.sh on the server, then restart the API."));
+            return BadRequest(new ApiError(ex.MessageText));
+        }
     }
 
     [HttpDelete("employees/{id:guid}")]
