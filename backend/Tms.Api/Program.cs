@@ -358,9 +358,9 @@ app.MapGet("/api/health", async (TmsDbContext db) =>
 
         return ok
 
-            ? Results.Ok(new { status = "healthy", service = "TMS Pro API", database = "connected", build = "2026-07-12-hr-save-auto" })
+            ? Results.Ok(new { status = "healthy", service = "TMS Pro API", database = "connected", build = "2026-07-12-hr-save-v2" })
 
-            : Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "disconnected", build = "2026-07-12-hr-save-auto" }, statusCode: 503);
+            : Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "disconnected", build = "2026-07-12-hr-save-v2" }, statusCode: 503);
 
     }
 

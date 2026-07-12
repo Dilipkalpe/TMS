@@ -1,7 +1,6 @@
 -- Install tenant-aware sp_hr_save_employee (39 parameters including p_company_id).
--- Run after hr schema exists. Safe to re-run.
+-- Safe to re-run. No psql meta-commands (runs via Npgsql in API startup).
 
-\echo '==> Drop all sp_hr_save_employee overloads'
 DO $$
 DECLARE r RECORD;
 BEGIN
@@ -15,11 +14,24 @@ BEGIN
     END LOOP;
 END $$;
 
-\echo '==> Ensure company_id on hr_employees'
 ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS company_id UUID;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS employment_type VARCHAR(20) NOT NULL DEFAULT 'Permanent';
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS daily_wage DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS contract_end_date DATE;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS esi_applicable BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS insurance_applicable BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS insurance_amount DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS license_number VARCHAR(50);
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS license_expiry DATE;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS assigned_vehicle_id VARCHAR(50);
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS route_allowance DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS fuel_allowance DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS loading_allowance DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS halting_allowance DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE hr_employees ADD COLUMN IF NOT EXISTS driver_bhatta DECIMAL(12,2) NOT NULL DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_hr_employees_company ON hr_employees(company_id);
 
-\echo '==> Create sp_hr_save_employee (tenant)'
 CREATE OR REPLACE FUNCTION sp_hr_save_employee(
     p_company_id UUID,
     p_id UUID, p_employee_code VARCHAR, p_name VARCHAR,
@@ -95,8 +107,3 @@ BEGIN
     RETURN v_id;
 END;
 $$ LANGUAGE plpgsql;
-
-\echo '==> Verify'
-SELECT proname, pronargs AS arg_count
-FROM pg_proc
-WHERE proname = 'sp_hr_save_employee';
