@@ -11,6 +11,19 @@ function getStoredBranchId() {
   return localStorage.getItem(BRANCH_KEY)
 }
 
+/** Auth + tenant headers shared by JSON API calls and multipart uploads. */
+function buildAuthHeaders({ json = true } = {}) {
+  const headers = { Accept: 'application/json' }
+  if (json) headers['Content-Type'] = 'application/json'
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const branchId = getStoredBranchId()
+  if (branchId && branchId !== 'all') headers['X-Branch-Id'] = branchId
+  const companyId = getStoredCompanyId() || DEMO_COMPANY_ID
+  if (companyId) headers['X-Company-Id'] = companyId
+  return headers
+}
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -59,15 +72,7 @@ const API_TIMEOUT_MS = 60000
 
 export async function apiRequest(path, options = {}) {
   const { method = 'GET', body, auth = true, timeout = API_TIMEOUT_MS } = options
-  const headers = { 'Content-Type': 'application/json', Accept: 'application/json' }
-  if (auth) {
-    const token = getToken()
-    if (token) headers.Authorization = `Bearer ${token}`
-    const branchId = getStoredBranchId()
-    if (branchId && branchId !== 'all') headers['X-Branch-Id'] = branchId
-    const companyId = getStoredCompanyId() || DEMO_COMPANY_ID
-    if (companyId) headers['X-Company-Id'] = companyId
-  }
+  const headers = auth ? buildAuthHeaders() : { 'Content-Type': 'application/json', Accept: 'application/json' }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
@@ -310,9 +315,7 @@ export const settingsApi = {
   get: () => apiRequest('/settings'),
   update: (data) => apiRequest('/settings', { method: 'PUT', body: data }),
   uploadLogo: async (file) => {
-    const token = getToken()
-    const headers = {}
-    if (token) headers.Authorization = `Bearer ${token}`
+    const headers = buildAuthHeaders({ json: false })
     const form = new FormData()
     form.append('file', file)
     const res = await fetch(`${API_BASE_URL}/settings/logo`, { method: 'POST', headers, body: form })
