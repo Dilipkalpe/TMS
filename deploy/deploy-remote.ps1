@@ -30,10 +30,8 @@ set -e
 cd '$RepoDir'
 echo '==> Git pull'
 git pull --ff-only
-chmod +x deploy/force-rebuild.sh deploy/fix-hr-payroll.sh 2>/dev/null || true
-$hrStep
-echo '==> Rebuild API + Web'
-bash deploy/force-rebuild.sh
+chmod +x deploy/force-rebuild.sh deploy/fix-hr-payroll.sh deploy/fix-employee-save.sh 2>/dev/null || true
+bash deploy/fix-employee-save.sh
 echo '==> Health'
 sleep 5
 curl -fsS http://127.0.0.1:8080/api/health || curl -fsS http://127.0.0.1:8080/api/health

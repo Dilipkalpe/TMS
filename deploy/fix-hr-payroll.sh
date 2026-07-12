@@ -40,7 +40,8 @@ for f in \
   database/hr/tms_transport_hr.sql \
   database/payroll/tms_transport_payroll.sql \
   database/saas/tenant_hr_payroll_columns.sql \
-  database/saas/tenant_hr_payroll_procs.sql
+  database/saas/tenant_hr_payroll_procs.sql \
+  database/hr/install_sp_hr_save_employee.sql
 do
   run_sql "$REPO_DIR/$f"
 done
