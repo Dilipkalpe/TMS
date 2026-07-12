@@ -42,7 +42,7 @@ export default function ERPDataTable({
     <div className={fill ? 'scroll-hint-x flex min-h-0 flex-1 flex-col overflow-hidden' : 'report-table-shell scroll-hint-x'}>
       <div
         className={`mobile-scroll-x mobile-scroll-y overflow-auto ${
-          fill ? 'min-h-0 flex-1' : 'report-table-scroll'
+          fill ? 'erp-list-table-scroll min-h-0 flex-1 report-table-scroll' : 'report-table-scroll'
         }`}
       >
         <table className="w-full min-w-[640px] border-collapse text-left text-xs sm:text-sm">

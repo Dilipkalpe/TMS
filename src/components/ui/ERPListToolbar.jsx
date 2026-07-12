@@ -61,18 +61,18 @@ export default function ERPListToolbar({
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <Button variant="outline" size="sm" icon={RefreshCw} onClick={onRefresh}>
-            Refresh
+        <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+          <Button variant="outline" size="sm" icon={RefreshCw} onClick={onRefresh} className="!px-2 sm:!px-3">
+            <span className="hidden min-[400px]:inline">Refresh</span>
           </Button>
-          <Button variant="outline" size="sm" icon={Columns3} onClick={onManageColumns}>
+          <Button variant="outline" size="sm" icon={Columns3} onClick={onManageColumns} className="!px-2 sm:!px-3">
+            <span className="hidden min-[400px]:inline sm:hidden">Cols</span>
             <span className="hidden sm:inline">Manage Columns</span>
-            <span className="sm:hidden">Columns</span>
           </Button>
-          <Button variant="outline" size="sm" icon={Download} onClick={onExport}>
+          <Button variant="outline" size="sm" icon={Download} onClick={onExport} className="!px-2 sm:!px-3">
+            <span className="hidden min-[400px]:inline sm:hidden">Export</span>
             <span className="hidden sm:inline">Export Data</span>
-            <span className="sm:hidden">Export</span>
-            <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className="hidden h-3.5 w-3.5 sm:inline" />
           </Button>
           {onImport && (
             <Button variant="outline" size="sm" icon={Upload} onClick={onImport}>

@@ -39,7 +39,7 @@ export default function NotificationPanel() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-xl p-2.5 text-primary transition-all hover:bg-primary/10 dark:text-blue-200 dark:hover:bg-primary/20"
+        className="relative rounded-lg p-1.5 text-primary transition-all hover:bg-primary/10 sm:rounded-xl sm:p-2.5 dark:text-blue-200 dark:hover:bg-primary/20"
         aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
