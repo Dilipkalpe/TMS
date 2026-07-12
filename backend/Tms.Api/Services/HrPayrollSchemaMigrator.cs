@@ -37,6 +37,9 @@ public static class HrPayrollSchemaMigrator
 
     public static async Task EnsureAsync(TmsDbContext db, CancellationToken ct = default)
     {
+        if (!await TenantHrPayrollInstallGuard.IsGetEmployeeProcInstalledAsync(db, ct))
+            await PsqlFileRunner.RunSqlFileAsync(db, "database/hr/install_tenant_hr_employee_procs.sql", ct);
+
         foreach (var file in SchemaSqlFiles)
             await PsqlFileRunner.RunSqlFileAsync(db, file, ct);
 

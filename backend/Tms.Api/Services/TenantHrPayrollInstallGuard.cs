@@ -20,6 +20,9 @@ static class TenantHrPayrollInstallGuard
             && await ProcExistsAsync(db, "sp_hr_list_employees", 5, ct);
     }
 
+    public static Task<bool> IsGetEmployeeProcInstalledAsync(TmsDbContext db, CancellationToken ct = default)
+        => ProcExistsAsync(db, "sp_hr_get_employee", 2, ct);
+
     public static Task<bool> IsSaveEmployeeProcInstalledAsync(TmsDbContext db, CancellationToken ct = default)
         => ProcExistsAsync(db, "sp_hr_save_employee", 39, ct);
 

@@ -126,7 +126,33 @@ public class HrService(IConfiguration config, ITenantContext tenants)
     public async Task<HrEmployeeDetailDto?> GetEmployeeAsync(Guid id, CancellationToken ct = default)
     {
         await using var conn = await OpenAsync(ct);
-        await using var cmd = new NpgsqlCommand("SELECT * FROM sp_hr_get_employee(@p_company_id, @p_id)", conn);
+        await using var cmd = new NpgsqlCommand(
+            """
+            SELECT e.id, e.employee_code, e.name, e.employee_type,
+                   COALESCE(e.employment_type, 'Permanent') AS employment_type,
+                   e.department_id, d.name AS department_name,
+                   e.designation_id, g.name AS designation_name,
+                   e.driver_id, e.email, e.phone,
+                   e.date_of_joining, e.date_of_birth, e.gender, e.address,
+                   e.bank_account, e.bank_ifsc, e.pan,
+                   e.basic_salary, COALESCE(e.daily_wage, 0) AS daily_wage,
+                   e.hra, e.da, e.conveyance, e.other_allowance, e.advance,
+                   e.pf_applicable, COALESCE(e.esi_applicable, FALSE) AS esi_applicable,
+                   COALESCE(e.insurance_applicable, TRUE) AS insurance_applicable,
+                   COALESCE(e.insurance_amount, 0) AS insurance_amount,
+                   e.contract_end_date,
+                   e.license_number, e.license_expiry, e.assigned_vehicle_id,
+                   COALESCE(e.route_allowance, 0) AS route_allowance,
+                   COALESCE(e.fuel_allowance, 0) AS fuel_allowance,
+                   COALESCE(e.loading_allowance, 0) AS loading_allowance,
+                   COALESCE(e.halting_allowance, 0) AS halting_allowance,
+                   COALESCE(e.driver_bhatta, 0) AS driver_bhatta,
+                   e.status, e.created_at
+            FROM hr_employees e
+            LEFT JOIN hr_departments d ON d.id = e.department_id AND d.company_id = @p_company_id
+            LEFT JOIN hr_designations g ON g.id = e.designation_id
+            WHERE e.id = @p_id AND e.company_id = @p_company_id
+            """, conn);
         cmd.Parameters.AddWithValue("p_company_id", CompanyId);
         cmd.Parameters.AddWithValue("p_id", id);
         await using var r = await cmd.ExecuteReaderAsync(ct);

@@ -20,7 +20,7 @@ Write-Host ""
 Write-Host "You will be prompted for the VPS SSH password."
 Write-Host ""
 
-$remoteCmd = "set -e; cd $RepoDir; git pull --ff-only; chmod +x deploy/fix-employee-save.sh deploy/force-rebuild.sh; bash deploy/fix-employee-save.sh"
+$remoteCmd = "set -e; cd $RepoDir; git pull --ff-only; chmod +x deploy/patch-hr-get-employee.sh deploy/fix-employee-save.sh deploy/force-rebuild.sh; bash deploy/patch-hr-get-employee.sh; bash deploy/force-rebuild.sh"
 
 & ssh "${User}@${Server}" $remoteCmd
 
