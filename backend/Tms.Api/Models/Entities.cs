@@ -295,5 +295,7 @@ public class CompanySettings : ITenantScoped
     public string? Email { get; set; }
     public string? TransportLicenseNo { get; set; }
     public int? FleetSize { get; set; }
+    /// <summary>FirstLRThenBooking | FirstBookingThenLR</summary>
+    public string DocumentFlow { get; set; } = "FirstBookingThenLR";
     public DateTime UpdatedAt { get; set; }
 }

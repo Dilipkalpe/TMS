@@ -17,7 +17,8 @@ public class DashboardController(
     IBranchContext branches,
     ITenantContext tenants,
     TenantCacheService cache,
-    DashboardReadService dashboardRead) : ControllerBase
+    DashboardReadService dashboardRead,
+    DocumentFlowService documentFlow) : ControllerBase
 {
     Guid CompanyId => TenantScope.ResolveCompanyId(tenants);
     Guid? BranchId => branches.EffectiveBranchId;
@@ -33,9 +34,12 @@ public class DashboardController(
 
     async Task<DashboardStatsDto> LoadStatsAsync()
     {
+        var (pendingDocuments, _, _) = await documentFlow.GetPendingDocumentCountAsync();
         var spStats = await dashboardRead.TryGetStatsAsync(CompanyId, BranchId);
         if (spStats != null)
-            return spStats;
+        {
+            return spStats with { PendingLr = pendingDocuments };
+        }
 
         return await LoadStatsViaEfAsync();
     }
@@ -46,19 +50,17 @@ public class DashboardController(
         var bookings = tenants.Filter(branches.Filter(db.Bookings.AsNoTracking()));
         var vehicles = tenants.Filter(branches.Filter(db.Vehicles.AsNoTracking()));
         var drivers = tenants.Filter(branches.Filter(db.Drivers.AsNoTracking()));
-        var lrs = tenants.Filter(db.LorryReceipts.AsNoTracking());
 
-        var lrBookingIds = lrs.Select(l => l.BookingId).Distinct();
         var totalIncome = await bookings.SumAsync(b => b.Freight);
         var totalExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, branches);
-        var pendingLr = await bookings.CountAsync(b => !lrBookingIds.Contains(b.Id));
+        var (pendingDocuments, _, _) = await documentFlow.GetPendingDocumentCountAsync();
 
         return new DashboardStatsDto(
             await vehicles.CountAsync(),
             await drivers.CountAsync(),
             await tenants.Filter(branches.Filter(db.Customers.AsNoTracking())).CountAsync(),
             await bookings.CountAsync(),
-            pendingLr,
+            pendingDocuments,
             await bookings.CountAsync(b => b.BookingDate == today),
             totalIncome,
             totalExpenses,
@@ -265,7 +267,15 @@ public class DashboardController(
             alerts.Add(new { id = $"out-{c.Id}", type = "warning", title = "High receivable", message = $"{c.Name} · ₹{c.Outstanding:N0}", path = $"/customers/{c.Id}", time = DateTime.UtcNow.ToString("yyyy-MM-dd") });
         var pendingLr = await CountPendingLrAsync();
         if (pendingLr > 0)
-            alerts.Add(new { id = "lr-pending", type = "info", title = "LR generation pending", message = $"{pendingLr} booking(s) without LR", path = "/lr", time = DateTime.UtcNow.ToString("yyyy-MM-dd") });
+        {
+            var flow = await documentFlow.GetFlowAsync();
+            var title = flow == DocumentFlow.FirstLRThenBooking ? "Booking pending for LR" : "LR generation pending";
+            var message = flow == DocumentFlow.FirstLRThenBooking
+                ? $"{pendingLr} LR(s) without booking"
+                : $"{pendingLr} booking(s) without LR";
+            var path = flow == DocumentFlow.FirstLRThenBooking ? "/bookings" : "/lr";
+            alerts.Add(new { id = "lr-pending", type = "info", title, message, path, time = DateTime.UtcNow.ToString("yyyy-MM-dd") });
+        }
 
         try
         {
@@ -296,13 +306,8 @@ public class DashboardController(
 
     async Task<int> CountPendingLrAsync()
     {
-        var spStats = await dashboardRead.TryGetStatsAsync(CompanyId, BranchId);
-        if (spStats != null)
-            return spStats.PendingLr;
-
-        var bookings = tenants.Filter(branches.Filter(db.Bookings.AsNoTracking()));
-        return await bookings.CountAsync(b =>
-            !db.LorryReceipts.AsNoTracking().Any(l => l.BookingId == b.Id && l.CompanyId == CompanyId));
+        var (count, _, _) = await documentFlow.GetPendingDocumentCountAsync();
+        return count;
     }
 
     async Task AddMaintenanceAlertsAsync(List<object> alerts)

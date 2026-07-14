@@ -7,12 +7,13 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import ERPDataTable from '../../components/ui/ERPDataTable'
-import { lrApi } from '../../services/api'
+import { lrApi, bookingsApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { Save, Printer, Download, Copy, Loader2 } from 'lucide-react'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
+import { useDocumentFlow } from '../../hooks/useDocumentFlow'
 
 const PAYMENT_TYPES = ['To Pay', 'Paid', 'TBB', 'To Be Billed']
 
@@ -58,10 +59,12 @@ export default function GenerateLR() {
   const { toast } = useToast()
   const { company, print } = usePrint()
   const [searchParams] = useSearchParams()
+  const { isFirstBookingThenLr, documentFlowLabel, loading: flowLoading } = useDocumentFlow()
   const [form, setForm] = useState(emptyForm)
   const [lrList, setLrList] = useState([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [bookingOptions, setBookingOptions] = useState([{ value: '', label: 'Select booking…' }])
 
   useEffect(() => {
     lrApi.list({ page: 1, pageSize: 15 })
@@ -70,6 +73,21 @@ export default function GenerateLR() {
       .finally(() => setLoading(false))
   }, [toast])
 
+  useEffect(() => {
+    if (!isFirstBookingThenLr) return
+    bookingsApi.list({ page: 1, pageSize: 100 })
+      .then((res) => {
+        const rows = unwrapList(res)
+        setBookingOptions([
+          { value: '', label: 'Select booking…' },
+          ...rows.map((b) => ({
+            value: b.id,
+            label: `${b.id} · ${b.customer || b.customerName || ''} · ${b.from || ''} → ${b.to || ''}`,
+          })),
+        ])
+      })
+      .catch(() => setBookingOptions([{ value: '', label: 'Select booking…' }]))
+  }, [isFirstBookingThenLr])
   useEffect(() => {
     const bookingId = searchParams.get('bookingId')
     if (!bookingId) return
@@ -111,6 +129,14 @@ export default function GenerateLR() {
   }
 
   const handleSave = async () => {
+    if (isFirstBookingThenLr && !form.bookingId?.trim()) {
+      toast({
+        title: 'Validation',
+        message: `Company Document Flow is "${documentFlowLabel}". Create a Booking first, then link it when generating the LR.`,
+        type: 'warning',
+      })
+      return
+    }
     if (!form.from?.trim() || !form.to?.trim()) {
       toast({ title: 'Validation', message: 'From and To cities are required.', type: 'warning' })
       return
@@ -178,12 +204,57 @@ export default function GenerateLR() {
 
   return (
     <ERPContentPage module="LR" title="Add New Record">
+      {isFirstBookingThenLr && !flowLoading && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          Document Flow: <strong>{documentFlowLabel}</strong>. Booking No. is required before saving this LR.
+        </div>
+      )}
       <div className="space-y-4">
         <Card>
           <CardHeader title="Generate New LR" subtitle="Fill in the LR details below" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Input label="LR Number" value={form.lrNumber} placeholder="Auto-generated on save" onChange={(e) => update('lrNumber', e.target.value)} />
-            <Input label="Booking No." value={form.bookingId} placeholder="Linked booking (optional)" onChange={(e) => update('bookingId', e.target.value)} />
+            {isFirstBookingThenLr ? (
+              <Select
+                label="Booking No. (required)"
+                value={form.bookingId}
+                options={bookingOptions}
+                onChange={(e) => {
+                  const bookingId = e.target.value
+                  update('bookingId', bookingId)
+                  if (bookingId) {
+                    lrApi.prefillFromBooking(bookingId)
+                      .then((prefill) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          bookingId: prefill.bookingId,
+                          consignor: prefill.consignor ?? '',
+                          consignee: prefill.consignee ?? '',
+                          from: prefill.from ?? '',
+                          to: prefill.to ?? '',
+                          vehicle: prefill.vehicle ?? '',
+                          driver: prefill.driver ?? '',
+                          material: prefill.material ?? '',
+                          quantity: prefill.quantity ?? '',
+                          freight: prefill.freight ?? 0,
+                          gst: prefill.gst ?? 0,
+                          hamali: prefill.hamali ?? 0,
+                          loadingCharges: prefill.loadingCharges ?? 0,
+                          unloadingCharges: prefill.unloadingCharges ?? 0,
+                          insurance: prefill.insurance ?? 0,
+                          advance: prefill.advance ?? 0,
+                          balance: prefill.balance ?? 0,
+                          paymentType: prefill.paymentType ?? prev.paymentType,
+                          remarks: prefill.remarks ?? '',
+                        }))
+                      })
+                      .catch((err) => toast({ title: 'Booking load failed', message: err.message, type: 'warning' }))
+                  }
+                }}
+              />
+            ) : (
+              <Input label="Booking No." value={form.bookingId} placeholder="Optional link" onChange={(e) => update('bookingId', e.target.value)} />
+            )}
             <Input label="LR Date" type="date" value={form.lrDate} onChange={(e) => update('lrDate', e.target.value)} />
             <Input label="Consignor" value={form.consignor} onChange={(e) => update('consignor', e.target.value)} />
             <Input label="Consignee" value={form.consignee} onChange={(e) => update('consignee', e.target.value)} />

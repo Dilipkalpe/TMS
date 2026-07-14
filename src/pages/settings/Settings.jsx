@@ -9,8 +9,9 @@ import { usePrint } from '../../context/PrintContext'
 import { settingsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { getStoredPrintLogoUrl, resolveCompanyLogoUrl } from '../../utils/printLogo'
-import { Save, Download, Shield, Building2, Loader2, Upload, X, ImageIcon, Bell } from 'lucide-react'
+import { Save, Download, Shield, Building2, Loader2, Upload, X, ImageIcon, Bell, GitBranch } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { DOCUMENT_FLOW, DOCUMENT_FLOW_LABELS } from '../../hooks/useDocumentFlow'
 
 export default function Settings() {
   const { theme, setTheme } = useTheme()
@@ -146,6 +147,80 @@ export default function Settings() {
             transportLicenseNo: settings.transportLicenseNo, fleetSize: settings.fleetSize ? Number(settings.fleetSize) : null,
           })}>Save Profile</Button>
           <Button variant="outline" icon={Save} onClick={savePrintLogo}>Save Logo URL Override</Button>
+        </div>
+      ),
+    },
+    {
+      id: 'document-flow',
+      label: 'Document Flow',
+      content: (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="mb-2 flex items-center gap-2">
+              <GitBranch className="h-5 w-5 text-primary" />
+              <p className="font-semibold text-slate-800 dark:text-slate-100">Document Flow Preference</p>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Controls whether your company creates Lorry Receipts before Bookings, or Bookings before LRs.
+              Validation and dashboard pending counts follow this setting.
+            </p>
+          </div>
+          <fieldset className="space-y-3">
+            <legend className="sr-only">Document Flow Preference</legend>
+            {[
+              {
+                value: DOCUMENT_FLOW.FirstLRThenBooking,
+                title: DOCUMENT_FLOW_LABELS.FirstLRThenBooking,
+                desc: 'Create LR first. Booking can be created only after selecting that LR.',
+              },
+              {
+                value: DOCUMENT_FLOW.FirstBookingThenLR,
+                title: DOCUMENT_FLOW_LABELS.FirstBookingThenLR,
+                desc: 'Create Booking first. LR can be generated only after linking a Booking.',
+              },
+            ].map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex cursor-pointer gap-3 rounded-xl border-2 p-4 transition-all ${
+                  (settings.documentFlow ?? DOCUMENT_FLOW.FirstBookingThenLR) === opt.value
+                    ? 'border-primary bg-primary/5'
+                    : 'border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="documentFlow"
+                  className="mt-1"
+                  value={opt.value}
+                  checked={(settings.documentFlow ?? DOCUMENT_FLOW.FirstBookingThenLR) === opt.value}
+                  onChange={() => update('documentFlow', opt.value)}
+                />
+                <span>
+                  <span className="block font-medium text-slate-800 dark:text-slate-100">{opt.title}</span>
+                  <span className="mt-0.5 block text-sm text-slate-500">{opt.desc}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <Button
+            icon={saving ? Loader2 : Save}
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true)
+              try {
+                const res = await settingsApi.setDocumentFlow(settings.documentFlow || DOCUMENT_FLOW.FirstBookingThenLR)
+                update('documentFlow', res.documentFlow)
+                update('documentFlowLabel', res.documentFlowLabel)
+                toast({ title: 'Saved', message: 'Document flow preference updated.', type: 'success' })
+              } catch (err) {
+                toast({ title: 'Save failed', message: err.message, type: 'error' })
+              } finally {
+                setSaving(false)
+              }
+            }}
+          >
+            Save Document Flow
+          </Button>
         </div>
       ),
     },

@@ -391,7 +391,7 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
 [Authorize]
 [ApiController]
 [Route("api/lr")]
-public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync) : ControllerBase
+public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync, DocumentFlowService documentFlow) : ControllerBase
 {
     async Task<Driver?> ResolveDriverAsync(string? driverName, CancellationToken ct = default)
     {
@@ -500,6 +500,15 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             return BadRequest(new ApiError("From and To cities are required."));
 
         var bookingId = ApiParseHelper.BodyString(body, "bookingId");
+        try
+        {
+            await documentFlow.EnsureCanCreateLrAsync(bookingId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
         Booking? booking = null;
         if (!string.IsNullOrEmpty(bookingId))
             booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
@@ -578,7 +587,17 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         {
             var newBookingId = ApiParseHelper.BodyString(body, "bookingId");
             if (string.IsNullOrEmpty(newBookingId))
+            {
+                try
+                {
+                    await documentFlow.EnsureCanClearLrBookingLinkAsync();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new ApiError(ex.Message));
+                }
                 lr.BookingId = null;
+            }
             else
             {
                 var linked = await TenantScope.FindBookingAsync(db, tenants, branches, newBookingId);

@@ -129,6 +129,7 @@ builder.Services.AddScoped<RouteOptimizationService>();
 builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<LookupQuickCreateService>();
 builder.Services.AddScoped<DriverSyncService>();
+builder.Services.AddScoped<DocumentFlowService>();
 
 builder.Services.AddHttpClient();
 
@@ -358,9 +359,9 @@ app.MapGet("/api/health", async (TmsDbContext db) =>
 
         return ok
 
-            ? Results.Ok(new { status = "healthy", service = "TMS Pro API", database = "connected", build = "2026-07-12-hr-get-employee-fix" })
+            ? Results.Ok(new { status = "healthy", service = "TMS Pro API", database = "connected", build = "2026-07-14-document-flow" })
 
-            : Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "disconnected", build = "2026-07-12-hr-get-employee-fix" }, statusCode: 503);
+            : Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "disconnected", build = "2026-07-14-document-flow" }, statusCode: 503);
 
     }
 

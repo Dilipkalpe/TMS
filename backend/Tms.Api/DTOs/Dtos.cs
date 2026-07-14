@@ -30,7 +30,7 @@ public record CreateBookingRequest(
     string Date, string Customer, string? Consignor, string? Consignee,
     string From, string To, string? Material, string? Quantity,
     string? Vehicle, string? Driver, decimal Freight, string Status, string Payment,
-    decimal Advance, string? Remarks);
+    decimal Advance, string? Remarks, string? LrNumber = null);
 
 public record VehicleDto(
     string Id, string Number, string? Type, string? Model, string? Capacity, string? Owner,

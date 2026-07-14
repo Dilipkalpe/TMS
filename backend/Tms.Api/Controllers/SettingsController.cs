@@ -10,17 +10,27 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/settings")]
-public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHostEnvironment env) : ControllerBase
+public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHostEnvironment env, DocumentFlowService documentFlow) : ControllerBase
 {
     private static readonly string[] AllowedLogoExtensions = [".png", ".jpg", ".jpeg", ".svg", ".webp"];
     private const long MaxLogoBytes = 2 * 1024 * 1024;
 
     [HttpGet]
-    public async Task<ActionResult<object>> Get()
+    public async Task<ActionResult<object>> Get(CancellationToken ct)
     {
-        var s = await FindSettingsAsync();
+        var flow = await documentFlow.GetFlowAsync(ct);
+        var s = await FindSettingsAsync(ct);
         if (s == null)
-            return Ok(new { companyName = "TMS Pro Logistics Pvt Ltd", financialYear = "2025-26", gstRate = 18 });
+        {
+            return Ok(new
+            {
+                companyName = "TMS Pro Logistics Pvt Ltd",
+                financialYear = "2025-26",
+                gstRate = 18,
+                documentFlow = flow,
+                documentFlowLabel = DocumentFlow.DisplayLabel(flow),
+            });
+        }
 
         return Ok(new
         {
@@ -35,6 +45,8 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
             email = s.Email ?? "info@tmstransport.com",
             transportLicenseNo = s.TransportLicenseNo,
             fleetSize = s.FleetSize,
+            documentFlow = DocumentFlow.Normalize(s.DocumentFlow),
+            documentFlowLabel = DocumentFlow.DisplayLabel(s.DocumentFlow),
             gstType = "Regular",
             stateCode = "27 - Maharashtra",
             yearStart = "2025-04-01",
@@ -42,8 +54,44 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
         });
     }
 
+    [HttpGet("document-flow")]
+    public async Task<ActionResult<object>> GetDocumentFlow(CancellationToken ct)
+    {
+        var flow = await documentFlow.GetFlowAsync(ct);
+        return Ok(new
+        {
+            documentFlow = flow,
+            documentFlowLabel = DocumentFlow.DisplayLabel(flow),
+            options = new[]
+            {
+                new { value = DocumentFlow.FirstLRThenBooking, label = DocumentFlow.DisplayLabel(DocumentFlow.FirstLRThenBooking) },
+                new { value = DocumentFlow.FirstBookingThenLR, label = DocumentFlow.DisplayLabel(DocumentFlow.FirstBookingThenLR) },
+            },
+        });
+    }
+
+    [HttpPut("document-flow")]
+    public async Task<ActionResult<object>> PutDocumentFlow([FromBody] DocumentFlowRequest body, CancellationToken ct)
+    {
+        try
+        {
+            await documentFlow.SetFlowAsync(body.DocumentFlow, ct);
+            var flow = await documentFlow.GetFlowAsync(ct);
+            return Ok(new
+            {
+                message = "Document flow preference saved.",
+                documentFlow = flow,
+                documentFlowLabel = DocumentFlow.DisplayLabel(flow),
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPut]
-    public async Task<ActionResult<object>> Update([FromBody] Dictionary<string, object?> body)
+    public async Task<ActionResult<object>> Update([FromBody] Dictionary<string, object?> body, CancellationToken ct)
     {
         var s = await GetOrCreateSettings();
         if (body.ContainsKey("companyName")) s.CompanyName = body["companyName"]?.ToString();
@@ -57,9 +105,21 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
         if (body.TryGetValue("fleetSize", out var fs) && int.TryParse(fs?.ToString(), out var fleet)) s.FleetSize = fleet;
         if (body.TryGetValue("gstRate", out var gr) && decimal.TryParse(gr?.ToString(), out var rate)) s.GstRate = rate;
         if (body.ContainsKey("logoUrl")) s.LogoUrl = body["logoUrl"]?.ToString();
+        if (body.ContainsKey("documentFlow"))
+        {
+            var raw = body["documentFlow"]?.ToString();
+            if (!DocumentFlow.IsValid(raw))
+                return BadRequest(new { message = $"Invalid documentFlow. Use '{DocumentFlow.FirstLRThenBooking}' or '{DocumentFlow.FirstBookingThenLR}'." });
+            s.DocumentFlow = DocumentFlow.Normalize(raw);
+        }
         s.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-        return Ok(new { message = "Settings saved successfully.", logoUrl = s.LogoUrl });
+        await db.SaveChangesAsync(ct);
+        return Ok(new
+        {
+            message = "Settings saved successfully.",
+            logoUrl = s.LogoUrl,
+            documentFlow = DocumentFlow.Normalize(s.DocumentFlow),
+        });
     }
 
     [HttpPost("logo")]
@@ -132,8 +192,38 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
         var companyId = TenantScope.ResolveCompanyId(tenants);
         var s = await db.CompanySettings.FirstOrDefaultAsync(x => x.CompanyId == companyId);
         if (s != null) return s;
-        s = new CompanySettings { CompanyId = companyId };
+        s = new CompanySettings { CompanyId = companyId, DocumentFlow = DocumentFlow.Default };
         db.CompanySettings.Add(s);
         return s;
+    }
+}
+
+public record DocumentFlowRequest(string DocumentFlow);
+
+/// <summary>Alias route matching product API: GET /api/company/settings/document-flow</summary>
+[Authorize]
+[ApiController]
+[Route("api/company/settings")]
+public class CompanyDocumentFlowController(DocumentFlowService documentFlow) : ControllerBase
+{
+    [HttpGet("document-flow")]
+    public async Task<ActionResult<object>> Get(CancellationToken ct)
+    {
+        var flow = await documentFlow.GetFlowAsync(ct);
+        return Ok(new { documentFlow = flow });
+    }
+
+    [HttpPut("document-flow")]
+    public async Task<ActionResult<object>> Put([FromBody] DocumentFlowRequest body, CancellationToken ct)
+    {
+        try
+        {
+            await documentFlow.SetFlowAsync(body.DocumentFlow, ct);
+            return Ok(new { documentFlow = await documentFlow.GetFlowAsync(ct) });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

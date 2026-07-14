@@ -382,6 +382,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Email).HasColumnName("email");
             e.Property(x => x.TransportLicenseNo).HasColumnName("transport_license_no");
             e.Property(x => x.FleetSize).HasColumnName("fleet_size");
+            e.Property(x => x.DocumentFlow).HasColumnName("document_flow").HasMaxLength(40);
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });
     }

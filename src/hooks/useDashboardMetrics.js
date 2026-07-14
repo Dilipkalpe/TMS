@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { dashboardApi } from '../services/api'
+import { dashboardApi, settingsApi } from '../services/api'
 import { formatChange } from '../utils/export'
+import { DOCUMENT_FLOW } from './useDocumentFlow'
 
 const PERIOD_MONTHS = { '3m': 3, '6m': 6, '12m': 12, ytd: 12 }
 
@@ -23,12 +24,17 @@ export function useDashboardMetrics({ period = '12m', compare = false, refreshSe
   const [raw, setRaw] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [documentFlow, setDocumentFlow] = useState(DOCUMENT_FLOW.FirstBookingThenLR)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const stats = await dashboardApi.stats()
+      const [stats, flowRes] = await Promise.all([
+        dashboardApi.stats(),
+        settingsApi.getDocumentFlow().catch(() => null),
+      ])
+      if (flowRes?.documentFlow) setDocumentFlow(flowRes.documentFlow)
       setRaw((prev) => ({ ...(prev ?? {}), stats }))
       setLoading(false)
 
@@ -145,7 +151,7 @@ export function useDashboardMetrics({ period = '12m', compare = false, refreshSe
       { label: 'Total Drivers', value: String(s.totalDrivers), icon: 'UserCircle', color: 'indigo' },
       { label: 'Total Customers', value: String(s.totalCustomers), icon: 'Users', color: 'violet' },
       { label: 'Total Trips', value: String(s.totalTrips), icon: 'Route', color: 'cyan' },
-      { label: 'Pending LR', value: String(s.pendingLr), icon: 'FileText', color: 'amber' },
+      { label: documentFlow === DOCUMENT_FLOW.FirstLRThenBooking ? 'Pending Booking' : 'Pending LR', value: String(s.pendingLr), icon: 'FileText', color: 'amber' },
       { label: "Today's Bookings", value: String(s.todaysBookings), icon: 'CalendarPlus', color: 'emerald' },
       { label: 'Total Income', value: formatLakhs(s.totalIncome), icon: 'TrendingUp', color: 'green' },
       { label: 'Total Expenses', value: formatLakhs(s.totalExpenses), icon: 'TrendingDown', color: 'red' },
@@ -183,7 +189,7 @@ export function useDashboardMetrics({ period = '12m', compare = false, refreshSe
         activeVehicles: s.totalVehicles,
       },
     }
-  }, [raw, period, compare, loading, error, load])
+  }, [raw, period, compare, loading, error, load, documentFlow])
 }
 
 export const DEFAULT_WIDGET_IDS = [

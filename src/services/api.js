@@ -326,6 +326,11 @@ export const settingsApi = {
     return res.json()
   },
   deleteLogo: () => apiRequest('/settings/logo', { method: 'DELETE' }),
+  getDocumentFlow: () => apiRequest('/settings/document-flow'),
+  /** Alias matching product docs: GET /api/company/settings/document-flow */
+  getCompanyDocumentFlow: () => apiRequest('/company/settings/document-flow'),
+  setDocumentFlow: (documentFlow) =>
+    apiRequest('/settings/document-flow', { method: 'PUT', body: { documentFlow } }),
 }
 
 export const payrollApi = {

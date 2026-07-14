@@ -11,7 +11,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class BookingsController(TmsDbContext db, NotificationDispatcher notifications, IBranchContext branches, ITenantContext tenants, SubscriptionService subscriptions, DriverSyncService driverSync) : ControllerBase
+public class BookingsController(TmsDbContext db, NotificationDispatcher notifications, IBranchContext branches, ITenantContext tenants, SubscriptionService subscriptions, DriverSyncService driverSync, DocumentFlowService documentFlow) : ControllerBase
 {
     async Task<Driver?> ResolveDriverAsync(string? driverName, CancellationToken ct = default)
     {
@@ -57,6 +57,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
         try
         {
             var companyId = tenants.AssignCompanyId ?? TenantContext.DefaultCompanyId;
+            await documentFlow.EnsureCanCreateBookingAsync(req.LrNumber, ct);
             await subscriptions.EnsureCanCreateBookingAsync(companyId);
 
             var id = await IdGenerator.NextBookingId(db);
@@ -68,6 +69,17 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
 
             if (!ApiParseHelper.TryParseDate(req.Date, out var bookingDate))
                 return BadRequest(new ApiError("Invalid booking date. Use YYYY-MM-DD."));
+
+            LorryReceipt? linkedLr = null;
+            if (!string.IsNullOrWhiteSpace(req.LrNumber))
+            {
+                linkedLr = await tenants.Filter(db.LorryReceipts)
+                    .FirstOrDefaultAsync(l => l.LrNumber == req.LrNumber, ct);
+                if (linkedLr == null)
+                    return BadRequest(new ApiError($"LR '{req.LrNumber}' was not found in your company."));
+                if (!string.IsNullOrEmpty(linkedLr.BookingId))
+                    return BadRequest(new ApiError($"LR '{req.LrNumber}' is already linked to booking '{linkedLr.BookingId}'."));
+            }
 
             var balance = req.Freight - req.Advance;
             var booking = new Booking
@@ -98,6 +110,11 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
                 UpdatedAt = DateTime.UtcNow
             };
             db.Bookings.Add(booking);
+            if (linkedLr != null)
+            {
+                linkedLr.BookingId = id;
+                linkedLr.UpdatedAt = DateTime.UtcNow;
+            }
             await CustomerTrackingService.RecordStatusAsync(db, booking.Id, booking.Status, "Booking created");
             await db.SaveChangesAsync();
             await subscriptions.IncrementBookingUsageAsync(companyId);

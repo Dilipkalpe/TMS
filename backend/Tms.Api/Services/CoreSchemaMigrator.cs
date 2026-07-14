@@ -30,6 +30,8 @@ public static class CoreSchemaMigrator
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
+        await PsqlFileRunner.RunSqlFileAsync(db, "database/settings_document_flow.sql", ct);
+
         await PsqlFileRunner.RunSqlFileAsync(db, "database/core/stored_procedures.sql", ct);
     }
 

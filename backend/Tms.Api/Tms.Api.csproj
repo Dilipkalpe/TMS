@@ -35,6 +35,7 @@
     <None Include="..\..\database\perf\add_perf_indexes.sql" Link="database\perf\add_perf_indexes.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\perf\partition_bookings.sql" Link="database\perf\partition_bookings.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\settings_extension.sql" Link="database\settings_extension.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\settings_document_flow.sql" Link="database\settings_document_flow.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\hr\schema.sql" Link="database\hr\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\hr\stored_procedures.sql" Link="database\hr\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\hr\seed.sql" Link="database\hr\seed.sql" CopyToOutputDirectory="PreserveNewest" />

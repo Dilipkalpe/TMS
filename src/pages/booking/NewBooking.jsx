@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -7,16 +7,20 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import { Save, ArrowLeft, Loader2 } from 'lucide-react'
-import { bookingsApi } from '../../services/api'
+import { bookingsApi, lrApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
+import { useDocumentFlow } from '../../hooks/useDocumentFlow'
 
 const bookingStatuses = ['Pending', 'Confirmed', 'In Transit', 'Delivered', 'Cancelled']
 const paymentStatuses = ['Unpaid', 'Partial', 'Paid']
 
 export default function NewBooking() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { toast } = useToast()
+  const { isFirstLrThenBooking, documentFlowLabel, loading: flowLoading } = useDocumentFlow()
   const [saving, setSaving] = useState(false)
+  const [unlinkedLrs, setUnlinkedLrs] = useState([])
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     customer: '',
@@ -33,11 +37,65 @@ export default function NewBooking() {
     status: 'Pending',
     payment: 'Unpaid',
     remarks: '',
+    lrNumber: searchParams.get('lrNumber') || '',
   })
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
+  useEffect(() => {
+    if (!isFirstLrThenBooking) return
+    lrApi.list({ page: 1, pageSize: 100 })
+      .then((res) => {
+        const rows = unwrapList(res).filter((r) => !r.bookingId)
+        setUnlinkedLrs(rows)
+      })
+      .catch(() => setUnlinkedLrs([]))
+  }, [isFirstLrThenBooking])
+
+  const lrOptions = useMemo(
+    () => [
+      { value: '', label: 'Select LR…' },
+      ...unlinkedLrs.map((r) => ({
+        value: r.lrNumber,
+        label: `${r.lrNumber} · ${r.from || ''} → ${r.to || ''}`,
+      })),
+    ],
+    [unlinkedLrs],
+  )
+
+  const applyLr = async (lrNumber) => {
+    set('lrNumber', lrNumber)
+    if (!lrNumber) return
+    try {
+      const lr = await lrApi.get(lrNumber)
+      setForm((f) => ({
+        ...f,
+        lrNumber,
+        consignor: lr.consignor || f.consignor,
+        consignee: lr.consignee || f.consignee,
+        from: lr.from || f.from,
+        to: lr.to || f.to,
+        vehicle: lr.vehicle || f.vehicle,
+        driver: lr.driver || f.driver,
+        material: lr.material || f.material,
+        quantity: lr.quantity || f.quantity,
+        freight: lr.freight ?? f.freight,
+        advance: lr.advance ?? f.advance,
+      }))
+    } catch {
+      /* keep manual entry */
+    }
+  }
+
   const handleSave = async () => {
+    if (isFirstLrThenBooking && !form.lrNumber?.trim()) {
+      toast({
+        title: 'Validation',
+        message: `Company Document Flow is "${documentFlowLabel}". Create an LR first, then select it here.`,
+        type: 'warning',
+      })
+      return
+    }
     if (!form.customer?.trim()) {
       toast({ title: 'Validation', message: 'Customer is required.', type: 'warning' })
       return
@@ -64,6 +122,7 @@ export default function NewBooking() {
         status: form.status,
         payment: form.payment,
         remarks: form.remarks,
+        lrNumber: form.lrNumber || undefined,
       })
       toast({ title: 'Booking saved', type: 'success' })
       navigate('/bookings')
@@ -76,8 +135,21 @@ export default function NewBooking() {
 
   return (
     <ERPContentPage module="Booking" title="Add New Record">
+      {isFirstLrThenBooking && !flowLoading && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          Document Flow: <strong>{documentFlowLabel}</strong>. Select an existing LR before saving this booking.
+        </div>
+      )}
       <Card>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {isFirstLrThenBooking && (
+            <Select
+              label="Linked LR (required)"
+              value={form.lrNumber}
+              onChange={(e) => applyLr(e.target.value)}
+              options={lrOptions}
+            />
+          )}
           <Input label="Booking Date" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
           <LookupSelect label="Customer" type="customers" value={form.customer} onChange={(v) => set('customer', v)} placeholder="Search customer…" />
           <Input label="Consignor" value={form.consignor} onChange={(e) => set('consignor', e.target.value)} placeholder="Consignor name" />
