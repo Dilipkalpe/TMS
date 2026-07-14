@@ -184,18 +184,25 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
     async Task<CompanySettings?> FindSettingsAsync(CancellationToken ct = default)
     {
         if (tenants.EffectiveCompanyId == null) return null;
-        return await db.CompanySettings.FirstOrDefaultAsync(s => s.CompanyId == tenants.EffectiveCompanyId.Value, ct);
+        var companyId = tenants.EffectiveCompanyId.Value;
+        var s = await db.CompanySettings.FirstOrDefaultAsync(x => x.CompanyId == companyId, ct);
+        if (s != null) return s;
+
+        // Show legacy singleton / unassigned row until it is claimed on save.
+        s = await db.CompanySettings
+            .Where(x => x.CompanyId == Guid.Empty)
+            .OrderBy(x => x.Id)
+            .FirstOrDefaultAsync(ct);
+        if (s != null) return s;
+
+        s = await db.CompanySettings.FirstOrDefaultAsync(x => x.Id == 1, ct);
+        if (s != null && (s.CompanyId == Guid.Empty || s.CompanyId == companyId))
+            return s;
+        return null;
     }
 
-    private async Task<CompanySettings> GetOrCreateSettings()
-    {
-        var companyId = TenantScope.ResolveCompanyId(tenants);
-        var s = await db.CompanySettings.FirstOrDefaultAsync(x => x.CompanyId == companyId);
-        if (s != null) return s;
-        s = new CompanySettings { CompanyId = companyId, DocumentFlow = DocumentFlow.Default };
-        db.CompanySettings.Add(s);
-        return s;
-    }
+    private Task<CompanySettings> GetOrCreateSettings() =>
+        documentFlow.GetOrCreateSettingsAsync();
 }
 
 public record DocumentFlowRequest(string DocumentFlow);

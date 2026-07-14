@@ -369,7 +369,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
         modelBuilder.Entity<CompanySettings>(e =>
         {
             e.ToTable("company_settings");
-            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            e.HasIndex(x => x.CompanyId).IsUnique();
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.CompanyName).HasColumnName("company_name");
             e.Property(x => x.Address).HasColumnName("address");

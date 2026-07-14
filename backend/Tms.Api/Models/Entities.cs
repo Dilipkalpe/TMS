@@ -282,7 +282,7 @@ public class AccountingReportJob : ITenantScoped
 
 public class CompanySettings : ITenantScoped
 {
-    public int Id { get; set; } = 1;
+    public int Id { get; set; }
     public Guid CompanyId { get; set; }
     public string? CompanyName { get; set; }
     public string? Address { get; set; }

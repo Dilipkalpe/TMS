@@ -224,7 +224,8 @@ CREATE TABLE voucher_lines (
 );
 
 CREATE TABLE company_settings (
-    id              INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    id              SERIAL PRIMARY KEY,
+    company_id      UUID,
     company_name    VARCHAR(200),
     address         TEXT,
     gstin           VARCHAR(20),
@@ -233,6 +234,7 @@ CREATE TABLE company_settings (
     gst_rate        DECIMAL(5,2) DEFAULT 18,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE UNIQUE INDEX uq_company_settings_company_id ON company_settings (company_id) WHERE company_id IS NOT NULL;
 
 CREATE INDEX idx_bookings_date ON bookings(booking_date);
 CREATE INDEX idx_bookings_status ON bookings(status);

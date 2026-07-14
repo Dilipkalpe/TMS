@@ -6,9 +6,15 @@ git pull --ff-only
 
 # Ensure document_flow column exists before API starts
 PG=$(docker ps -q -f name=postgres | head -1 || true)
-if [ -n "$PG" ] && [ -f database/settings_document_flow.sql ]; then
-  echo "==> Apply document_flow column"
-  docker exec -i "$PG" psql -U tms -d tms_pro -v ON_ERROR_STOP=1 < database/settings_document_flow.sql || true
+if [ -n "$PG" ]; then
+  if [ -f database/settings_document_flow.sql ]; then
+    echo "==> Apply document_flow column"
+    docker exec -i "$PG" psql -U tms -d tms_pro -v ON_ERROR_STOP=1 < database/settings_document_flow.sql || true
+  fi
+  if [ -f database/settings_extension.sql ]; then
+    echo "==> Apply company_settings sequence / multi-tenant id fix"
+    docker exec -i "$PG" psql -U tms -d tms_pro -v ON_ERROR_STOP=1 < database/settings_extension.sql || true
+  fi
 fi
 
 docker compose -f deploy/docker-compose.vps.yml build --no-cache tms-api tms-web

@@ -23,13 +23,8 @@ public static class CoreSchemaMigrator
             }
         }
 
-        var settingsExt = await LoadSqlAsync("settings_extension.sql", ct);
-        foreach (var stmt in ParseSql(settingsExt))
-        {
-            await using var cmd = new NpgsqlCommand(stmt, conn);
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
-
+        // Use PsqlFileRunner so DO $$ / multi-statement blocks in settings_extension.sql are not split.
+        await PsqlFileRunner.RunSqlFileAsync(db, "database/settings_extension.sql", ct);
         await PsqlFileRunner.RunSqlFileAsync(db, "database/settings_document_flow.sql", ct);
 
         await PsqlFileRunner.RunSqlFileAsync(db, "database/core/stored_procedures.sql", ct);

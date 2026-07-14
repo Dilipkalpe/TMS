@@ -57,20 +57,61 @@ public class DocumentFlowService(TmsDbContext db, ITenantContext tenants)
             throw new InvalidOperationException(
                 $"Invalid document flow. Use '{DocumentFlow.FirstLRThenBooking}' or '{DocumentFlow.FirstBookingThenLR}'.");
 
+        var settings = await GetOrCreateSettingsAsync(ct);
+        settings.DocumentFlow = normalized;
+        settings.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// One settings row per company. Adopts a legacy singleton / unassigned row when present
+    /// so we never INSERT id=1 on top of an existing company_settings primary key
+    /// (legacy schema used DEFAULT 1 CHECK (id = 1)).
+    /// </summary>
+    public async Task<CompanySettings> GetOrCreateSettingsAsync(CancellationToken ct = default)
+    {
         var companyId = TenantScope.ResolveCompanyId(tenants);
         var settings = await db.CompanySettings.FirstOrDefaultAsync(s => s.CompanyId == companyId, ct);
+        if (settings != null) return settings;
+
+        // Legacy unassigned row (company_id NULL → Guid.Empty).
+        settings = await db.CompanySettings
+            .Where(s => s.CompanyId == Guid.Empty)
+            .OrderBy(s => s.Id)
+            .FirstOrDefaultAsync(ct);
+
+        // Classic singleton id=1, or the only row in the table (pre-multi-tenant installs).
         if (settings == null)
         {
-            settings = new CompanySettings { CompanyId = companyId, DocumentFlow = normalized };
-            db.CompanySettings.Add(settings);
-        }
-        else
-        {
-            settings.DocumentFlow = normalized;
-            settings.UpdatedAt = DateTime.UtcNow;
+            settings = await db.CompanySettings.FirstOrDefaultAsync(s => s.Id == 1, ct);
+            if (settings != null && settings.CompanyId != Guid.Empty && settings.CompanyId != companyId)
+                settings = null;
         }
 
-        await db.SaveChangesAsync(ct);
+        if (settings == null)
+        {
+            var total = await db.CompanySettings.CountAsync(ct);
+            if (total == 1)
+                settings = await db.CompanySettings.OrderBy(s => s.Id).FirstAsync(ct);
+        }
+
+        if (settings != null)
+        {
+            settings.CompanyId = companyId;
+            if (string.IsNullOrWhiteSpace(settings.DocumentFlow))
+                settings.DocumentFlow = DocumentFlow.Default;
+            return settings;
+        }
+
+        // New row: leave Id unset so SERIAL / sequence assigns it (never hardcode 1).
+        settings = new CompanySettings
+        {
+            CompanyId = companyId,
+            DocumentFlow = DocumentFlow.Default,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        db.CompanySettings.Add(settings);
+        return settings;
     }
 
     /// <summary>
