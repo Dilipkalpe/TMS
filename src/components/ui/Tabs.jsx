@@ -5,7 +5,7 @@ export default function Tabs({ tabs, defaultTab, fill = false }) {
   const current = tabs.find((t) => t.id === active)
 
   return (
-    <div className={fill ? 'flex h-full min-h-0 flex-col overflow-hidden' : ''}>
+    <div className={fill ? 'flex h-auto min-h-0 flex-col overflow-visible lg:h-full lg:overflow-hidden' : ''}>
       <div className="mb-2 flex shrink-0 gap-1 overflow-x-auto mobile-scroll-x rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900">
         {tabs.map((tab) => (
           <button
@@ -21,8 +21,8 @@ export default function Tabs({ tabs, defaultTab, fill = false }) {
           </button>
         ))}
       </div>
-      <div className={fill ? 'report-tabs-panel min-h-0 flex-1 overflow-hidden' : ''}>
-        <div className={fill ? 'min-h-0 flex-1 overflow-hidden' : ''}>{current?.content}</div>
+      <div className={fill ? 'report-tabs-panel min-h-0 flex-1 overflow-visible lg:overflow-hidden' : ''}>
+        <div className={fill ? 'min-h-0 flex-1 overflow-visible lg:overflow-hidden' : ''}>{current?.content}</div>
       </div>
     </div>
   )

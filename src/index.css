@@ -257,10 +257,26 @@ html {
     background-color: var(--scrollbar-thumb-active);
   }
 
-  /* List pages — bounded height so table scroll stays on screen */
+  /*
+   * List / report pages on mobile:
+   * Do NOT lock .erp-list-page to a rigid dvh height. Status cards + toolbar +
+   * filters + pagination are shrink-0; a fixed parent height with nested
+   * overflow-hidden collapses the flex table region to ~0px (rows exist in
+   * React / Print, but the grid looks empty).
+   */
   .erp-list-page {
-    height: calc(100dvh - 6.75rem);
-    max-height: calc(100dvh - 6.75rem);
+    height: auto;
+    max-height: none;
+    flex: 1 1 auto;
+  }
+
+  .erp-list-page .erp-list-card {
+    overflow: visible;
+  }
+
+  .erp-list-page .erp-list-table-region {
+    overflow: visible;
+    min-height: min(50dvh, 22rem);
   }
 
   .erp-list-page .report-table-scroll::before {
@@ -268,7 +284,10 @@ html {
   }
 
   .erp-list-page .report-table-scroll {
-    max-height: none;
+    /* Always reserve visible space for rows; scroll inside this box */
+    min-height: min(50dvh, 22rem);
+    max-height: min(60dvh, calc(100dvh - 14rem));
+    flex: 1 1 auto;
     border: 1px solid color-mix(in srgb, var(--scrollbar-thumb) 30%, transparent);
     border-radius: 0;
     overflow: scroll;
@@ -290,15 +309,15 @@ html {
   /* Tabbed reports (e.g. Outstanding) */
   .report-tabs-panel {
     display: flex;
-    min-height: 0;
     flex-direction: column;
-    max-height: min(72dvh, calc(100dvh - 10.5rem));
+    min-height: min(50dvh, 22rem);
+    max-height: min(70dvh, calc(100dvh - 12rem));
   }
 
   .report-tabs-panel .report-table-scroll {
-    max-height: none;
-    flex: 1;
-    min-height: 0;
+    flex: 1 1 auto;
+    min-height: min(40dvh, 16rem);
+    max-height: min(60dvh, calc(100dvh - 14rem));
   }
 
   .report-tabs-panel .report-table-scroll::before {

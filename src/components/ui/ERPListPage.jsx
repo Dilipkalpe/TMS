@@ -188,10 +188,10 @@ export default function ERPListPage({
   }
 
   return (
-    <div className="erp-list-page h-full min-h-0">
+    <div className="erp-list-page min-h-0 h-auto lg:h-full">
       <ERPPageTitle module={module} title={title} />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-primary/20 bg-white shadow-sm dark:bg-slate-900">
+      <div className="erp-list-card flex min-h-0 flex-1 flex-col overflow-visible rounded-lg border border-primary/20 bg-white shadow-sm lg:overflow-hidden dark:bg-slate-900">
         {statusCards.length > 0 && (
           <div className="shrink-0 border-x border-primary/20 p-2 sm:p-3">
             <StatusSummaryCards cards={statusCards} />
@@ -225,7 +225,7 @@ export default function ERPListPage({
           </div>
         )}
 
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden border-x border-primary/20">
+        <div className="erp-list-table-region relative flex min-h-0 flex-1 flex-col overflow-visible border-x border-primary/20 lg:overflow-hidden">
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/70">
               <span className="text-sm text-slate-500">Loading records…</span>
