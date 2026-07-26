@@ -3,7 +3,7 @@ import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { branchesApi } from '../../services/api'
+import { branchesApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { useBranch } from '../../context/BranchContext'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
@@ -20,7 +20,7 @@ export default function BranchesPage() {
   const [saving, setSaving] = useState(false)
 
   const load = () => branchesApi.list(false)
-    .then(setRows)
+    .then((res) => setRows(unwrapList(res)))
     .catch((e) => toast({ title: 'Load failed', message: e.message, type: 'error' }))
 
   useEffect(() => {

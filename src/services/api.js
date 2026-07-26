@@ -143,7 +143,7 @@ export const subscriptionApi = {
 }
 
 export const branchesApi = {
-  list: () => apiRequest('/branches'),
+  list: (activeOnly = true) => apiRequest(`/branches?${queryString({ activeOnly })}`),
   get: (id) => apiRequest(`/branches/${id}`),
   create: (data) => apiRequest('/branches', { method: 'POST', body: data }),
   update: (id, data) => apiRequest(`/branches/${id}`, { method: 'PUT', body: data }),

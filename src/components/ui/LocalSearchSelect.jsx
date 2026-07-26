@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 /**
  * Searchable dropdown for a static in-memory option list (max 10 shown).
+ * When closed, shows the selected label. On open, clears the filter so all options bind.
  */
 export default function LocalSearchSelect({
   label,
@@ -19,21 +20,24 @@ export default function LocalSearchSelect({
   const wrapRef = useRef(null)
 
   const selectedLabel = (() => {
-    const match = options.find((o) => getOptionValue(o) === value)
-    return match ? getOptionLabel(match) : value
+    const match = options.find((o) => String(getOptionValue(o)) === String(value ?? ''))
+    return match ? getOptionLabel(match) : ''
   })()
 
   useEffect(() => {
-    setQuery(selectedLabel ?? '')
-  }, [value, selectedLabel])
+    if (!open) setQuery(selectedLabel ?? '')
+  }, [value, selectedLabel, open])
 
   useEffect(() => {
     const onDoc = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false)
+        setQuery(selectedLabel ?? '')
+      }
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
-  }, [])
+  }, [selectedLabel])
 
   const q = query.trim().toLowerCase()
   const filtered = options
@@ -59,13 +63,16 @@ export default function LocalSearchSelect({
       )}
       <input
         type="text"
-        value={query}
+        value={open ? query : (selectedLabel || query)}
         placeholder={placeholder}
         onChange={(e) => {
           setQuery(e.target.value)
           setOpen(true)
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setOpen(true)
+          setQuery('')
+        }}
         className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
       />
       {open && (
@@ -74,7 +81,7 @@ export default function LocalSearchSelect({
             <li className="px-3 py-2 text-sm text-slate-500">No matches</li>
           )}
           {filtered.map((opt) => (
-            <li key={getOptionValue(opt)}>
+            <li key={String(getOptionValue(opt))}>
               <button
                 type="button"
                 className="w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-primary/10 dark:text-slate-100 dark:hover:bg-primary/20"

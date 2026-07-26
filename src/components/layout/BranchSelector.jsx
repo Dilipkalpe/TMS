@@ -23,7 +23,10 @@ export default function BranchSelector() {
 
   const branchOptions = [
     { value: 'all', label: 'All branches' },
-    ...branches.map((b) => ({ value: b.id, label: `${b.code} — ${b.name}` })),
+    ...branches.map((b) => ({
+      value: String(b.id),
+      label: `${b.code || ''} — ${b.name || 'Branch'}`.trim(),
+    })),
   ]
 
   return (

@@ -35,7 +35,7 @@ public static class DbSeeder
         Branch? delhi = null;
         var defaultCompanyId = TenantContext.DefaultCompanyId;
 
-        if (!await db.Branches.AnyAsync())
+        if (!await db.Branches.AnyAsync(b => b.CompanyId == defaultCompanyId))
         {
             ho = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "HO-MUM", Name = "Head Office — Mumbai", City = "Mumbai", State = "Maharashtra", IsHeadOffice = true, IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
             pune = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "PUN", Name = "Pune Branch", City = "Pune", State = "Maharashtra", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
@@ -45,9 +45,10 @@ public static class DbSeeder
         }
         else
         {
-            ho = await db.Branches.FirstOrDefaultAsync(b => b.IsHeadOffice) ?? await db.Branches.OrderBy(b => b.Code).FirstOrDefaultAsync();
-            pune = await db.Branches.FirstOrDefaultAsync(b => b.Code == "PUN");
-            delhi = await db.Branches.FirstOrDefaultAsync(b => b.Code == "DEL");
+            ho = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.IsHeadOffice)
+                ?? await db.Branches.Where(b => b.CompanyId == defaultCompanyId).OrderBy(b => b.Code).FirstOrDefaultAsync();
+            pune = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "PUN");
+            delhi = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "DEL");
         }
 
         if (ho != null)
