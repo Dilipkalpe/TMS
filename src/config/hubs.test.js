@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { accountingCards } from '../config/accountingHub'
+import { adminCards } from '../config/adminHub'
 import { operationsCards } from '../config/operationsHub'
 import { reportCards } from '../config/reportsHub'
 
@@ -8,6 +9,12 @@ describe('hub navigation config', () => {
     const paths = accountingCards.map((c) => c.path)
     expect(new Set(paths).size).toBe(paths.length)
     expect(accountingCards.every((c) => c.title && c.path.startsWith('/'))).toBe(true)
+  })
+
+  it('admin hub includes master menus', () => {
+    const paths = adminCards.map((c) => c.path)
+    expect(paths).toEqual(['/customers', '/vehicles', '/freight-rates', '/vendors'])
+    expect(adminCards.every((c) => c.title && c.icon && c.description)).toBe(true)
   })
 
   it('operations hub cards have required fields', () => {

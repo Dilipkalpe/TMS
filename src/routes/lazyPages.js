@@ -42,6 +42,7 @@ export const PortalInvoiceView = lazy(() => import('../pages/portal/PortalInvoic
 export const PortalPublicTrack = lazy(() => import('../pages/portal/PortalPublicTrack'))
 
 // Heavy modules — code-split to reduce initial bundle on low-resource VPS clients
+export const AdminHub = lazy(() => import('../pages/admin/AdminHub'))
 export const AccountingHub = lazy(() => import('../pages/accounting/AccountingHub'))
 export const ChartOfAccounts = lazy(() => import('../pages/accounting/ChartOfAccounts'))
 export const LedgerMaster = lazy(() => import('../pages/accounting/LedgerMaster'))

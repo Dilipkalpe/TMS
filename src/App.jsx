@@ -17,6 +17,7 @@ import {
   Settings, BranchesPage, PortalUsersPage, NotificationSettings,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
+  AdminHub,
   AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry,
   LedgerReport, CustomerLedgerReport, VendorLedgerReport, DriverLedgerReport,
   VehicleLedgerReport, CashBook, BankBook, DayBook, JournalRegister,
@@ -128,6 +129,7 @@ export default function App() {
         <Route path="hr/leaves" element={<LeaveManagement />} />
         <Route path="hr/holidays" element={<HolidaysPage />} />
         <Route path="hr/tms-norms" element={<HrTmsNorms />} />
+        <Route path="admin" element={<AdminHub />} />
         <Route path="accounting" element={<AccountingHub />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/ledger-master" element={<LedgerMaster />} />
