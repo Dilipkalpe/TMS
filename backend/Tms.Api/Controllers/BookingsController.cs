@@ -34,8 +34,10 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
         q = q.OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.Id);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var lrByBooking = await ResolveLrNumbersAsync(items.Select(b => b.Id).ToList());
         return Ok(new PagedResult<BookingDto>(
-            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+            items.Select(b => EntityMappers.ToDto(b, lrByBooking.GetValueOrDefault(b.Id))).ToList(),
+            total, p, size, hasMore, approx));
     }
 
     [HttpGet("{id}")]
@@ -43,7 +45,8 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
     {
         var b = await db.Bookings.FindAsync(id);
         if (b == null || !TenantAccess.CanAccess(tenants, b) || !BranchAccess.CanAccess(branches, b)) return NotFound();
-        return Ok(EntityMappers.ToDto(b));
+        var lrNumber = await ResolveLrNumberAsync(id);
+        return Ok(EntityMappers.ToDto(b, lrNumber));
     }
 
     [HttpPost]
@@ -99,8 +102,8 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
                 DriverId = driver?.Id,
                 DriverName = driver?.Name ?? req.Driver,
                 Freight = req.Freight,
-                Status = req.Status,
-                Payment = req.Payment,
+                Status = string.IsNullOrWhiteSpace(req.Status) ? "Pending" : req.Status,
+                Payment = string.IsNullOrWhiteSpace(req.Payment) ? "Unpaid" : req.Payment,
                 Advance = req.Advance,
                 Balance = balance,
                 Remarks = req.Remarks,
@@ -118,7 +121,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
             await CustomerTrackingService.RecordStatusAsync(db, booking.Id, booking.Status, "Booking created");
             await db.SaveChangesAsync();
             await subscriptions.IncrementBookingUsageAsync(companyId);
-            return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(booking));
+            return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(booking, linkedLr?.LrNumber));
         }
         catch (InvalidOperationException ex)
         {
@@ -148,6 +151,9 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
         if (string.IsNullOrWhiteSpace(req.From) || string.IsNullOrWhiteSpace(req.To))
             return BadRequest(new ApiError("From and To cities are required."));
 
+        var linkedLrNumber = await ResolveLrNumberAsync(id);
+        var hasLr = !string.IsNullOrWhiteSpace(linkedLrNumber);
+
         var customer = await TenantScope.FindCustomerByNameAsync(db, tenants, branches, req.Customer);
 
         var vehicle = !string.IsNullOrEmpty(req.Vehicle)
@@ -160,24 +166,46 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
         if (!ApiParseHelper.TryParseDate(req.Date, out var bookingDate))
             return BadRequest(new ApiError("Invalid booking date. Use YYYY-MM-DD."));
 
-        booking.BookingDate = bookingDate;
-        booking.CustomerId = customer?.Id;
-        booking.CustomerName = req.Customer;
-        booking.Consignor = req.Consignor;
-        booking.Consignee = req.Consignee;
-        booking.FromCity = req.From;
-        booking.ToCity = req.To;
-        booking.Material = req.Material;
-        booking.Quantity = req.Quantity;
-        booking.VehicleId = vehicle?.Id;
-        booking.VehicleNumber = vehicle?.Number ?? req.Vehicle;
-        booking.DriverId = driver?.Id;
-        booking.DriverName = driver?.Name ?? req.Driver;
-        booking.Freight = req.Freight;
+        // Full edit only before an LR is generated. After LR, status/payment/remarks only.
+        if (!hasLr)
+        {
+            booking.BookingDate = bookingDate;
+            booking.CustomerId = customer?.Id;
+            booking.CustomerName = req.Customer;
+            booking.Consignor = req.Consignor;
+            booking.Consignee = req.Consignee;
+            booking.FromCity = req.From;
+            booking.ToCity = req.To;
+            booking.Material = req.Material;
+            booking.Quantity = req.Quantity;
+            booking.VehicleId = vehicle?.Id;
+            booking.VehicleNumber = vehicle?.Number ?? req.Vehicle;
+            booking.DriverId = driver?.Id;
+            booking.DriverName = driver?.Name ?? req.Driver;
+            booking.Freight = req.Freight;
+            booking.Advance = req.Advance;
+            booking.Balance = req.Freight - req.Advance;
+        }
+        else if (
+            booking.CustomerName != req.Customer ||
+            booking.FromCity != req.From ||
+            booking.ToCity != req.To ||
+            booking.Freight != req.Freight ||
+            booking.Advance != req.Advance ||
+            (booking.Consignor ?? "") != (req.Consignor ?? "") ||
+            (booking.Consignee ?? "") != (req.Consignee ?? "") ||
+            (booking.Material ?? "") != (req.Material ?? "") ||
+            (booking.Quantity ?? "") != (req.Quantity ?? "") ||
+            (booking.VehicleNumber ?? "") != (vehicle?.Number ?? req.Vehicle ?? "") ||
+            (booking.DriverName ?? "") != (driver?.Name ?? req.Driver ?? "") ||
+            booking.BookingDate != bookingDate)
+        {
+            return BadRequest(new ApiError(
+                $"Booking '{id}' already has LR '{linkedLrNumber}'. Edit booking details before generating the LR, or update the LR instead."));
+        }
+
         booking.Status = req.Status;
         booking.Payment = req.Payment;
-        booking.Advance = req.Advance;
-        booking.Balance = req.Freight - req.Advance;
         booking.Remarks = req.Remarks;
         booking.UpdatedAt = DateTime.UtcNow;
 
@@ -208,11 +236,32 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
             await CustomerTrackingService.RecordStatusAsync(db, booking.Id, req.Status);
 
         await db.SaveChangesAsync();
-        return Ok(EntityMappers.ToDto(booking));
+        return Ok(EntityMappers.ToDto(booking, linkedLrNumber));
     }
 
     static bool IsDispatchStatus(string status) =>
         status is "In Transit" or "On Trip" or "Dispatched" or "Delivered";
+
+    async Task<string?> ResolveLrNumberAsync(string bookingId, CancellationToken ct = default)
+    {
+        return await tenants.Filter(db.LorryReceipts.AsNoTracking())
+            .Where(l => l.BookingId == bookingId)
+            .OrderBy(l => l.LrNumber)
+            .Select(l => l.LrNumber)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    async Task<Dictionary<string, string>> ResolveLrNumbersAsync(IReadOnlyList<string> bookingIds, CancellationToken ct = default)
+    {
+        if (bookingIds.Count == 0) return new Dictionary<string, string>();
+        var rows = await tenants.Filter(db.LorryReceipts.AsNoTracking())
+            .Where(l => l.BookingId != null && bookingIds.Contains(l.BookingId))
+            .Select(l => new { l.BookingId, l.LrNumber })
+            .ToListAsync(ct);
+        return rows
+            .GroupBy(r => r.BookingId!)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.LrNumber).First().LrNumber);
+    }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)

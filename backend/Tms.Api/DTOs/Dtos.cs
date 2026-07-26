@@ -24,7 +24,7 @@ public record BookingDto(
     string Id, string Date, string Customer, string? Consignor, string? Consignee,
     string From, string To, string? Material, string? Quantity,
     string? Vehicle, string? Driver, decimal Freight, string Status, string Payment,
-    decimal Advance, decimal Balance, string? Remarks);
+    decimal Advance, decimal Balance, string? Remarks, string? LrNumber = null);
 
 public record CreateBookingRequest(
     string Date, string Customer, string? Consignor, string? Consignee,

@@ -34,6 +34,7 @@ export default function BookingDetails() {
     )
   }
 
+  const hasLr = Boolean(booking.lrNumber)
   const fields = [
     { label: 'Booking ID', value: booking.id },
     { label: 'Date', value: booking.date },
@@ -48,6 +49,7 @@ export default function BookingDetails() {
     { label: 'Freight', value: formatCurrency(booking.freight) },
     { label: 'Advance', value: formatCurrency(booking.advance) },
     { label: 'Balance', value: formatCurrency(booking.balance) },
+    ...(booking.lrNumber ? [{ label: 'Linked LR', value: booking.lrNumber }] : []),
   ]
 
   return (
@@ -60,8 +62,10 @@ export default function BookingDetails() {
           <div className="flex flex-wrap gap-2">
             <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
             <Badge variant={statusVariant(booking.payment)}>Payment: {booking.payment}</Badge>
-            <Button variant="outline" icon={Pencil} onClick={() => navigate(`/bookings/${booking.id}/edit`)}>Edit</Button>
-            {isFirstBookingThenLr && (
+            <Button variant="outline" icon={Pencil} onClick={() => navigate(`/bookings/${booking.id}/edit`)}>
+              {hasLr ? 'Edit Status' : 'Edit'}
+            </Button>
+            {isFirstBookingThenLr && !hasLr && (
               <Button variant="outline" icon={FileText} onClick={() => navigate(`/lr/generate?bookingId=${encodeURIComponent(booking.id)}`)}>Generate LR</Button>
             )}
             <PrintButton

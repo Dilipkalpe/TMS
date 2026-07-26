@@ -11,7 +11,6 @@ import { bookingsApi, freightRatesApi, lrApi, unwrapList } from '../../services/
 import { useToast } from '../../context/ToastContext'
 import { useDocumentFlow } from '../../hooks/useDocumentFlow'
 
-const bookingStatuses = ['Pending', 'Confirmed', 'In Transit', 'Delivered', 'Cancelled']
 const paymentStatuses = ['Unpaid', 'Partial', 'Paid']
 
 export default function NewBooking() {
@@ -34,7 +33,6 @@ export default function NewBooking() {
     driver: '',
     freight: '',
     advance: '',
-    status: 'Pending',
     payment: 'Unpaid',
     remarks: '',
     lrNumber: searchParams.get('lrNumber') || '',
@@ -142,7 +140,7 @@ export default function NewBooking() {
         driver: form.driver,
         freight: Number(form.freight) || 0,
         advance: Number(form.advance) || 0,
-        status: form.status,
+        status: 'Pending',
         payment: form.payment,
         remarks: form.remarks,
         lrNumber: form.lrNumber || undefined,
@@ -190,7 +188,6 @@ export default function NewBooking() {
             <Button type="button" variant="outline" className="mb-0.5" onClick={applyFreightRate}>Apply Rate</Button>
           </div>
           <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => set('advance', e.target.value)} />
-          <Select label="Booking Status" value={form.status} onChange={(e) => set('status', e.target.value)} options={bookingStatuses} />
           <Select label="Payment Status" value={form.payment} onChange={(e) => set('payment', e.target.value)} options={paymentStatuses} />
           <div className="sm:col-span-2 lg:col-span-3">
             <Textarea label="Remarks" value={form.remarks} onChange={(e) => set('remarks', e.target.value)} placeholder="Additional notes..." />

@@ -6,7 +6,7 @@ namespace Tms.Api.Services;
 
 public static class EntityMappers
 {
-    public static BookingDto ToDto(Booking b) => new(
+    public static BookingDto ToDto(Booking b, string? lrNumber = null) => new(
         b.Id,
         b.BookingDate.ToString("yyyy-MM-dd"),
         b.CustomerName,
@@ -15,7 +15,7 @@ public static class EntityMappers
         b.Material, b.Quantity,
         b.VehicleNumber, b.DriverName,
         b.Freight, b.Status, b.Payment,
-        b.Advance, b.Balance, b.Remarks);
+        b.Advance, b.Balance, b.Remarks, lrNumber);
 
     public static VehicleDto ToDto(Vehicle v) => new(
         v.Id, v.Number, v.Type, v.Model, v.Capacity, v.Owner, v.Status,

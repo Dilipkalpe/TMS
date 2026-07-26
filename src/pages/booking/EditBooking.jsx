@@ -20,12 +20,14 @@ export default function EditBooking() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(null)
+  const [lrNumber, setLrNumber] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     bookingsApi.get(id)
       .then((booking) => {
         if (cancelled) return
+        setLrNumber(booking.lrNumber || null)
         setForm({
           date: booking.date,
           customer: booking.customer ?? '',
@@ -52,6 +54,7 @@ export default function EditBooking() {
   }, [id, toast])
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+  const detailsLocked = Boolean(lrNumber)
 
   const handleSave = async () => {
     if (!form.customer?.trim()) {
@@ -100,20 +103,30 @@ export default function EditBooking() {
 
   return (
     <ERPContentPage module="Booking" title={`Edit Booking ${id}`}>
+      {!detailsLocked && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+          No LR yet — you can edit all booking details before generating the LR.
+        </div>
+      )}
+      {detailsLocked && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          LR <strong>{lrNumber}</strong> is already generated. Booking details are locked; you can still update status, payment, and remarks. Edit the LR for route/freight changes.
+        </div>
+      )}
       <Card>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input label="Booking Date" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
-          <LookupSelect label="Customer" type="customers" value={form.customer} onChange={(v) => set('customer', v)} placeholder="Search customer…" />
-          <Input label="Consignor" value={form.consignor} onChange={(e) => set('consignor', e.target.value)} />
-          <Input label="Consignee" value={form.consignee} onChange={(e) => set('consignee', e.target.value)} />
-          <Input label="From" value={form.from} onChange={(e) => set('from', e.target.value)} placeholder="Origin city" />
-          <Input label="To" value={form.to} onChange={(e) => set('to', e.target.value)} placeholder="Destination city" />
-          <Input label="Material" value={form.material} onChange={(e) => set('material', e.target.value)} />
-          <Input label="Quantity" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} />
-          <LookupSelect label="Vehicle" type="vehicles" value={form.vehicle} onChange={(v) => set('vehicle', v)} placeholder="Search vehicle…" />
-          <DriverLookupSelect label="Driver" value={form.driver} onChange={(v) => set('driver', v)} />
-          <Input label="Freight (₹)" type="number" value={form.freight} onChange={(e) => set('freight', e.target.value)} />
-          <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => set('advance', e.target.value)} />
+          <Input label="Booking Date" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} disabled={detailsLocked} />
+          <LookupSelect label="Customer" type="customers" value={form.customer} onChange={(v) => set('customer', v)} placeholder="Search customer…" disabled={detailsLocked} />
+          <Input label="Consignor" value={form.consignor} onChange={(e) => set('consignor', e.target.value)} disabled={detailsLocked} />
+          <Input label="Consignee" value={form.consignee} onChange={(e) => set('consignee', e.target.value)} disabled={detailsLocked} />
+          <Input label="From" value={form.from} onChange={(e) => set('from', e.target.value)} placeholder="Origin city" disabled={detailsLocked} />
+          <Input label="To" value={form.to} onChange={(e) => set('to', e.target.value)} placeholder="Destination city" disabled={detailsLocked} />
+          <Input label="Material" value={form.material} onChange={(e) => set('material', e.target.value)} disabled={detailsLocked} />
+          <Input label="Quantity" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} disabled={detailsLocked} />
+          <LookupSelect label="Vehicle" type="vehicles" value={form.vehicle} onChange={(v) => set('vehicle', v)} placeholder="Search vehicle…" disabled={detailsLocked} />
+          <DriverLookupSelect label="Driver" value={form.driver} onChange={(v) => set('driver', v)} disabled={detailsLocked} />
+          <Input label="Freight (₹)" type="number" value={form.freight} onChange={(e) => set('freight', e.target.value)} disabled={detailsLocked} />
+          <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => set('advance', e.target.value)} disabled={detailsLocked} />
           <Select label="Booking Status" value={form.status} onChange={(e) => set('status', e.target.value)} options={bookingStatuses} />
           <Select label="Payment Status" value={form.payment} onChange={(e) => set('payment', e.target.value)} options={paymentStatuses} />
           <div className="sm:col-span-2 lg:col-span-3">

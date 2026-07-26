@@ -49,6 +49,7 @@ export default function LookupSelect({
   className = '',
   limit = 10,
   allowCreate = true,
+  disabled = false,
 }) {
   const fetcher = type === 'employees'
     ? (search, cap) => (
@@ -249,20 +250,24 @@ export default function LookupSelect({
           type="text"
           value={query}
           placeholder={placeholder}
+          disabled={disabled}
+          readOnly={disabled}
           onChange={(e) => {
+            if (disabled) return
             setQuery(e.target.value)
             setOpen(true)
             if (!e.target.value) onChange?.('')
           }}
           onFocus={() => {
+            if (disabled) return
             setOpen(true)
             loadOptions(query)
           }}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+          onKeyDown={disabled ? undefined : handleKeyDown}
+          onBlur={disabled ? undefined : handleBlur}
+          className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
         />
-        {open && (
+        {!disabled && open && (
           <ul
             className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
             role="listbox"
