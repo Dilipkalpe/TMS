@@ -64,6 +64,11 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<BookingPayment> BookingPayments => Set<BookingPayment>();
     public DbSet<Provision> Provisions => Set<Provision>();
     public DbSet<TransportBill> TransportBills => Set<TransportBill>();
+    public DbSet<FreightRate> FreightRates => Set<FreightRate>();
+    public DbSet<Quotation> Quotations => Set<Quotation>();
+    public DbSet<QuotationLine> QuotationLines => Set<QuotationLine>();
+    public DbSet<FreightInvoice> FreightInvoices => Set<FreightInvoice>();
+    public DbSet<FreightInvoiceLine> FreightInvoiceLines => Set<FreightInvoiceLine>();
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<CompanySubscription> CompanySubscriptions => Set<CompanySubscription>();
@@ -360,7 +365,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.ReportType).HasColumnName("report_type");
             e.Property(x => x.Status).HasColumnName("status");
-            e.Property(x => x.ResultJson).HasColumnName("result_json");
+            e.Property(x => x.ResultJson).HasColumnName("result_json").HasColumnType("jsonb");
             e.Property(x => x.Error).HasColumnName("error_text");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.CompletedAt).HasColumnName("completed_at");
@@ -1044,6 +1049,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.BookingId).HasColumnName("booking_id");
+            e.Property(x => x.FreightInvoiceId).HasColumnName("freight_invoice_id");
             e.Property(x => x.PaymentDate).HasColumnName("payment_date");
             e.Property(x => x.Amount).HasColumnName("amount");
             e.Property(x => x.PaymentMode).HasColumnName("payment_mode");
@@ -1085,6 +1091,99 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.TotalAmount).HasColumnName("total_amount");
             e.Property(x => x.BillDataJson).HasColumnName("bill_data").HasColumnType("jsonb");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<FreightRate>(e =>
+        {
+            e.ToTable("freight_rates");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.CustomerId).HasColumnName("customer_id");
+            e.Property(x => x.FromCity).HasColumnName("from_city");
+            e.Property(x => x.ToCity).HasColumnName("to_city");
+            e.Property(x => x.VehicleType).HasColumnName("vehicle_type");
+            e.Property(x => x.RateAmount).HasColumnName("rate_amount");
+            e.Property(x => x.RateUnit).HasColumnName("rate_unit");
+            e.Property(x => x.ValidFrom).HasColumnName("valid_from");
+            e.Property(x => x.ValidTo).HasColumnName("valid_to");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.Notes).HasColumnName("notes");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<Quotation>(e =>
+        {
+            e.ToTable("quotations");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.QuoteNo).HasColumnName("quote_no");
+            e.Property(x => x.CustomerId).HasColumnName("customer_id");
+            e.Property(x => x.CustomerName).HasColumnName("customer_name");
+            e.Property(x => x.FromCity).HasColumnName("from_city");
+            e.Property(x => x.ToCity).HasColumnName("to_city");
+            e.Property(x => x.VehicleType).HasColumnName("vehicle_type");
+            e.Property(x => x.Freight).HasColumnName("freight");
+            e.Property(x => x.ValidUntil).HasColumnName("valid_until");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.Notes).HasColumnName("notes");
+            e.Property(x => x.BookingId).HasColumnName("booking_id");
+            e.Property(x => x.FreightRateId).HasColumnName("freight_rate_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<QuotationLine>(e =>
+        {
+            e.ToTable("quotation_lines");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.QuotationId).HasColumnName("quotation_id");
+            e.Property(x => x.Description).HasColumnName("description");
+            e.Property(x => x.Qty).HasColumnName("qty");
+            e.Property(x => x.Rate).HasColumnName("rate");
+            e.Property(x => x.Amount).HasColumnName("amount");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+        });
+
+        modelBuilder.Entity<FreightInvoice>(e =>
+        {
+            e.ToTable("freight_invoices");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.InvoiceNo).HasColumnName("invoice_no");
+            e.Property(x => x.BookingId).HasColumnName("booking_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number");
+            e.Property(x => x.CustomerId).HasColumnName("customer_id");
+            e.Property(x => x.CustomerName).HasColumnName("customer_name");
+            e.Property(x => x.Gstin).HasColumnName("gstin");
+            e.Property(x => x.PlaceOfSupply).HasColumnName("place_of_supply");
+            e.Property(x => x.BillType).HasColumnName("bill_type");
+            e.Property(x => x.InvoiceDate).HasColumnName("invoice_date");
+            e.Property(x => x.DueDate).HasColumnName("due_date");
+            e.Property(x => x.TaxableAmount).HasColumnName("taxable_amount");
+            e.Property(x => x.GstAmount).HasColumnName("gst_amount");
+            e.Property(x => x.TotalAmount).HasColumnName("total_amount");
+            e.Property(x => x.AdvanceAdjusted).HasColumnName("advance_adjusted");
+            e.Property(x => x.AmountPaid).HasColumnName("amount_paid");
+            e.Property(x => x.Balance).HasColumnName("balance");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.InvoiceDataJson).HasColumnName("invoice_data").HasColumnType("jsonb");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<FreightInvoiceLine>(e =>
+        {
+            e.ToTable("freight_invoice_lines");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.FreightInvoiceId).HasColumnName("freight_invoice_id");
+            e.Property(x => x.Description).HasColumnName("description");
+            e.Property(x => x.Qty).HasColumnName("qty");
+            e.Property(x => x.Rate).HasColumnName("rate");
+            e.Property(x => x.Amount).HasColumnName("amount");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
         });
     }
 }

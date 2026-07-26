@@ -285,6 +285,9 @@ if (!app.Environment.IsEnvironment("Testing"))
                 logger.LogInformation("Ensuring booking-finance schema…");
                 await BookingFinanceSchemaMigrator.EnsureAsync(db);
 
+                logger.LogInformation("Ensuring commercial schema…");
+                await CommercialSchemaMigrator.EnsureAsync(db);
+
                 logger.LogInformation("Ensuring maintenance schema…");
                 await MaintenanceSchemaMigrator.EnsureAsync(db);
 

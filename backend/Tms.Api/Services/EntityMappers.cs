@@ -161,4 +161,32 @@ public static class IdGenerator
         var count = await db.Vehicles.CountAsync();
         return $"V-{(count + 1):D3}";
     }
+
+    public static async Task<string> NextQuoteNo(Data.TmsDbContext db)
+    {
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"QT-{year}-";
+        var nos = await db.Quotations.AsNoTracking()
+            .Where(q => q.QuoteNo.StartsWith(prefix))
+            .Select(q => q.QuoteNo)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(nos, prefix, 0);
+        return $"{prefix}{max + 1:D4}";
+    }
+
+    public static async Task<string> NextFreightInvoiceNo(Data.TmsDbContext db, string billType)
+    {
+        var prefix = billType.ToUpperInvariant() switch
+        {
+            "RCM" => $"FI-RCM-{DateTime.UtcNow.Year}-",
+            "STANDARD" => $"FI-STD-{DateTime.UtcNow.Year}-",
+            _ => $"FI-FC-{DateTime.UtcNow.Year}-",
+        };
+        var nos = await db.FreightInvoices.AsNoTracking()
+            .Where(i => i.InvoiceNo.StartsWith(prefix))
+            .Select(i => i.InvoiceNo)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(nos, prefix, 0);
+        return $"{prefix}{max + 1:D4}";
+    }
 }

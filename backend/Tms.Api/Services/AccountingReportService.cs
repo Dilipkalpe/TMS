@@ -530,8 +530,50 @@ public static class AccountingReportService
         }).ToList();
     }
 
-    public static async Task<object> BuildSalesRegisterAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default) =>
-        (await tenants.Filter(db.LorryReceipts.AsNoTracking()).OrderByDescending(l => l.LrDate).ToListAsync(ct))
-            .Select(l => new { date = l.LrDate.ToString("yyyy-MM-dd"), lrNo = l.LrNumber, customer = l.Consignor, route = $"{l.FromCity} → {l.ToCity}", freight = l.Freight, gst = l.Gst, total = l.Freight + l.Gst })
+    public static async Task<object> BuildSalesRegisterAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    {
+        try
+        {
+            var invoices = await tenants.Filter(db.FreightInvoices.AsNoTracking())
+                .Where(i => i.Status != "Cancelled")
+                .OrderByDescending(i => i.InvoiceDate)
+                .Take(500)
+                .ToListAsync(ct);
+
+            if (invoices.Count > 0)
+            {
+                return invoices.Select(i => new
+                {
+                    date = i.InvoiceDate.ToString("yyyy-MM-dd"),
+                    lrNo = i.InvoiceNo,
+                    customer = i.CustomerName,
+                    route = i.BookingId,
+                    freight = i.TaxableAmount,
+                    gst = i.GstAmount,
+                    total = i.TotalAmount + i.AdvanceAdjusted,
+                    balance = i.Balance,
+                    status = i.Status,
+                    source = "freight_invoice",
+                }).ToList();
+            }
+        }
+        catch (Exception)
+        {
+            // freight_invoices may not exist yet on older deployments — fall through to LR register.
+        }
+
+        return (await tenants.Filter(db.LorryReceipts.AsNoTracking()).OrderByDescending(l => l.LrDate).ToListAsync(ct))
+            .Select(l => new
+            {
+                date = l.LrDate.ToString("yyyy-MM-dd"),
+                lrNo = l.LrNumber,
+                customer = l.Consignor,
+                route = $"{l.FromCity} → {l.ToCity}",
+                freight = l.Freight,
+                gst = l.Gst,
+                total = l.Freight + l.Gst,
+                source = "lr",
+            })
             .ToList();
+    }
 }

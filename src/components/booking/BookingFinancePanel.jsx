@@ -4,23 +4,25 @@ import Button from '../ui/Button'
 import Input, { Select, Textarea } from '../ui/Input'
 import ERPDataTable from '../ui/ERPDataTable'
 import { formatCurrency } from '../ui/ReportFilters'
-import { bookingFinanceApi } from '../../services/api'
+import { bookingFinanceApi, freightInvoicesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { Plus, Loader2, Printer, Trash2 } from 'lucide-react'
 import { usePrint } from '../../context/PrintContext'
 import TransportBillPrint from '../print/TransportBillPrint'
+import { useNavigate } from 'react-router-dom'
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'NEFT', 'Cheque', 'RTGS']
 const CHARGE_TYPES = ['Commission', 'Fixed', 'Loading', 'Other']
 const EXPENSE_CATS = ['Fuel', 'Toll', 'Hamali', 'Detention', 'Other']
 
 export default function BookingFinancePanel({ bookingId, booking, onBookingChange }) {
+  const navigate = useNavigate()
   const { toast } = useToast()
   const { company, print } = usePrint()
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '' })
+  const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
   const [brokerForm, setBrokerForm] = useState({ brokerName: '', chargeType: 'Commission', amount: '', remarks: '' })
   const [expenseForm, setExpenseForm] = useState({ category: 'Fuel', amount: '', vendorName: '', description: '' })
 
@@ -46,9 +48,13 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
     }
     setSaving(true)
     try {
-      await bookingFinanceApi.recordPayment(bookingId, { ...paymentForm, amount })
+      await bookingFinanceApi.recordPayment(bookingId, {
+        ...paymentForm,
+        amount,
+        freightInvoiceId: paymentForm.freightInvoiceId || undefined,
+      })
       toast({ title: 'Payment recorded', type: 'success' })
-      setPaymentForm({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '' })
+      setPaymentForm({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
       reload()
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
@@ -93,6 +99,23 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
     }
   }
 
+  const createFreightInvoice = async (billType) => {
+    setSaving(true)
+    try {
+      const inv = await freightInvoicesApi.create({ bookingId, billType, customerName: booking?.customer })
+      toast({
+        title: 'Freight invoice created',
+        message: `${inv.invoiceNo} · Balance ${formatCurrency(inv.balance)}`,
+        type: 'success',
+      })
+      reload()
+    } catch (err) {
+      toast({ title: 'Failed', message: err.message, type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const createBill = async (billType) => {
     setSaving(true)
     try {
@@ -126,11 +149,13 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
   const live = summary?.booking ?? booking
   const pl = summary?.profitLoss ?? {}
   const received = Math.max(0, (live?.freight ?? 0) - (live?.balance ?? 0))
+  const openInvoices = (summary?.freightInvoices ?? []).filter((i) => i.status !== 'Cancelled' && Number(i.balance) > 0)
   const paymentCols = [
     { key: 'paymentDate', label: 'Date' },
     { key: 'amount', label: 'Amount', render: (r) => formatCurrency(r.amount) },
     { key: 'paymentMode', label: 'Mode' },
     { key: 'referenceNo', label: 'Reference' },
+    { key: 'freightInvoiceId', label: 'Invoice', render: (r) => (r.freightInvoiceId ? String(r.freightInvoiceId).slice(0, 8) : '—') },
   ]
 
   return (
@@ -159,6 +184,20 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
             <Select label="Mode" options={PAYMENT_MODES} value={paymentForm.paymentMode} onChange={(e) => setPaymentForm((f) => ({ ...f, paymentMode: e.target.value }))} />
             <Input label="Reference" value={paymentForm.referenceNo} onChange={(e) => setPaymentForm((f) => ({ ...f, referenceNo: e.target.value }))} />
             <Input label="Remarks" value={paymentForm.remarks} onChange={(e) => setPaymentForm((f) => ({ ...f, remarks: e.target.value }))} />
+            {openInvoices.length > 0 && (
+              <Select
+                label="Allocate to Invoice"
+                value={paymentForm.freightInvoiceId}
+                onChange={(e) => setPaymentForm((f) => ({ ...f, freightInvoiceId: e.target.value }))}
+                options={[
+                  { value: '', label: 'Auto (latest open invoice)' },
+                  ...openInvoices.map((i) => ({
+                    value: i.id,
+                    label: `${i.invoiceNo} · Bal ${formatCurrency(i.balance)}`,
+                  })),
+                ]}
+              />
+            )}
           </div>
           <Button className="mt-3" icon={saving ? Loader2 : Plus} disabled={saving} onClick={submitPayment}>Record Payment</Button>
           <div className="mt-4">
@@ -206,7 +245,32 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
       </Card>
 
       <Card>
-        <CardHeader title="RCM & FC Billing" subtitle="Includes freight, other charges, advance (booking + payments), and balance due" />
+        <CardHeader title="Freight Invoice" subtitle="Canonical AR invoice linked to payments (Phase 1)" />
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled={saving} onClick={() => createFreightInvoice('FC')}>Create FC Invoice</Button>
+          <Button variant="outline" disabled={saving} onClick={() => createFreightInvoice('RCM')}>Create RCM Invoice</Button>
+          <Button variant="outline" disabled={saving} onClick={() => createFreightInvoice('STANDARD')}>Create Standard Invoice</Button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {(summary?.freightInvoices ?? []).map((inv) => (
+            <div key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-2 text-sm dark:border-slate-800">
+              <div>
+                <p className="font-medium">{inv.invoiceNo} · {inv.billType} · {inv.status}</p>
+                <p className="text-xs text-slate-500">
+                  Total {formatCurrency(inv.totalAmount)} · Paid {formatCurrency(inv.amountPaid)} · Balance {formatCurrency(inv.balance)}
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => navigate(`/accounting/freight-invoices/${inv.id}`)}>Open</Button>
+            </div>
+          ))}
+          {(summary?.freightInvoices ?? []).length === 0 && (
+            <p className="text-sm text-slate-500">No freight invoices yet.</p>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="RCM & FC Billing" subtitle="Legacy transport bills (kept for compatibility)" />
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" disabled={saving} onClick={() => createBill('RCM')}>Generate RCM Bill</Button>
           <Button variant="outline" disabled={saving} onClick={() => createBill('FC')}>Generate FC Bill</Button>

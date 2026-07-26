@@ -17,9 +17,10 @@ export default function BookingPaymentAdjustment() {
   const { toast } = useToast()
   const [bookingId, setBookingId] = useState('')
   const [booking, setBooking] = useState(null)
+  const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '' })
+  const [form, setForm] = useState({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
 
   const loadBooking = async (id) => {
     if (!id?.trim()) return
@@ -28,8 +29,15 @@ export default function BookingPaymentAdjustment() {
       const b = await bookingsApi.get(id.trim())
       setBooking(b)
       setBookingId(id.trim())
+      try {
+        const fin = await bookingFinanceApi.summary(id.trim())
+        setInvoices((fin.freightInvoices || []).filter((i) => i.status !== 'Cancelled' && Number(i.balance) > 0))
+      } catch {
+        setInvoices([])
+      }
     } catch (err) {
       setBooking(null)
+      setInvoices([])
       toast({ title: 'Not found', message: err.message, type: 'error' })
     } finally {
       setLoading(false)
@@ -45,10 +53,15 @@ export default function BookingPaymentAdjustment() {
     }
     setSaving(true)
     try {
-      const res = await bookingFinanceApi.recordPayment(booking.id, { ...form, amount })
+      const res = await bookingFinanceApi.recordPayment(booking.id, {
+        ...form,
+        amount,
+        freightInvoiceId: form.freightInvoiceId || undefined,
+      })
       toast({ title: 'Payment recorded', message: `Outstanding: ${formatCurrency(res.outstanding)}`, type: 'success' })
       setBooking((b) => ({ ...b, balance: res.outstanding, payment: res.paymentStatus }))
-      setForm({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '' })
+      setForm({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
+      await loadBooking(booking.id)
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
     } finally {
@@ -85,6 +98,17 @@ export default function BookingPaymentAdjustment() {
             <Select label="Mode" options={PAYMENT_MODES} value={form.paymentMode} onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value }))} />
             <Input label="Reference" value={form.referenceNo} onChange={(e) => setForm((f) => ({ ...f, referenceNo: e.target.value }))} />
             <Input label="Remarks" value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} />
+            {invoices.length > 0 && (
+              <Select
+                label="Allocate to Invoice"
+                value={form.freightInvoiceId}
+                onChange={(e) => setForm((f) => ({ ...f, freightInvoiceId: e.target.value }))}
+                options={[
+                  { value: '', label: 'Auto (latest open invoice)' },
+                  ...invoices.map((i) => ({ value: i.id, label: `${i.invoiceNo} · Bal ${formatCurrency(i.balance)}` })),
+                ]}
+              />
+            )}
           </div>
           <div className="mt-4 flex gap-2">
             <Button icon={saving ? Loader2 : Save} disabled={saving} onClick={handleSave}>{saving ? 'Saving…' : 'Record Payment'}</Button>

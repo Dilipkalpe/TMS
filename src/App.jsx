@@ -10,6 +10,8 @@ import {
   GenerateLR, LRList, EditLR,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
+  FreightRateList, NewFreightRate, FreightRateDetails,
+  QuotationList, NewQuotation, QuotationDetails,
   VendorList, VendorDetails, NewVendor,
   ExpenseList, NewExpense,
   Settings, BranchesPage, PortalUsersPage, NotificationSettings,
@@ -19,6 +21,7 @@ import {
   LedgerReport, CustomerLedgerReport, VendorLedgerReport, DriverLedgerReport,
   VehicleLedgerReport, CashBook, BankBook, DayBook, JournalRegister,
   ReceiptRegister, PaymentRegister, PurchaseRegister, SalesRegister,
+  FreightInvoiceList, FreightInvoiceDetails,
   TrialBalance, ProfitLoss, BalanceSheet, BookingPaymentAdjustment,
   ProvisionsPage, OutstandingReport, GSTReports,
   ReportsHub, TripReport, VehicleReport, DriverReport, IncomeReport,
@@ -97,6 +100,12 @@ export default function App() {
         <Route path="customers" element={<CustomerList />} />
         <Route path="customers/new" element={<NewCustomer />} />
         <Route path="customers/:id" element={<CustomerDetails />} />
+        <Route path="freight-rates" element={<FreightRateList />} />
+        <Route path="freight-rates/new" element={<NewFreightRate />} />
+        <Route path="freight-rates/:id" element={<FreightRateDetails />} />
+        <Route path="quotations" element={<QuotationList />} />
+        <Route path="quotations/new" element={<NewQuotation />} />
+        <Route path="quotations/:id" element={<QuotationDetails />} />
         <Route path="vendors" element={<VendorList />} />
         <Route path="vendors/new" element={<NewVendor />} />
         <Route path="vendors/:id" element={<VendorDetails />} />
@@ -137,6 +146,8 @@ export default function App() {
         <Route path="accounting/payment-register" element={<PaymentRegister />} />
         <Route path="accounting/purchase-register" element={<PurchaseRegister />} />
         <Route path="accounting/sales-register" element={<SalesRegister />} />
+        <Route path="accounting/freight-invoices" element={<FreightInvoiceList />} />
+        <Route path="accounting/freight-invoices/:id" element={<FreightInvoiceDetails />} />
         <Route path="accounting/trial-balance" element={<TrialBalance />} />
         <Route path="accounting/profit-loss" element={<ProfitLoss />} />
         <Route path="accounting/balance-sheet" element={<BalanceSheet />} />

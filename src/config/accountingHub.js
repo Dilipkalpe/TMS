@@ -15,6 +15,7 @@ export const accountingCards = [
   { title: 'Payment Register', path: '/accounting/payment-register', icon: 'CreditCard', description: 'All payment vouchers' },
   { title: 'Purchase Register', path: '/accounting/purchase-register', icon: 'ShoppingCart', description: 'Purchase bills register' },
   { title: 'Sales Register', path: '/accounting/sales-register', icon: 'ShoppingBag', description: 'Sales invoices register' },
+  { title: 'Freight Invoices', path: '/accounting/freight-invoices', icon: 'FileText', description: 'Freight invoices linked to booking payments' },
   { title: 'Trial Balance', path: '/accounting/trial-balance', icon: 'Calculator', description: 'Debit and credit trial balance' },
   { title: 'Payment Adjustment', path: '/accounting/payment-adjustment', icon: 'IndianRupee', description: 'Record booking outstanding payments' },
   { title: 'Provisions', path: '/accounting/provisions', icon: 'FileStack', description: 'Vendor and party provisions' },

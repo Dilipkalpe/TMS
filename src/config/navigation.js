@@ -7,6 +7,8 @@ export const navigation = [
   { title: 'Operations', path: '/operations', icon: 'Layers' },
   { title: 'HR', path: '/hr', icon: 'Briefcase' },
   { title: 'Customers', path: '/customers', icon: 'Users' },
+  { title: 'Freight Rates', path: '/freight-rates', icon: 'IndianRupee' },
+  { title: 'Quotations', path: '/quotations', icon: 'FileSpreadsheet' },
   { title: 'Vendors', path: '/vendors', icon: 'Building2' },
   { title: 'Expenses', path: '/expenses', icon: 'Wallet' },
   { title: 'Payroll', path: '/payroll', icon: 'Banknote' },

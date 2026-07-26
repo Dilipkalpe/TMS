@@ -61,6 +61,7 @@
     <None Include="..\..\database\routing\schema.sql" Link="database\routing\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\branches\schema.sql" Link="database\branches\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\booking_finance\schema.sql" Link="database\booking_finance\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\commercial\schema.sql" Link="database\commercial\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\stored_procedures.sql" Link="database\reports\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\sp_dashboard_stats.sql" Link="database\reports\sp_dashboard_stats.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\sp_accounting_customer_ledger.sql" Link="database\reports\sp_accounting_customer_ledger.sql" CopyToOutputDirectory="PreserveNewest" />

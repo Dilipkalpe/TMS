@@ -12,12 +12,14 @@ export default function SalesRegister() {
   const { data, loading, error, refresh } = useApiResource(() => accountingApi.salesRegister())
   const columns = [
     { key: 'date', label: 'Date' },
-    { key: 'lrNo', label: 'LR No.' },
+    { key: 'lrNo', label: 'Invoice / LR No.' },
     { key: 'customer', label: 'Customer' },
-    { key: 'route', label: 'Route' },
+    { key: 'route', label: 'Route / Booking' },
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
     { key: 'gst', label: 'GST', render: (r) => formatCurrency(r.gst) },
     { key: 'total', label: 'Total', render: (r) => formatCurrency(r.total) },
+    { key: 'balance', label: 'Balance', render: (r) => (r.balance != null ? formatCurrency(r.balance) : '—') },
+    { key: 'status', label: 'Status' },
   ]
 
   return (

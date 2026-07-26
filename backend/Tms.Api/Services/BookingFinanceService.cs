@@ -206,6 +206,35 @@ public static class BookingFinanceService
             lines);
     }
 
+    public static async Task RecalculateFreightInvoiceStatusAsync(
+        TmsDbContext db, FreightInvoice invoice, CancellationToken ct = default)
+    {
+        if (invoice.Status == "Cancelled") return;
+
+        var paid = await db.BookingPayments
+            .Where(p => p.FreightInvoiceId == invoice.Id)
+            .SumAsync(p => p.Amount, ct);
+
+        var pendingAdded = db.ChangeTracker.Entries<BookingPayment>()
+            .Where(e => e.State == EntityState.Added && e.Entity.FreightInvoiceId == invoice.Id)
+            .Sum(e => e.Entity.Amount);
+        paid += pendingAdded;
+
+        invoice.AmountPaid = paid;
+        invoice.Balance = Math.Max(0, invoice.TotalAmount - paid);
+        invoice.Status = invoice.Balance <= 0 ? "Paid" : paid > 0 ? "Partial" : "Issued";
+        invoice.UpdatedAt = DateTime.UtcNow;
+    }
+
+    public static async Task SyncFreightInvoiceFromPaymentAsync(
+        TmsDbContext db, Guid? freightInvoiceId, CancellationToken ct = default)
+    {
+        if (freightInvoiceId == null) return;
+        var inv = await db.FreightInvoices.FindAsync([freightInvoiceId.Value], ct);
+        if (inv == null) return;
+        await RecalculateFreightInvoiceStatusAsync(db, inv, ct);
+    }
+
     static void AddLrLineIfMissing(
         List<BillLineItem> lines,
         HashSet<string> expenseCategories,

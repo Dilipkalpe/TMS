@@ -27,6 +27,8 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
             .OrderByDescending(e => e.ExpenseDate).ToListAsync();
         var bills = await db.TransportBills.Where(b => b.BookingId == bookingId)
             .OrderByDescending(b => b.BillDate).ToListAsync();
+        var freightInvoices = await db.FreightInvoices.Where(i => i.BookingId == bookingId)
+            .OrderByDescending(i => i.InvoiceDate).ToListAsync();
         var pl = await BookingFinanceService.BuildBookingProfitLossAsync(db, booking);
 
         return Ok(new
@@ -36,6 +38,17 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
             brokerCharges = brokerCharges.Select(MapBrokerCharge),
             expenses = expenses.Select(MapExpense),
             bills = bills.Select(MapBill),
+            freightInvoices = freightInvoices.Select(i => new
+            {
+                id = i.Id,
+                invoiceNo = i.InvoiceNo,
+                billType = i.BillType,
+                invoiceDate = i.InvoiceDate.ToString("yyyy-MM-dd"),
+                totalAmount = i.TotalAmount,
+                amountPaid = i.AmountPaid,
+                balance = i.Balance,
+                status = i.Status,
+            }),
             profitLoss = pl
         });
     }
@@ -61,11 +74,38 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
         if (amount > booking.Balance)
             return BadRequest(new ApiError($"Payment exceeds outstanding balance ({booking.Balance:N2})."));
 
+        Guid? freightInvoiceId = null;
+        if (Guid.TryParse(ApiParseHelper.BodyString(body, "freightInvoiceId"), out var fid))
+            freightInvoiceId = fid;
+
+        FreightInvoice? invoice = null;
+        if (freightInvoiceId != null)
+        {
+            invoice = await db.FreightInvoices.FindAsync(freightInvoiceId.Value);
+            if (invoice == null || invoice.BookingId != bookingId || !TenantAccess.CanAccess(tenants, invoice))
+                return BadRequest(new ApiError("Freight invoice not found for this booking."));
+            if (invoice.Status == "Cancelled")
+                return BadRequest(new ApiError("Cannot pay a cancelled freight invoice."));
+            if (amount > invoice.Balance)
+                return BadRequest(new ApiError($"Payment exceeds invoice balance ({invoice.Balance:N2})."));
+        }
+        else
+        {
+            // Auto-allocate to the open invoice for this booking when exactly one exists.
+            invoice = await db.FreightInvoices
+                .Where(i => i.BookingId == bookingId && i.Status != "Cancelled" && i.Balance > 0)
+                .OrderByDescending(i => i.CreatedAt)
+                .FirstOrDefaultAsync();
+            if (invoice != null)
+                freightInvoiceId = invoice.Id;
+        }
+
         var payment = new BookingPayment
         {
             Id = Guid.NewGuid(),
             CompanyId = booking.CompanyId,
             BookingId = bookingId,
+            FreightInvoiceId = freightInvoiceId,
             PaymentDate = ApiParseHelper.BodyDate(body, "paymentDate", DateOnly.FromDateTime(DateTime.UtcNow)),
             Amount = amount,
             PaymentMode = ApiParseHelper.BodyString(body, "paymentMode") ?? "Cash",
@@ -75,10 +115,21 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
         };
         db.BookingPayments.Add(payment);
         await BookingFinanceService.RecalculateBookingPaymentStatusAsync(db, booking);
+        if (invoice != null)
+            await BookingFinanceService.RecalculateFreightInvoiceStatusAsync(db, invoice);
         await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
         await db.SaveChangesAsync();
 
-        return Ok(new { message = "Payment recorded.", payment = MapPayment(payment), outstanding = booking.Balance, paymentStatus = booking.Payment });
+        return Ok(new
+        {
+            message = "Payment recorded.",
+            payment = MapPayment(payment),
+            outstanding = booking.Balance,
+            paymentStatus = booking.Payment,
+            freightInvoiceId,
+            invoiceBalance = invoice?.Balance,
+            invoiceStatus = invoice?.Status,
+        });
     }
 
     [HttpPost("bookings/{bookingId}/broker-charges")]
@@ -378,6 +429,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         id = p.Id,
         bookingId = p.BookingId,
+        freightInvoiceId = p.FreightInvoiceId,
         paymentDate = p.PaymentDate.ToString("yyyy-MM-dd"),
         amount = p.Amount,
         paymentMode = p.PaymentMode,

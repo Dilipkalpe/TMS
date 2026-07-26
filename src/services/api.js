@@ -184,6 +184,34 @@ export const customersApi = {
   setPortalAccess: (id, data) => apiRequest(`/customers/${id}/portal`, { method: 'PUT', body: data }),
 }
 
+export const freightRatesApi = {
+  list: (params = {}) => apiRequest(`/freight-rates?${new URLSearchParams(params)}`),
+  get: (id) => apiRequest(`/freight-rates/${id}`),
+  lookup: (params = {}) => apiRequest(`/freight-rates/lookup?${new URLSearchParams(params)}`),
+  create: (data) => apiRequest('/freight-rates', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/freight-rates/${id}`, { method: 'PUT', body: data }),
+  remove: (id) => apiRequest(`/freight-rates/${id}`, { method: 'DELETE' }),
+}
+
+export const quotationsApi = {
+  list: (params = {}) => apiRequest(`/quotations?${new URLSearchParams(params)}`),
+  get: (id) => apiRequest(`/quotations/${id}`),
+  create: (data) => apiRequest('/quotations', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/quotations/${id}`, { method: 'PUT', body: data }),
+  send: (id) => apiRequest(`/quotations/${id}/send`, { method: 'POST' }),
+  accept: (id) => apiRequest(`/quotations/${id}/accept`, { method: 'POST' }),
+  reject: (id) => apiRequest(`/quotations/${id}/reject`, { method: 'POST' }),
+  convertToBooking: (id) => apiRequest(`/quotations/${id}/convert-to-booking`, { method: 'POST' }),
+  remove: (id) => apiRequest(`/quotations/${id}`, { method: 'DELETE' }),
+}
+
+export const freightInvoicesApi = {
+  list: (params = {}) => apiRequest(`/freight-invoices?${new URLSearchParams(params)}`),
+  get: (id) => apiRequest(`/freight-invoices/${id}`),
+  create: (data) => apiRequest('/freight-invoices', { method: 'POST', body: data }),
+  cancel: (id) => apiRequest(`/freight-invoices/${id}/cancel`, { method: 'POST' }),
+}
+
 export const vendorsApi = {
   list: (params = {}) => apiRequest(`/vendors?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/vendors/${id}`),

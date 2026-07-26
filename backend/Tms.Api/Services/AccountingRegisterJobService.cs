@@ -45,7 +45,15 @@ public sealed class AccountingRegisterJobService(
 
         var data = await BuildRegisterAsync(reportType, companyId.Value, ct);
         cache.Set(key, data, CacheTtl);
-        await EnqueueAsync(companyId.Value, reportType, ct);
+        try
+        {
+            await EnqueueAsync(companyId.Value, reportType, ct);
+        }
+        catch (Exception ex)
+        {
+            // Report data is already built — do not fail the request if job enqueue/cache write fails.
+            logger.LogWarning(ex, "Failed to enqueue {ReportType} register job for company {CompanyId}", reportType, companyId);
+        }
         return data;
     }
 
@@ -117,17 +125,26 @@ public sealed class AccountingRegisterJobService(
                 job.Status = "Completed";
                 job.CompletedAt = DateTime.UtcNow;
                 job.Error = null;
+                await db.SaveChangesAsync(ct);
                 cache.Set(CacheKey(job.CompanyId, job.ReportType), data, CacheTtl);
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Accounting register job {JobId} ({Type}) failed", job.Id, job.ReportType);
+                job.ResultJson = null;
                 job.Status = "Failed";
-                job.Error = ex.Message;
+                job.Error = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message;
                 job.CompletedAt = DateTime.UtcNow;
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (Exception saveEx)
+                {
+                    logger.LogError(saveEx, "Could not persist Failed status for accounting job {JobId}", job.Id);
+                    db.ChangeTracker.Clear();
+                }
             }
-
-            await db.SaveChangesAsync(ct);
         }
     }
 

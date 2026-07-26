@@ -7,7 +7,7 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import { Save, ArrowLeft, Loader2 } from 'lucide-react'
-import { bookingsApi, lrApi, unwrapList } from '../../services/api'
+import { bookingsApi, freightRatesApi, lrApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { useDocumentFlow } from '../../hooks/useDocumentFlow'
 
@@ -87,6 +87,29 @@ export default function NewBooking() {
     }
   }
 
+  const applyFreightRate = async () => {
+    if (!form.from?.trim() || !form.to?.trim()) {
+      toast({ title: 'Validation', message: 'Enter From and To cities first.', type: 'warning' })
+      return
+    }
+    try {
+      const res = await freightRatesApi.lookup({
+        from: form.from,
+        to: form.to,
+        customerId: '',
+        vehicleType: '',
+      })
+      if (!res?.found) {
+        toast({ title: 'No rate found', message: 'No matching freight rate for this lane.', type: 'warning' })
+        return
+      }
+      set('freight', String(res.rate.rateAmount))
+      toast({ title: 'Freight rate applied', message: `₹${res.rate.rateAmount} (${res.rate.rateUnit})`, type: 'success' })
+    } catch (err) {
+      toast({ title: 'Lookup failed', message: err.message, type: 'error' })
+    }
+  }
+
   const handleSave = async () => {
     if (isFirstLrThenBooking && !form.lrNumber?.trim()) {
       toast({
@@ -160,7 +183,12 @@ export default function NewBooking() {
           <Input label="Quantity" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} placeholder="e.g. 12 MT" />
           <LookupSelect label="Vehicle" type="vehicles" value={form.vehicle} onChange={(v) => set('vehicle', v)} placeholder="Search vehicle…" />
           <DriverLookupSelect label="Driver" value={form.driver} onChange={(v) => set('driver', v)} />
-          <Input label="Freight (₹)" type="number" value={form.freight} onChange={(e) => set('freight', e.target.value)} />
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Input label="Freight (₹)" type="number" value={form.freight} onChange={(e) => set('freight', e.target.value)} />
+            </div>
+            <Button type="button" variant="outline" className="mb-0.5" onClick={applyFreightRate}>Apply Rate</Button>
+          </div>
           <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => set('advance', e.target.value)} />
           <Select label="Booking Status" value={form.status} onChange={(e) => set('status', e.target.value)} options={bookingStatuses} />
           <Select label="Payment Status" value={form.payment} onChange={(e) => set('payment', e.target.value)} options={paymentStatuses} />
