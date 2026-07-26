@@ -222,7 +222,7 @@ public class CustomersController(TmsDbContext db, IBranchContext branches, ITena
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class VendorsController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class VendorsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<VendorDto>>> GetAll(
@@ -232,7 +232,7 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants) : Contro
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.Vendors.AsNoTracking());
+        var q = tenants.Filter(branches.Filter(db.Vendors.AsNoTracking().Include(v => v.Branch)));
         if (!string.IsNullOrWhiteSpace(category) && category != "(All)")
             q = q.Where(v => v.Category == category);
         q = SearchHelper.Filter(q, search);
@@ -246,8 +246,8 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants) : Contro
     [HttpGet("{id}")]
     public async Task<ActionResult<VendorDto>> Get(string id)
     {
-        var v = await db.Vendors.FindAsync(id);
-        if (v == null || !TenantScope.CanAccessTenantEntity(tenants, v)) return NotFound();
+        var v = await db.Vendors.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
+        if (v == null || !TenantScope.CanAccessBranchEntity(tenants, branches, v)) return NotFound();
         return Ok(EntityMappers.ToDto(v));
     }
 
@@ -266,6 +266,7 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants) : Contro
             Address = body.GetValueOrDefault("address")?.ToString(),
             Category = body.GetValueOrDefault("category")?.ToString(),
             CompanyId = TenantScope.ResolveCompanyId(tenants),
+            BranchId = branches.AssignBranchId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -278,7 +279,7 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants) : Contro
     public async Task<ActionResult<VendorDto>> Update(string id, [FromBody] Dictionary<string, object?> body)
     {
         var v = await db.Vendors.FindAsync(id);
-        if (v == null || !TenantScope.CanAccessTenantEntity(tenants, v)) return NotFound();
+        if (v == null || !TenantScope.CanAccessBranchEntity(tenants, branches, v)) return NotFound();
         if (body.ContainsKey("name")) v.Name = body["name"]?.ToString() ?? v.Name;
         if (body.ContainsKey("contact")) v.Contact = body["contact"]?.ToString();
         if (body.ContainsKey("phone")) v.Phone = body["phone"]?.ToString();
@@ -292,7 +293,7 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants) : Contro
     public async Task<IActionResult> Delete(string id)
     {
         var v = await db.Vendors.FindAsync(id);
-        if (v == null || !TenantScope.CanAccessTenantEntity(tenants, v)) return NotFound();
+        if (v == null || !TenantScope.CanAccessBranchEntity(tenants, branches, v)) return NotFound();
         db.Vendors.Remove(v);
         await db.SaveChangesAsync();
         return NoContent();
@@ -408,52 +409,23 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.LorryReceipts.AsNoTracking());
+        var q = tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking().Include(l => l.Branch)));
         if (!string.IsNullOrWhiteSpace(paymentType) && paymentType != "(All)")
             q = q.Where(l => l.PaymentType == paymentType);
         q = SearchHelper.Filter(q, search);
         q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
-        var bookingIds = items
-            .Select(l => l.BookingId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct()
-            .Cast<string>()
-            .ToList();
-        var branchByBooking = bookingIds.Count == 0
-            ? new Dictionary<string, (Guid? BranchId, string? BranchName)>()
-            : (await db.Bookings.AsNoTracking()
-                .Where(b => bookingIds.Contains(b.Id))
-                .Select(b => new { b.Id, b.BranchId, BranchName = b.Branch != null ? b.Branch.Name : null })
-                .ToListAsync())
-                .ToDictionary(x => x.Id, x => (BranchId: x.BranchId, BranchName: x.BranchName));
         return Ok(new PagedResult<LrDto>(
-            items.Select(l =>
-            {
-                if (string.IsNullOrWhiteSpace(l.BookingId) || !branchByBooking.TryGetValue(l.BookingId, out var br))
-                    return EntityMappers.ToDto(l);
-                return EntityMappers.ToDto(l, br.BranchId, br.BranchName);
-            }).ToList(), total, p, size, hasMore, approx));
+            items.Select(l => EntityMappers.ToDto(l)).ToList(), total, p, size, hasMore, approx));
     }
 
     [HttpGet("{lrNumber}")]
     public async Task<ActionResult<LrDto>> Get(string lrNumber)
     {
-        var l = await db.LorryReceipts.FindAsync(lrNumber);
-        if (l == null || !TenantScope.CanAccessTenantEntity(tenants, l)) return NotFound();
-        Guid? branchId = null;
-        string? branchName = null;
-        if (!string.IsNullOrWhiteSpace(l.BookingId))
-        {
-            var br = await db.Bookings.AsNoTracking()
-                .Where(b => b.Id == l.BookingId)
-                .Select(b => new { b.BranchId, Name = b.Branch != null ? b.Branch.Name : null })
-                .FirstOrDefaultAsync();
-            branchId = br?.BranchId;
-            branchName = br?.Name;
-        }
-        return Ok(EntityMappers.ToDto(l, branchId, branchName));
+        var l = await db.LorryReceipts.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.LrNumber == lrNumber);
+        if (l == null || !TenantScope.CanAccessBranchEntity(tenants, branches, l)) return NotFound();
+        return Ok(EntityMappers.ToDto(l));
     }
 
     [HttpGet("prefill/{bookingId}")]
@@ -574,6 +546,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         {
             LrNumber = lrNumber,
             CompanyId = booking?.CompanyId ?? TenantScope.ResolveCompanyId(tenants),
+            BranchId = booking?.BranchId ?? branches.AssignBranchId,
             LrDate = ApiParseHelper.BodyDate(body, "lrDate", DateOnly.FromDateTime(DateTime.UtcNow)),
             BookingId = booking?.Id,
             Consignor = ApiParseHelper.BodyString(body, "consignor"),

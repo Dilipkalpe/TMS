@@ -34,7 +34,7 @@ public static class DocumentFlow
 }
 
 /// <summary>Centralized company document-flow reads and create/update validation.</summary>
-public class DocumentFlowService(TmsDbContext db, ITenantContext tenants)
+public class DocumentFlowService(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
 {
     public async Task<string> GetFlowAsync(CancellationToken ct = default)
     {
@@ -145,7 +145,7 @@ public class DocumentFlowService(TmsDbContext db, ITenantContext tenants)
                 "Company Document Flow is set to First LR → Next Booking. Create an LR first, then create the Booking linked to that LR.");
         }
 
-        var lr = await tenants.Filter(db.LorryReceipts.AsQueryable())
+        var lr = await TenantScope.LorryReceipts(db, tenants, branches)
             .FirstOrDefaultAsync(l => l.LrNumber == lrNumber, ct)
             ?? throw new InvalidOperationException($"LR '{lrNumber}' was not found in your company.");
 
@@ -179,13 +179,13 @@ public class DocumentFlowService(TmsDbContext db, ITenantContext tenants)
 
         if (flow == DocumentFlow.FirstLRThenBooking)
         {
-            var q = tenants.Filter(db.LorryReceipts.AsNoTracking())
+            var q = TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking()
                 .Where(l => l.BookingId == null || l.BookingId == "");
             var count = await q.CountAsync(ct);
             return (count, "Pending booking", $"{count} LR(s) without booking");
         }
 
-        var bookings = tenants.Filter(db.Bookings.AsNoTracking());
+        var bookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking();
         var countPending = companyId == null
             ? await bookings.CountAsync(b =>
                 !db.LorryReceipts.AsNoTracking().Any(l => l.BookingId == b.Id), ct)

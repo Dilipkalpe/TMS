@@ -91,6 +91,7 @@ builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = Compre
 
 
 builder.Services.AddScoped<DashboardReadService>();
+builder.Services.AddScoped<DashboardOverviewService>();
 builder.Services.AddScoped<AccountingReadService>();
 
 builder.Services.AddScoped<PayrollService>();
@@ -281,6 +282,9 @@ if (!app.Environment.IsEnvironment("Testing"))
 
                 logger.LogInformation("Ensuring branch schema…");
                 await BranchSchemaMigrator.EnsureAsync(db);
+
+                logger.LogInformation("Ensuring branch isolation columns…");
+                await BranchIsolationMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring booking-finance schema…");
                 await BookingFinanceSchemaMigrator.EnsureAsync(db);

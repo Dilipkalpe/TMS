@@ -18,11 +18,20 @@ public class DashboardController(
     ITenantContext tenants,
     TenantCacheService cache,
     DashboardReadService dashboardRead,
-    DocumentFlowService documentFlow) : ControllerBase
+    DocumentFlowService documentFlow,
+    DashboardOverviewService overviewService) : ControllerBase
 {
     Guid CompanyId => TenantScope.ResolveCompanyId(tenants);
     Guid? BranchId => branches.EffectiveBranchId;
     static readonly TimeSpan DashboardCacheTtl = TimeSpan.FromSeconds(45);
+
+    [HttpGet("overview")]
+    public async Task<ActionResult<DashboardOverviewDto>> Overview(CancellationToken ct)
+    {
+        var key = TenantCacheService.DashboardKey("overview", CompanyId, BranchId);
+        var data = await cache.GetOrCreateAsync(key, () => overviewService.BuildAsync(ct), DashboardCacheTtl);
+        return Ok(data);
+    }
 
     [HttpGet("stats")]
     public async Task<ActionResult<DashboardStatsDto>> Stats()
@@ -93,7 +102,8 @@ public class DashboardController(
     [HttpGet("recent-trips")]
     public async Task<ActionResult<IEnumerable<RecentTripDto>>> RecentTrips()
     {
-        var list = await tenants.Filter(db.LorryReceipts.AsQueryable()).OrderByDescending(l => l.LrDate).Take(5).ToListAsync();
+        var list = await TenantScope.LorryReceipts(db, tenants, branches)
+            .OrderByDescending(l => l.LrDate).Take(5).ToListAsync();
         return Ok(list.Select(l => new RecentTripDto(
             l.LrNumber, l.VehicleNumber ?? "", l.DriverName ?? "",
             l.FromCity, l.ToCity, $"₹{l.Freight:N0}")));
@@ -486,7 +496,7 @@ public class LookupsController(
         var key = TenantCacheService.LookupKey("vendors", CompanyId, BranchId, search, cap);
         var items = await cache.GetOrCreateAsync(key, async () =>
         {
-            var q = tenants.Filter(db.Vendors.AsNoTracking());
+            var q = BranchAccess.FilterForLookup(branches, tenants.Filter(db.Vendors.AsNoTracking()));
             q = SearchHelper.Filter(q, search);
             return await q.OrderBy(v => v.Name).Take(cap).Select(v => v.Name).ToArrayAsync();
         }, LookupCacheTtl);
@@ -523,7 +533,7 @@ public class ReportsController(ReadOnlyTmsDbContext db, IBranchContext branches,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.LorryReceipts.AsNoTracking()).AsQueryable();
+        var q = TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLowerInvariant();

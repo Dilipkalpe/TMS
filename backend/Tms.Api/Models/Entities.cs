@@ -38,10 +38,12 @@ public class Customer : IBranchScoped
     public DateTime UpdatedAt { get; set; }
 }
 
-public class Vendor : ITenantScoped
+public class Vendor : IBranchScoped
 {
     public string Id { get; set; } = "";
     public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
     public string Name { get; set; } = "";
     public string? Contact { get; set; }
     public string? Phone { get; set; }
@@ -177,10 +179,12 @@ public class Booking : IBranchScoped
     public DateTime UpdatedAt { get; set; }
 }
 
-public class LorryReceipt : ITenantScoped
+public class LorryReceipt : IBranchScoped
 {
     public string LrNumber { get; set; } = "";
     public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
     public DateOnly LrDate { get; set; }
     public string? BookingId { get; set; }
     public string? Consignor { get; set; }

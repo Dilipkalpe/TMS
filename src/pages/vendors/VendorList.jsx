@@ -18,6 +18,7 @@ export default function VendorList() {
 
   const columns = [
     { key: 'name', label: 'Vendor' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'contact', label: 'Contact' },
     { key: 'category', label: 'Category' },
     { key: 'phone', label: 'Phone' },

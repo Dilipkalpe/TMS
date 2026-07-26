@@ -17,6 +17,7 @@ export default function FreightRateList() {
   const columns = [
     { key: 'fromCity', label: 'From' },
     { key: 'toCity', label: 'To' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'vehicleType', label: 'Vehicle Type' },
     { key: 'customerId', label: 'Customer Id' },
     { key: 'rateAmount', label: 'Rate', render: (r) => formatCurrency(r.rateAmount) },

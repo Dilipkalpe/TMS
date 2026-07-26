@@ -240,6 +240,7 @@ export const lrApi = {
 }
 
 export const dashboardApi = {
+  overview: () => apiRequest('/dashboard/overview'),
   stats: () => apiRequest('/dashboard/stats'),
   recentBookings: () => apiRequest('/dashboard/recent-bookings'),
   recentTrips: () => apiRequest('/dashboard/recent-trips'),

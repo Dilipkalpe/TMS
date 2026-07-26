@@ -21,6 +21,7 @@ export default function FreightInvoiceList() {
 
   const columns = [
     { key: 'invoiceNo', label: 'Invoice No' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'bookingId', label: 'Booking' },
     { key: 'customerName', label: 'Customer' },
     { key: 'billType', label: 'Type' },

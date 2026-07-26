@@ -33,8 +33,17 @@ public static class TenantScope
         return branches != null ? branches.Filter(q) : q;
     }
 
-    public static IQueryable<Vendor> Vendors(TmsDbContext db, ITenantContext tenants) =>
-        tenants.Filter(db.Vendors.AsQueryable());
+    public static IQueryable<Vendor> Vendors(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    {
+        var q = tenants.Filter(db.Vendors.AsQueryable());
+        return branches != null ? branches.Filter(q) : q;
+    }
+
+    public static IQueryable<LorryReceipt> LorryReceipts(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    {
+        var q = tenants.Filter(db.LorryReceipts.AsQueryable());
+        return branches != null ? branches.Filter(q) : q;
+    }
 
     public static IQueryable<Broker> Brokers(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.Brokers.AsQueryable());
@@ -60,46 +69,40 @@ public static class TenantScope
     public static IQueryable<AiChatSession> AiChatSessions(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.AiChatSessions.AsQueryable());
 
-    public static IQueryable<GpsTrack> GpsTracks(TmsDbContext db, ITenantContext tenants)
+    public static IQueryable<FuelEntry> FuelEntries(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
     {
-        var companyId = tenants.EffectiveCompanyId;
-        if (companyId == null) return db.GpsTracks.Where(_ => false);
-        return db.GpsTracks.Where(t => db.Vehicles.Any(v => v.Id == t.VehicleId && v.CompanyId == companyId));
+        var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
+        return db.FuelEntries.Where(f => vehicles.Contains(f.VehicleId));
     }
 
-    public static IQueryable<GeofenceEvent> GeofenceEvents(TmsDbContext db, ITenantContext tenants)
+    public static IQueryable<GpsTrack> GpsTracks(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
     {
-        var companyId = tenants.EffectiveCompanyId;
-        if (companyId == null) return db.GeofenceEvents.Where(_ => false);
-        return db.GeofenceEvents.Where(e => db.Vehicles.Any(v => v.Id == e.VehicleId && v.CompanyId == companyId));
+        var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
+        return db.GpsTracks.Where(t => vehicles.Contains(t.VehicleId));
     }
 
-    public static IQueryable<MaintenanceRecord> MaintenanceRecords(TmsDbContext db, ITenantContext tenants)
+    public static IQueryable<GeofenceEvent> GeofenceEvents(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
     {
-        var companyId = tenants.EffectiveCompanyId;
-        if (companyId == null) return db.MaintenanceRecords.Where(_ => false);
-        return db.MaintenanceRecords.Where(m => db.Vehicles.Any(v => v.Id == m.VehicleId && v.CompanyId == companyId));
+        var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
+        return db.GeofenceEvents.Where(e => vehicles.Contains(e.VehicleId));
     }
 
-    public static IQueryable<MaintenanceSchedule> MaintenanceSchedules(TmsDbContext db, ITenantContext tenants)
+    public static IQueryable<MaintenanceRecord> MaintenanceRecords(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
     {
-        var companyId = tenants.EffectiveCompanyId;
-        if (companyId == null) return db.MaintenanceSchedules.Where(_ => false);
-        return db.MaintenanceSchedules.Where(m => db.Vehicles.Any(v => v.Id == m.VehicleId && v.CompanyId == companyId));
+        var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
+        return db.MaintenanceRecords.Where(m => vehicles.Contains(m.VehicleId));
     }
 
-    public static IQueryable<MaintenanceWorkOrder> MaintenanceWorkOrders(TmsDbContext db, ITenantContext tenants)
+    public static IQueryable<MaintenanceSchedule> MaintenanceSchedules(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
     {
-        var companyId = tenants.EffectiveCompanyId;
-        if (companyId == null) return db.MaintenanceWorkOrders.Where(_ => false);
-        return db.MaintenanceWorkOrders.Where(m => db.Vehicles.Any(v => v.Id == m.VehicleId && v.CompanyId == companyId));
+        var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
+        return db.MaintenanceSchedules.Where(m => vehicles.Contains(m.VehicleId));
     }
 
-    public static IQueryable<FuelEntry> FuelEntries(TmsDbContext db, ITenantContext tenants)
+    public static IQueryable<MaintenanceWorkOrder> MaintenanceWorkOrders(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
     {
-        var companyId = tenants.EffectiveCompanyId;
-        if (companyId == null) return db.FuelEntries.Where(_ => false);
-        return db.FuelEntries.Where(f => db.Vehicles.Any(v => v.Id == f.VehicleId && v.CompanyId == companyId));
+        var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
+        return db.MaintenanceWorkOrders.Where(m => vehicles.Contains(m.VehicleId));
     }
 
     public static IQueryable<Trip> Trips(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)

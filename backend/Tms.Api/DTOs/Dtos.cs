@@ -53,7 +53,8 @@ public record CustomerDto(
 
 public record VendorDto(
     string Id, string Name, string? Contact, string? Phone, string? Email, string? Gst,
-    string? Address, decimal Outstanding, string? Category, int TotalBills);
+    string? Address, decimal Outstanding, string? Category, int TotalBills,
+    Guid? BranchId = null, string? BranchName = null);
 
 public record ExpenseDto(
     string Id, string Date, string Category, string? Description, string? Vehicle,

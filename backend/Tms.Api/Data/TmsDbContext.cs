@@ -120,6 +120,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.ToTable("vendors");
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
             e.Property(x => x.Name).HasColumnName("name");
             e.Property(x => x.Contact).HasColumnName("contact");
             e.Property(x => x.Phone).HasColumnName("phone");
@@ -270,6 +271,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.HasKey(x => x.LrNumber);
             e.Property(x => x.LrNumber).HasColumnName("lr_number");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
             e.Property(x => x.LrDate).HasColumnName("lr_date");
             e.Property(x => x.BookingId).HasColumnName("booking_id");
             e.Property(x => x.Consignor).HasColumnName("consignor");
@@ -1098,6 +1100,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.ToTable("freight_rates");
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
             e.Property(x => x.CustomerId).HasColumnName("customer_id");
             e.Property(x => x.FromCity).HasColumnName("from_city");
             e.Property(x => x.ToCity).HasColumnName("to_city");
@@ -1117,6 +1120,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.ToTable("quotations");
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
             e.Property(x => x.QuoteNo).HasColumnName("quote_no");
             e.Property(x => x.CustomerId).HasColumnName("customer_id");
             e.Property(x => x.CustomerName).HasColumnName("customer_name");
@@ -1152,6 +1156,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.ToTable("freight_invoices");
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
             e.Property(x => x.InvoiceNo).HasColumnName("invoice_no");
             e.Property(x => x.BookingId).HasColumnName("booking_id");
             e.Property(x => x.LrNumber).HasColumnName("lr_number");

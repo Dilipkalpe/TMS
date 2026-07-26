@@ -12,11 +12,13 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/freight-rates")]
-public class FreightRatesController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class FreightRatesController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     static object Map(FreightRate r) => new
     {
         id = r.Id,
+        branchId = r.BranchId,
+        branchName = r.Branch?.Name,
         customerId = r.CustomerId,
         fromCity = r.FromCity,
         toCity = r.ToCity,
@@ -38,7 +40,7 @@ public class FreightRatesController(TmsDbContext db, ITenantContext tenants) : C
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.FreightRates.AsQueryable());
+        var q = tenants.Filter(branches.Filter(db.FreightRates.AsNoTracking().Include(r => r.Branch)));
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLowerInvariant();
@@ -71,7 +73,7 @@ public class FreightRatesController(TmsDbContext db, ITenantContext tenants) : C
         var fromCity = from.Trim();
         var toCity = to.Trim();
 
-        var q = tenants.Filter(db.FreightRates.AsQueryable())
+        var q = tenants.Filter(branches.Filter(db.FreightRates.AsQueryable()))
             .Where(r => r.IsActive
                 && r.FromCity.ToLower() == fromCity.ToLower()
                 && r.ToCity.ToLower() == toCity.ToLower()
@@ -113,6 +115,7 @@ public class FreightRatesController(TmsDbContext db, ITenantContext tenants) : C
         {
             Id = Guid.NewGuid(),
             CompanyId = TenantScope.ResolveCompanyId(tenants),
+            BranchId = branches.AssignBranchId,
             CustomerId = ApiParseHelper.BodyString(body, "customerId"),
             FromCity = fromCity.Trim(),
             ToCity = toCity.Trim(),
@@ -184,6 +187,8 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
     static object Map(Quotation q) => new
     {
         id = q.Id,
+        branchId = q.BranchId,
+        branchName = q.Branch?.Name,
         quoteNo = q.QuoteNo,
         customerId = q.CustomerId,
         customerName = q.CustomerName,
@@ -208,7 +213,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.Quotations.AsQueryable());
+        var q = tenants.Filter(branches.Filter(db.Quotations.AsNoTracking().Include(x => x.Branch)));
         if (!string.IsNullOrWhiteSpace(status))
             q = q.Where(x => x.Status == status);
         if (!string.IsNullOrWhiteSpace(search))
@@ -261,6 +266,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         {
             Id = Guid.NewGuid(),
             CompanyId = companyId,
+            BranchId = branches.AssignBranchId,
             QuoteNo = await IdGenerator.NextQuoteNo(db),
             CustomerId = ApiParseHelper.BodyString(body, "customerId"),
             CustomerName = customerName.Trim(),
@@ -439,6 +445,8 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
     static object Map(FreightInvoice inv) => new
     {
         id = inv.Id,
+        branchId = inv.BranchId,
+        branchName = inv.Branch?.Name,
         invoiceNo = inv.InvoiceNo,
         bookingId = inv.BookingId,
         lrNumber = inv.LrNumber,
@@ -470,7 +478,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.FreightInvoices.AsQueryable());
+        var q = tenants.Filter(branches.Filter(db.FreightInvoices.AsNoTracking().Include(i => i.Branch)));
         if (!string.IsNullOrWhiteSpace(status)) q = q.Where(i => i.Status == status);
         if (!string.IsNullOrWhiteSpace(bookingId)) q = q.Where(i => i.BookingId == bookingId);
         if (!string.IsNullOrWhiteSpace(search))
@@ -567,6 +575,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
         {
             Id = Guid.NewGuid(),
             CompanyId = booking.CompanyId,
+            BranchId = booking.BranchId ?? branches.AssignBranchId,
             InvoiceNo = await IdGenerator.NextFreightInvoiceNo(db, billType),
             BookingId = bookingId,
             LrNumber = lr?.LrNumber,

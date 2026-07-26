@@ -43,7 +43,8 @@ public static class EntityMappers
 
     public static VendorDto ToDto(Vendor v) => new(
         v.Id, v.Name, v.Contact, v.Phone, v.Email, v.Gst, v.Address,
-        v.Outstanding, v.Category, v.TotalBills);
+        v.Outstanding, v.Category, v.TotalBills,
+        v.BranchId, v.Branch?.Name);
 
     public static ExpenseDto ToDto(Expense e) => new(
         e.Id,
@@ -63,7 +64,7 @@ public static class EntityMappers
         l.Freight, l.Gst, l.Balance, l.PaymentType,
         l.BookingId, l.Hamali, l.LoadingCharges, l.UnloadingCharges,
         l.Insurance, l.Advance, l.Remarks,
-        branchId, branchName);
+        branchId ?? l.BranchId, branchName ?? l.Branch?.Name);
 }
 
 public static class IdGenerator

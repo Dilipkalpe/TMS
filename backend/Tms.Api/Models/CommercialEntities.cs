@@ -1,9 +1,11 @@
 namespace Tms.Api.Models;
 
-public class FreightRate : ITenantScoped
+public class FreightRate : IBranchScoped
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
     public string? CustomerId { get; set; }
     public string FromCity { get; set; } = "";
     public string ToCity { get; set; } = "";
@@ -18,10 +20,12 @@ public class FreightRate : ITenantScoped
     public DateTime UpdatedAt { get; set; }
 }
 
-public class Quotation : ITenantScoped
+public class Quotation : IBranchScoped
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
     public string QuoteNo { get; set; } = "";
     public string? CustomerId { get; set; }
     public string CustomerName { get; set; } = "";
@@ -50,10 +54,12 @@ public class QuotationLine : ITenantScoped
     public int SortOrder { get; set; }
 }
 
-public class FreightInvoice : ITenantScoped
+public class FreightInvoice : IBranchScoped
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
     public string InvoiceNo { get; set; } = "";
     public string BookingId { get; set; } = "";
     public string? LrNumber { get; set; }

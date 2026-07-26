@@ -24,6 +24,7 @@ export default function QuotationList() {
 
   const columns = [
     { key: 'quoteNo', label: 'Quote No' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'customerName', label: 'Customer' },
     { key: 'fromCity', label: 'From' },
     { key: 'toCity', label: 'To' },

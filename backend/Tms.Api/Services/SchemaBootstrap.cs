@@ -18,6 +18,7 @@ public static class SchemaBootstrap
             ("GPS", () => GpsSchemaMigrator.EnsureAsync(db, ct)),
             ("Notification", () => NotificationSchemaMigrator.EnsureAsync(db, ct)),
             ("Branch", () => BranchSchemaMigrator.EnsureAsync(db, ct)),
+            ("BranchIsolation", () => BranchIsolationMigrator.EnsureAsync(db, ct)),
             ("Portal", () => PortalSchemaMigrator.EnsureSchemaAsync(db, ct)),
             ("Routing", () => RouteSchemaMigrator.EnsureAsync(db, ct)),
             ("BookingFinance", () => BookingFinanceSchemaMigrator.EnsureAsync(db, ct)),

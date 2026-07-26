@@ -3,21 +3,30 @@ import ERPPageTitle from '../components/ui/ERPPageTitle'
 import StatusSummaryCards from '../components/ui/StatusSummaryCards'
 import AnalyticsChart from '../components/ui/AnalyticsChart'
 import ERPDataTable from '../components/ui/ERPDataTable'
+import Card, { CardHeader } from '../components/ui/Card'
 import Tabs from '../components/ui/Tabs'
 import Badge, { statusVariant } from '../components/ui/Badge'
 import AnalyticsFilterBar from '../components/dashboard/AnalyticsFilterBar'
 import WidgetPickerModal from '../components/dashboard/WidgetPickerModal'
-import AlertsPanel from '../components/dashboard/AlertsPanel'
 import { useDashboardMetrics, useDashboardRecent, DEFAULT_WIDGET_IDS } from '../hooks/useDashboardMetrics'
+import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useToast } from '../context/ToastContext'
 import { exportJson } from '../utils/export'
+import { formatCurrency } from '../components/ui/ReportFilters'
 import { TMS_COLORS } from '../config/theme'
 
 const colorMap = {
   indigo: 'violet',
   cyan: 'blue',
   emerald: 'green',
+  amber: 'amber',
+  orange: 'orange',
+  green: 'green',
+  red: 'red',
+  slate: 'slate',
+  violet: 'violet',
+  blue: 'blue',
 }
 
 const WIDGET_DEFS = [
@@ -46,10 +55,11 @@ export default function Dashboard() {
   const [visibleWidgets, setVisibleWidgets] = useLocalStorage('tms-dashboard-widgets', DEFAULT_WIDGET_IDS)
   const { toast } = useToast()
 
+  const overview = useDashboardOverview(refreshSeed)
   const metrics = useDashboardMetrics({ period, compare, refreshSeed })
-  const { bookings: recentBookings, trips: recentTrips } = useDashboardRecent(refreshSeed)
+  const { trips: recentTrips } = useDashboardRecent(refreshSeed)
 
-  const overviewCards = metrics.statsCards.map((stat) => ({
+  const overviewCards = overview.kpiCards.map((stat) => ({
     label: stat.label,
     count: stat.value,
     color: colorMap[stat.color] || stat.color,
@@ -65,6 +75,22 @@ export default function Dashboard() {
     { key: 'payment', label: 'Payment', render: (r) => <Badge variant={statusVariant(r.payment)}>{r.payment}</Badge> },
   ]
 
+  const deliveryColumns = [
+    { key: 'id', label: 'Booking' },
+    { key: 'customer', label: 'Customer' },
+    { key: 'route', label: 'Route' },
+    { key: 'date', label: 'Date' },
+    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
+  ]
+
+  const invoiceColumns = [
+    { key: 'invoiceNo', label: 'Invoice' },
+    { key: 'customerName', label: 'Customer' },
+    { key: 'invoiceDate', label: 'Date' },
+    { key: 'balance', label: 'Balance', render: (r) => formatCurrency(r.balance) },
+    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
+  ]
+
   const tripColumns = [
     { key: 'lr', label: 'LR No.' },
     { key: 'vehicle', label: 'Vehicle' },
@@ -72,6 +98,15 @@ export default function Dashboard() {
     { key: 'from', label: 'From' },
     { key: 'to', label: 'To' },
     { key: 'freight', label: 'Freight' },
+  ]
+
+  const branchColumns = [
+    { key: 'branchName', label: 'Branch', render: (r) => `${r.branchCode} — ${r.branchName}` },
+    { key: 'bookings', label: 'Bookings' },
+    { key: 'revenue', label: 'Revenue', render: (r) => formatCurrency(r.revenue) },
+    { key: 'delivered', label: 'Delivered' },
+    { key: 'pendingDelivery', label: 'Pending' },
+    { key: 'deliveryPerformancePct', label: 'Delivery %', render: (r) => `${r.deliveryPerformancePct}%` },
   ]
 
   const chartConfigs = useMemo(() => {
@@ -127,11 +162,11 @@ export default function Dashboard() {
 
   const handleRefresh = useCallback(async () => {
     setLoading(true)
-    await metrics.refresh()
+    await Promise.all([overview.refresh(), metrics.refresh()])
     setRefreshSeed((s) => s + 1)
     setLoading(false)
-    toast({ title: 'Dashboard refreshed', message: 'Analytics data updated', type: 'success' })
-  }, [toast, metrics])
+    toast({ title: 'Dashboard refreshed', message: 'Company/branch scoped data updated', type: 'success' })
+  }, [toast, metrics, overview])
 
   const handleExport = useCallback(() => {
     exportJson(
@@ -139,6 +174,7 @@ export default function Dashboard() {
         period,
         compare,
         exportedAt: new Date().toISOString(),
+        overview: overview.data,
         metrics: {
           revenue: metrics.revSlice,
           expenses: metrics.expSlice,
@@ -149,7 +185,7 @@ export default function Dashboard() {
       `tms-analytics-${period}.json`,
     )
     toast({ title: 'Export complete', message: 'Analytics JSON downloaded', type: 'success' })
-  }, [period, compare, metrics, toast])
+  }, [period, compare, metrics, overview, toast])
 
   const toggleWidget = (id) => {
     setVisibleWidgets((prev) =>
@@ -162,9 +198,74 @@ export default function Dashboard() {
       id: 'overview',
       label: 'Overview',
       content: (
-        <div className="p-2 sm:p-3">
-          <AlertsPanel limit={4} />
+        <div className="space-y-4 p-2 sm:p-3">
+          {overview.error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{overview.error}</p>
+          )}
+          {overview.alerts.length > 0 && (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {overview.alerts.map((a) => (
+                <div
+                  key={`${a.type}-${a.title}`}
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                >
+                  <p className="font-semibold">{a.title}</p>
+                  <p className="text-xs opacity-90">{a.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <StatusSummaryCards cards={overviewCards} />
+
+          <Card padding={false}>
+            <div className="p-4">
+              <CardHeader title="Branch Summary" subtitle="Compare bookings, revenue and delivery performance by branch" />
+            </div>
+            <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} />
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card padding={false}>
+              <div className="p-4"><CardHeader title="Top Customers" subtitle="By freight revenue" /></div>
+              <ERPDataTable
+                columns={[
+                  { key: 'name', label: 'Customer' },
+                  { key: 'count', label: 'Bookings' },
+                  { key: 'amount', label: 'Freight', render: (r) => formatCurrency(r.amount) },
+                ]}
+                data={overview.topCustomers}
+                showActions={false}
+              />
+            </Card>
+            <Card padding={false}>
+              <div className="p-4"><CardHeader title="Top Routes" subtitle="By booking volume" /></div>
+              <ERPDataTable
+                columns={[
+                  { key: 'name', label: 'Route' },
+                  { key: 'count', label: 'Trips' },
+                  { key: 'amount', label: 'Freight', render: (r) => formatCurrency(r.amount) },
+                ]}
+                data={overview.topRoutes}
+                showActions={false}
+              />
+            </Card>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card padding={false}>
+              <div className="p-4"><CardHeader title="Recent Bookings" /></div>
+              <ERPDataTable columns={bookingColumns} data={overview.recentBookings} showActions={false} />
+            </Card>
+            <Card padding={false}>
+              <div className="p-4"><CardHeader title="Recent Deliveries" /></div>
+              <ERPDataTable columns={deliveryColumns} data={overview.recentDeliveries} showActions={false} />
+            </Card>
+          </div>
+
+          <Card padding={false}>
+            <div className="p-4"><CardHeader title="Pending Invoices" subtitle="Open balances" /></div>
+            <ERPDataTable columns={invoiceColumns} data={overview.pendingInvoices} showActions={false} />
+          </Card>
         </div>
       ),
     },
@@ -181,7 +282,7 @@ export default function Dashboard() {
             onRefresh={handleRefresh}
             onExport={handleExport}
             onCustomize={() => setWidgetOpen(true)}
-            loading={loading || metrics.loading}
+            loading={loading || metrics.loading || overview.loading}
             periodLabel={metrics.periodLabel}
           />
           <div className="grid grid-cols-1 space-y-3 sm:grid-cols-2 sm:space-y-0 xl:grid-cols-3 2xl:grid-cols-4 [&>*]:mb-3">
@@ -202,7 +303,7 @@ export default function Dashboard() {
       label: 'Recent Bookings',
       content: (
         <div className="p-2 sm:p-3">
-          <ERPDataTable columns={bookingColumns} data={recentBookings} showActions={false} />
+          <ERPDataTable columns={bookingColumns} data={overview.recentBookings} showActions={false} />
         </div>
       ),
     },
