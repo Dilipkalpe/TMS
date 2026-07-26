@@ -91,19 +91,23 @@ public class DashboardOverviewService(TmsDbContext db, ITenantContext tenants, I
             pendingInvoicesCount);
 
         var branchSummary = await BuildBranchSummaryAsync(ct);
-        var topCustomers = await bookings
+        var topCustomers = (await bookings
             .GroupBy(b => b.CustomerName)
-            .Select(g => new NamedCountDto(g.Key, g.Count(), g.Sum(x => x.Freight)))
+            .Select(g => new { Name = g.Key, Count = g.Count(), Amount = g.Sum(x => x.Freight) })
             .OrderByDescending(x => x.Amount)
             .Take(5)
-            .ToListAsync(ct);
+            .ToListAsync(ct))
+            .Select(x => new NamedCountDto(x.Name, x.Count, x.Amount))
+            .ToList();
 
-        var topRoutes = await bookings
+        var topRoutes = (await bookings
             .GroupBy(b => b.FromCity + " → " + b.ToCity)
-            .Select(g => new NamedCountDto(g.Key, g.Count(), g.Sum(x => x.Freight)))
+            .Select(g => new { Name = g.Key, Count = g.Count(), Amount = g.Sum(x => x.Freight) })
             .OrderByDescending(x => x.Count)
             .Take(5)
-            .ToListAsync(ct);
+            .ToListAsync(ct))
+            .Select(x => new NamedCountDto(x.Name, x.Count, x.Amount))
+            .ToList();
 
         var recentBookings = (await bookings
             .OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.Id)
