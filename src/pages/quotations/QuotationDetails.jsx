@@ -5,7 +5,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Input, { Select, Textarea } from '../../components/ui/Input'
-import { ArrowLeft, Check, FilePlus, Loader2, Save, Send, X } from 'lucide-react'
+import { ArrowLeft, Check, FilePlus, Loader2, Save, Send, Trash2, X } from 'lucide-react'
 import { freightRatesApi, quotationsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../components/ui/ReportFilters'
@@ -118,6 +118,26 @@ export default function QuotationDetails() {
           )}
           {quote.bookingId && (
             <Button variant="outline" onClick={() => navigate(`/bookings/${quote.bookingId}`)}>Open Booking</Button>
+          )}
+          {!quote.bookingId && (
+            <Button
+              variant="outline"
+              icon={Trash2}
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`Delete quotation ${quote.quoteNo}?`)) return
+                setBusy(true)
+                quotationsApi.remove(id)
+                  .then(() => {
+                    toast({ title: 'Deleted', type: 'success' })
+                    navigate('/quotations')
+                  })
+                  .catch((err) => toast({ title: 'Delete failed', message: err.message, type: 'error' }))
+                  .finally(() => setBusy(false))
+              }}
+            >
+              Delete
+            </Button>
           )}
         </div>
       }

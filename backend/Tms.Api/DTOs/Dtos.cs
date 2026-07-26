@@ -66,7 +66,8 @@ public record LrDto(
 public record DashboardStatsDto(
     int TotalVehicles, int TotalDrivers, int TotalCustomers, int TotalTrips,
     int PendingLr, int TodaysBookings, decimal TotalIncome, decimal TotalExpenses,
-    decimal NetProfit, decimal CashBalance, decimal BankBalance);
+    decimal NetProfit, decimal CashBalance, decimal BankBalance,
+    decimal OutstandingAmount = 0, int PendingDelivery = 0);
 
 public record RecentBookingDto(string Id, string Customer, string Route, string Date, string Status, string Payment);
 public record RecentTripDto(string Lr, string Vehicle, string Driver, string From, string To, string Freight);

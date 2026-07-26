@@ -153,7 +153,14 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         return Ok(new { message = "OTP sent", bookingId });
     }
 
-    public record ConfirmPod(string OtpCode, string RecipientName, decimal? DeliveryLat, decimal? DeliveryLng, string? SignatureUrl, string? PhotoUrl);
+    public record ConfirmPod(
+        string OtpCode,
+        string RecipientName,
+        string? DeliveryDate,
+        decimal? DeliveryLat,
+        decimal? DeliveryLng,
+        string? SignatureUrl,
+        string? PhotoUrl);
 
     [HttpPost("{bookingId}/confirm")]
     public async Task<IActionResult> Confirm(string bookingId, [FromBody] ConfirmPod body)
@@ -165,6 +172,13 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         if (pod?.OtpCode == null) return BadRequest(new { message = "Generate OTP first" });
         if (pod.OtpCode != body.OtpCode) return BadRequest(new { message = "Invalid OTP" });
 
+        DateTime deliveredAt = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(body.DeliveryDate) &&
+            DateOnly.TryParse(body.DeliveryDate, out var deliveryDay))
+        {
+            deliveredAt = DateTime.SpecifyKind(deliveryDay.ToDateTime(TimeOnly.FromDateTime(DateTime.UtcNow)), DateTimeKind.Utc);
+        }
+
         pod.OtpVerified = true;
         pod.RecipientName = body.RecipientName;
         pod.DeliveryLat = body.DeliveryLat;
@@ -172,7 +186,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         pod.SignatureUrl = body.SignatureUrl;
         pod.PhotoUrl = body.PhotoUrl;
         pod.ConfirmedBy = User.Identity?.Name;
-        pod.DeliveredAt = DateTime.UtcNow;
+        pod.DeliveredAt = deliveredAt;
 
         booking.Status = "Delivered";
         booking.UpdatedAt = DateTime.UtcNow;
@@ -187,9 +201,10 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
             Variables = new Dictionary<string, string>
             {
                 ["bookingId"] = booking.Id,
-                ["recipientName"] = body.RecipientName,
+                ["recipientName"] = body.RecipientName ?? "",
                 ["origin"] = booking.FromCity,
                 ["destination"] = booking.ToCity,
+                ["deliveryDate"] = deliveredAt.ToString("yyyy-MM-dd"),
             },
             SmsPhone = customer?.Phone,
             WhatsAppPhone = customer?.Phone,
@@ -197,16 +212,40 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         });
 
         await db.SaveChangesAsync();
-        return Ok(new { message = "Delivery confirmed", pod });
+        return Ok(new
+        {
+            message = "Delivery confirmed",
+            bookingId,
+            bookingStatus = booking.Status,
+            deliveryDate = deliveredAt.ToString("yyyy-MM-dd"),
+            remake = true,
+            pod = new
+            {
+                pod.Id,
+                pod.BookingId,
+                pod.OtpVerified,
+                pod.RecipientName,
+                deliveredAt = pod.DeliveredAt,
+            },
+        });
     }
 
     [HttpGet("{bookingId}")]
     public async Task<IActionResult> Get(string bookingId)
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
-        if (booking == null) return NotFound();
+        if (booking == null) return NotFound(new { message = "Booking not found" });
 
         var pod = await TenantScope.FindPodForBookingAsync(db, tenants, bookingId);
-        return pod == null ? NotFound() : Ok(pod);
+        return Ok(new
+        {
+            bookingId,
+            bookingStatus = booking.Status,
+            alreadyDelivered = booking.Status == "Delivered" || (pod?.OtpVerified == true),
+            deliveryDate = pod?.DeliveredAt?.ToString("yyyy-MM-dd"),
+            recipientName = pod?.RecipientName,
+            otpVerified = pod?.OtpVerified ?? false,
+            pod,
+        });
     }
 }

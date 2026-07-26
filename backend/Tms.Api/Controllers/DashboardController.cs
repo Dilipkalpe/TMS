@@ -35,16 +35,27 @@ public class DashboardController(
     async Task<DashboardStatsDto> LoadStatsAsync()
     {
         var (pendingDocuments, _, _) = await documentFlow.GetPendingDocumentCountAsync();
+        var outstanding = await tenants.Filter(branches.Filter(db.Bookings.AsNoTracking()))
+            .Where(b => b.Balance > 0 && b.Status != "Cancelled")
+            .SumAsync(b => (decimal?)b.Balance) ?? 0;
+        var pendingDelivery = await tenants.Filter(branches.Filter(db.Bookings.AsNoTracking()))
+            .CountAsync(b => b.Status != "Delivered" && b.Status != "Cancelled");
+
         var spStats = await dashboardRead.TryGetStatsAsync(CompanyId, BranchId);
         if (spStats != null)
         {
-            return spStats with { PendingLr = pendingDocuments };
+            return spStats with
+            {
+                PendingLr = pendingDocuments,
+                OutstandingAmount = outstanding,
+                PendingDelivery = pendingDelivery,
+            };
         }
 
-        return await LoadStatsViaEfAsync();
+        return await LoadStatsViaEfAsync(pendingDocuments, outstanding, pendingDelivery);
     }
 
-    async Task<DashboardStatsDto> LoadStatsViaEfAsync()
+    async Task<DashboardStatsDto> LoadStatsViaEfAsync(int pendingDocuments, decimal outstanding, int pendingDelivery)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var bookings = tenants.Filter(branches.Filter(db.Bookings.AsNoTracking()));
@@ -53,7 +64,6 @@ public class DashboardController(
 
         var totalIncome = await bookings.SumAsync(b => b.Freight);
         var totalExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, branches);
-        var (pendingDocuments, _, _) = await documentFlow.GetPendingDocumentCountAsync();
 
         return new DashboardStatsDto(
             await vehicles.CountAsync(),
@@ -66,7 +76,9 @@ public class DashboardController(
             totalExpenses,
             totalIncome - totalExpenses,
             await AccountingBalanceService.GetCashBalanceAsync(db, tenants),
-            await AccountingBalanceService.GetBankBalanceAsync(db, tenants));
+            await AccountingBalanceService.GetBankBalanceAsync(db, tenants),
+            outstanding,
+            pendingDelivery);
     }
 
     [HttpGet("recent-bookings")]

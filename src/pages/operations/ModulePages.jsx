@@ -168,6 +168,8 @@ export function EpodPage() {
   const [otp, setOtp] = useState('')
   const [demoOtp, setDemoOtp] = useState('')
   const [recipient, setRecipient] = useState('')
+  const [deliveryDate, setDeliveryDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [podInfo, setPodInfo] = useState(null)
 
   useEffect(() => {
     bookingsApi.list({ pageSize: 100 })
@@ -175,28 +177,102 @@ export function EpodPage() {
       .catch((e) => toast({ title: 'Failed to load bookings', message: e.message, type: 'error' }))
   }, [toast])
 
+  useEffect(() => {
+    if (!bookingId) {
+      setPodInfo(null)
+      return
+    }
+    podApi.get(bookingId)
+      .then((info) => {
+        setPodInfo(info)
+        if (info?.recipientName) setRecipient(info.recipientName)
+        if (info?.deliveryDate) setDeliveryDate(info.deliveryDate)
+      })
+      .catch(() => setPodInfo(null))
+  }, [bookingId])
+
   const sendOtp = async () => {
-    try { const r = await podApi.sendOtp(bookingId); setDemoOtp(r.demoOtp ?? ''); toast({ title: 'OTP sent', type: 'success' }) }
-    catch (e) { toast({ title: 'Failed', message: e.message, type: 'error' }) }
+    if (!bookingId) {
+      toast({ title: 'Select a booking', type: 'warning' })
+      return
+    }
+    try {
+      const r = await podApi.sendOtp(bookingId)
+      setDemoOtp(r.demoOtp ?? '')
+      toast({
+        title: podInfo?.alreadyDelivered ? 'OTP sent for re-delivery' : 'OTP sent',
+        type: 'success',
+      })
+    } catch (e) {
+      toast({ title: 'Failed', message: e.message, type: 'error' })
+    }
   }
+
   const confirm = async () => {
-    try { await podApi.confirm(bookingId, { otpCode: otp, recipientName: recipient }); toast({ title: 'Delivery confirmed', type: 'success' }) }
-    catch (e) { toast({ title: 'Failed', message: e.message, type: 'error' }) }
+    if (!bookingId) {
+      toast({ title: 'Select a booking', type: 'warning' })
+      return
+    }
+    if (!otp.trim() || !recipient.trim()) {
+      toast({ title: 'OTP and recipient name are required', type: 'warning' })
+      return
+    }
+    try {
+      const res = await podApi.confirm(bookingId, {
+        otpCode: otp,
+        recipientName: recipient,
+        deliveryDate,
+      })
+      toast({
+        title: 'Delivery confirmed',
+        message: `Date: ${res.deliveryDate || deliveryDate}`,
+        type: 'success',
+      })
+      setOtp('')
+      setDemoOtp('')
+      const info = await podApi.get(bookingId)
+      setPodInfo(info)
+      const list = await bookingsApi.list({ pageSize: 100 })
+      setBookings(list.items ?? list ?? [])
+    } catch (e) {
+      toast({ title: 'Failed', message: e.message, type: 'error' })
+    }
   }
+
   return (
     <ERPContentPage module="Operations" title="ePOD">
       <Card className="mx-auto max-w-lg space-y-3 p-6">
+        <p className="text-sm text-slate-500">
+          Confirm delivery with OTP. Already-delivered bookings can be marked again with a new OTP and delivery date.
+        </p>
         <select required value={bookingId} onChange={(e) => setBookingId(e.target.value)} className={inputClass}>
           <option value="">Select booking…</option>
           {bookings.map((b) => (
-            <option key={b.id} value={b.id}>{b.id} — {b.fromCity} → {b.toCity}</option>
+            <option key={b.id} value={b.id}>
+              {b.id} — {b.fromCity} → {b.toCity} ({b.status || '—'})
+            </option>
           ))}
         </select>
-        <Button onClick={sendOtp}>Send OTP</Button>
+        {podInfo?.alreadyDelivered && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+            Already delivered{podInfo.deliveryDate ? ` on ${podInfo.deliveryDate}` : ''}.
+            Send OTP again to re-mark with a new delivery date.
+          </p>
+        )}
+        <Button onClick={sendOtp} disabled={!bookingId}>Send OTP</Button>
         {demoOtp && <p className="text-sm text-amber-700">Demo OTP: {demoOtp}</p>}
         <input placeholder="OTP" value={otp} onChange={(e) => setOtp(e.target.value)} className={inputClass} />
         <input placeholder="Recipient name" value={recipient} onChange={(e) => setRecipient(e.target.value)} className={inputClass} />
-        <Button onClick={confirm}>Confirm Delivery</Button>
+        <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+          Delivery date
+          <input
+            type="date"
+            value={deliveryDate}
+            onChange={(e) => setDeliveryDate(e.target.value)}
+            className={`${inputClass} mt-1`}
+          />
+        </label>
+        <Button onClick={confirm} disabled={!bookingId}>Confirm Delivery</Button>
       </Card>
     </ERPContentPage>
   )

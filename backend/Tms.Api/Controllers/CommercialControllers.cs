@@ -423,6 +423,10 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         if (q == null || !TenantAccess.CanAccess(tenants, q)) return NotFound();
         if (!string.IsNullOrEmpty(q.BookingId))
             return BadRequest(new ApiError("Cannot delete a quotation that was converted to a booking."));
+
+        var lines = await db.QuotationLines.Where(l => l.QuotationId == id).ToListAsync();
+        if (lines.Count > 0)
+            db.QuotationLines.RemoveRange(lines);
         db.Quotations.Remove(q);
         await db.SaveChangesAsync();
         return NoContent();

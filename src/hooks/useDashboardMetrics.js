@@ -158,6 +158,8 @@ export function useDashboardMetrics({ period = '12m', compare = false, refreshSe
       { label: 'Net Profit', value: formatLakhs(s.netProfit), icon: 'IndianRupee', color: 'green' },
       { label: 'Cash Balance', value: formatLakhs(s.cashBalance), icon: 'Banknote', color: 'slate' },
       { label: 'Bank Balance', value: formatLakhs(s.bankBalance), icon: 'Landmark', color: 'blue' },
+      { label: 'Outstanding Amt', value: formatLakhs(s.outstandingAmount ?? 0), icon: 'AlertCircle', color: 'orange' },
+      { label: 'Pending Delivery', value: String(s.pendingDelivery ?? 0), icon: 'Package', color: 'amber' },
     ]
 
     return {
