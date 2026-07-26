@@ -8,13 +8,13 @@ export default function DataTable({ columns, data, onRowClick, sticky = true, fi
           fill ? 'min-h-0 flex-1' : ''
         } ${fill ? '' : 'rounded-[12px] border border-slate-200/80 dark:border-slate-800'}`}
       >
-        <table className="w-full min-w-[520px] text-left text-xs sm:text-sm">
+        <table className="w-full table-auto text-left text-xs sm:text-sm">
           <thead className={sticky ? 'sticky top-0 z-10' : ''}>
             <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/80">
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`whitespace-nowrap ${cellPad} text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs dark:text-slate-400`}
+                  className={`${cellPad} text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs dark:text-slate-400`}
                 >
                   {col.label}
                 </th>
@@ -29,7 +29,7 @@ export default function DataTable({ columns, data, onRowClick, sticky = true, fi
                 className={`transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${onRowClick ? 'cursor-pointer' : ''}`}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className={`whitespace-nowrap ${cellPad} text-slate-700 dark:text-slate-300`}>
+                  <td key={col.key} className={`${cellPad} break-words text-slate-700 dark:text-slate-300`}>
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}

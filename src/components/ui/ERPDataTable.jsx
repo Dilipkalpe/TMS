@@ -28,13 +28,13 @@ export default function ERPDataTable({
 }) {
   const start = (page - 1) * pageSize
   const rows = data.slice(start, start + pageSize)
-  const cellPad = 'px-2 py-1.5 sm:px-3 sm:py-2'
+  const cellPad = 'px-1.5 py-1.5 sm:px-2.5 sm:py-2'
   const hasActionColumn = showActions && (onPrint || onEdit || onDelete)
   const actionWidth = actionColumnWidth(onPrint, onEdit, onDelete)
 
   const allColumns = [
-    ...(showSerial ? [{ key: '__sr', label: 'Sr.', width: 'w-12' }] : []),
-    ...(hasActionColumn ? [{ key: '__action', label: 'Action', width: actionWidth }] : []),
+    ...(showSerial ? [{ key: '__sr', label: 'Sr.', width: 'w-10', nowrap: true }] : []),
+    ...(hasActionColumn ? [{ key: '__action', label: 'Action', width: actionWidth, nowrap: true }] : []),
     ...columns,
   ]
 
@@ -45,13 +45,15 @@ export default function ERPDataTable({
           fill ? 'erp-list-table-scroll min-h-0 flex-1 report-table-scroll' : 'report-table-scroll'
         }`}
       >
-        <table className="w-full min-w-[640px] border-collapse text-left text-xs sm:text-sm">
+        <table className="w-full table-auto border-collapse text-left text-xs sm:text-sm lg:table-fixed">
           <thead className={sticky ? 'sticky top-0 z-10' : ''}>
             <tr className="border border-primary/30 bg-primary text-white">
               {allColumns.map((col) => (
                 <th
                   key={col.key}
-                  className={`whitespace-nowrap border border-primary/20 ${cellPad} text-xs font-semibold ${col.width ?? ''}`}
+                  className={`border border-primary/20 ${cellPad} text-xs font-semibold ${col.width ?? ''} ${
+                    col.nowrap === false ? 'whitespace-normal' : 'whitespace-nowrap'
+                  }`}
                 >
                   {col.label}
                   {sortKey === col.key && (
@@ -83,14 +85,14 @@ export default function ERPDataTable({
                   {allColumns.map((col) => {
                     if (col.key === '__sr') {
                       return (
-                        <td key={col.key} className={`border border-primary/10 ${cellPad} text-slate-600`}>
+                        <td key={col.key} className={`border border-primary/10 ${cellPad} whitespace-nowrap text-slate-600`}>
                           {start + i + 1}
                         </td>
                       )
                     }
                     if (col.key === '__action') {
                       return (
-                        <td key={col.key} className={`border border-primary/10 ${cellPad}`}>
+                        <td key={col.key} className={`border border-primary/10 ${cellPad} whitespace-nowrap`}>
                           <div className="flex items-center justify-start gap-1" onClick={(e) => e.stopPropagation()}>
                             {onPrint && (
                               <button
@@ -126,12 +128,15 @@ export default function ERPDataTable({
                         </td>
                       )
                     }
+                    const wrap = col.nowrap === true ? 'whitespace-nowrap' : 'break-words'
+                    const truncate = col.truncate ? 'max-w-[12rem] truncate' : ''
                     return (
                       <td
                         key={col.key}
-                        className={`border border-primary/10 ${cellPad} text-slate-700 dark:text-slate-300 ${
+                        className={`border border-primary/10 ${cellPad} text-slate-700 dark:text-slate-300 ${wrap} ${truncate} ${
                           col.align === 'right' ? 'text-right' : ''
-                        }`}
+                        } ${col.width ?? ''}`}
+                        title={col.truncate && !col.render ? String(row[col.key] ?? '') : undefined}
                       >
                         {col.render ? col.render(row) : row[col.key]}
                       </td>

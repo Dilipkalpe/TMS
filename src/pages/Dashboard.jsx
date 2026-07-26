@@ -237,6 +237,27 @@ export default function Dashboard() {
             </div>
           )}
           <StatusSummaryCards cards={overviewCards} />
+        </div>
+      ),
+    },
+    {
+      id: 'branch-wise',
+      label: 'Overview - Branch Wise',
+      content: (
+        <div className="space-y-4 p-2 sm:p-3">
+          {overview.error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{overview.error}</p>
+          )}
+          <StatusSummaryCards cards={branchOverviewCards} />
+          <Card padding={false}>
+            <div className="p-4">
+              <CardHeader
+                title="Branch-wise Operations & Finance"
+                subtitle="Consolidated bookings, revenue, collections, expenses, fleet and invoice dues by branch"
+              />
+            </div>
+            <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} />
+          </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card padding={false}>
@@ -279,27 +300,6 @@ export default function Dashboard() {
           <Card padding={false}>
             <div className="p-4"><CardHeader title="Pending Invoices" subtitle="Open balances" /></div>
             <ERPDataTable columns={invoiceColumns} data={overview.pendingInvoices} showActions={false} />
-          </Card>
-        </div>
-      ),
-    },
-    {
-      id: 'branch-wise',
-      label: 'Overview - Branch Wise',
-      content: (
-        <div className="space-y-4 p-2 sm:p-3">
-          {overview.error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{overview.error}</p>
-          )}
-          <StatusSummaryCards cards={branchOverviewCards} />
-          <Card padding={false}>
-            <div className="p-4">
-              <CardHeader
-                title="Branch-wise Operations & Finance"
-                subtitle="Consolidated bookings, revenue, collections, expenses, fleet and invoice dues by branch"
-              />
-            </div>
-            <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} />
           </Card>
         </div>
       ),
