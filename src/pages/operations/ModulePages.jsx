@@ -243,7 +243,8 @@ export function EpodPage() {
     <ERPContentPage module="Operations" title="ePOD">
       <Card className="mx-auto max-w-lg space-y-3 p-6">
         <p className="text-sm text-slate-500">
-          Confirm delivery with OTP. Already-delivered bookings can be marked again with a new OTP and delivery date.
+          OTP-based proof of delivery. For delivery without OTP, use{' '}
+          <Link to="/operations/pod" className="text-primary hover:underline">Operations → POD</Link>.
         </p>
         <select required value={bookingId} onChange={(e) => setBookingId(e.target.value)} className={inputClass}>
           <option value="">Select booking…</option>
@@ -273,6 +274,124 @@ export function EpodPage() {
           />
         </label>
         <Button onClick={confirm} disabled={!bookingId}>Confirm Delivery</Button>
+      </Card>
+    </ERPContentPage>
+  )
+}
+
+/** Mark delivery by booking without OTP — supports re-mark with delivery date. */
+export function PodPage() {
+  const { toast } = useToast()
+  const [bookings, setBookings] = useState([])
+  const [bookingId, setBookingId] = useState('')
+  const [recipient, setRecipient] = useState('')
+  const [deliveryDate, setDeliveryDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [remarks, setRemarks] = useState('')
+  const [podInfo, setPodInfo] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  const reloadBookings = useCallback(() => {
+    bookingsApi.list({ pageSize: 200 })
+      .then((r) => setBookings(r.items ?? r ?? []))
+      .catch((e) => toast({ title: 'Failed to load bookings', message: e.message, type: 'error' }))
+  }, [toast])
+
+  useEffect(() => { reloadBookings() }, [reloadBookings])
+
+  useEffect(() => {
+    if (!bookingId) {
+      setPodInfo(null)
+      return
+    }
+    podApi.get(bookingId)
+      .then((info) => {
+        setPodInfo(info)
+        if (info?.recipientName) setRecipient(info.recipientName)
+        if (info?.deliveryDate) setDeliveryDate(info.deliveryDate)
+        else setDeliveryDate(new Date().toISOString().slice(0, 10))
+      })
+      .catch(() => setPodInfo(null))
+  }, [bookingId])
+
+  const markDelivered = async () => {
+    if (!bookingId) {
+      toast({ title: 'Select a booking', type: 'warning' })
+      return
+    }
+    if (!deliveryDate) {
+      toast({ title: 'Delivery date is required', type: 'warning' })
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await podApi.markDelivered(bookingId, {
+        recipientName: recipient || 'Receiver',
+        deliveryDate,
+        remarks,
+      })
+      toast({
+        title: res.remake ? 'Delivery re-marked' : 'Delivery marked',
+        message: `${bookingId} · ${res.deliveryDate}`,
+        type: 'success',
+      })
+      setRemarks('')
+      const info = await podApi.get(bookingId)
+      setPodInfo(info)
+      reloadBookings()
+    } catch (e) {
+      toast({ title: 'Failed', message: e.message, type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <ERPContentPage module="Operations" title="POD — Mark Delivery">
+      <Card className="mx-auto max-w-lg space-y-3 p-6">
+        <p className="text-sm text-slate-500">
+          Mark or re-mark delivery for a booking <strong>without OTP</strong>. Choose booking, delivery date, and save.
+          For OTP proof use{' '}
+          <Link to="/operations/epod" className="text-primary hover:underline">ePOD</Link>.
+        </p>
+        <select required value={bookingId} onChange={(e) => setBookingId(e.target.value)} className={inputClass}>
+          <option value="">Select booking no…</option>
+          {bookings.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.id} — {b.fromCity} → {b.toCity} ({b.status || '—'})
+            </option>
+          ))}
+        </select>
+        {podInfo?.alreadyDelivered && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+            Already delivered{podInfo.deliveryDate ? ` on ${podInfo.deliveryDate}` : ''}.
+            You can mark again with a new delivery date.
+          </p>
+        )}
+        <input
+          placeholder="Recipient name"
+          value={recipient}
+          onChange={(e) => setRecipient(e.target.value)}
+          className={inputClass}
+        />
+        <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+          Delivery date
+          <input
+            type="date"
+            required
+            value={deliveryDate}
+            onChange={(e) => setDeliveryDate(e.target.value)}
+            className={`${inputClass} mt-1`}
+          />
+        </label>
+        <input
+          placeholder="Remarks (optional)"
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+          className={inputClass}
+        />
+        <Button onClick={markDelivered} disabled={!bookingId || saving}>
+          {saving ? 'Saving…' : podInfo?.alreadyDelivered ? 'Re-mark Delivery' : 'Mark Delivery'}
+        </Button>
       </Card>
     </ERPContentPage>
   )

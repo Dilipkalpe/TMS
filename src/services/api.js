@@ -447,6 +447,7 @@ export const geofenceApi = {
 export const podApi = {
   sendOtp: (bookingId) => apiRequest(`/pod/${bookingId}/send-otp`, { method: 'POST' }),
   confirm: (bookingId, data) => apiRequest(`/pod/${bookingId}/confirm`, { method: 'POST', body: data }),
+  markDelivered: (bookingId, data) => apiRequest(`/pod/${bookingId}/mark-delivered`, { method: 'POST', body: data }),
   get: (bookingId) => apiRequest(`/pod/${bookingId}`),
 }
 

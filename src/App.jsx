@@ -34,7 +34,7 @@ import {
   LeaveManagement, HolidaysPage, HrTmsNorms,
   MaintenancePage, OperationsHub, FleetMapPage, RouteOptimizerPage,
   VehicleHistoryPage, GeofenceManagerPage, GeofenceAlertsPage,
-  FuelPage, EpodPage, CustomerPortalPage, TripsPage, ShipmentsPage,
+  FuelPage, EpodPage, PodPage, CustomerPortalPage, TripsPage, ShipmentsPage,
   FinanceModulePage, DocumentsPage, NotificationsPage, AnalyticsPage,
   MarketplacePage, WarehousePage, IotPage, AiPage, PlatformHub,
 } from './routes/lazyPages'
@@ -83,6 +83,7 @@ export default function App() {
         <Route path="operations/gps/alerts" element={<GeofenceAlertsPage />} />
         <Route path="operations/gps/vehicles/:vehicleId" element={<VehicleHistoryPage />} />
         <Route path="operations/epod" element={<EpodPage />} />
+        <Route path="operations/pod" element={<PodPage />} />
         <Route path="operations/customer-portal" element={<CustomerPortalPage />} />
         <Route path="operations/trips" element={<TripsPage />} />
         <Route path="operations/routing" element={<RouteOptimizerPage />} />

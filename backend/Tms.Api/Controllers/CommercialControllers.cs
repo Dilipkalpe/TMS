@@ -420,16 +420,14 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
     public async Task<IActionResult> Delete(Guid id)
     {
         var q = await db.Quotations.FindAsync(id);
-        if (q == null || !TenantAccess.CanAccess(tenants, q)) return NotFound();
+        if (q == null || !TenantAccess.CanAccess(tenants, q)) return NotFound(new ApiError("Quotation not found."));
         if (!string.IsNullOrEmpty(q.BookingId))
-            return BadRequest(new ApiError("Cannot delete a quotation that was converted to a booking."));
+            return BadRequest(new ApiError($"Cannot delete — already converted to booking {q.BookingId}. Open the booking instead."));
 
-        var lines = await db.QuotationLines.Where(l => l.QuotationId == id).ToListAsync();
-        if (lines.Count > 0)
-            db.QuotationLines.RemoveRange(lines);
-        db.Quotations.Remove(q);
-        await db.SaveChangesAsync();
-        return NoContent();
+        // Remove lines first (covers DBs without ON DELETE CASCADE).
+        await db.QuotationLines.Where(l => l.QuotationId == id).ExecuteDeleteAsync();
+        await db.Quotations.Where(x => x.Id == id).ExecuteDeleteAsync();
+        return Ok(new { message = "Quotation deleted", id });
     }
 }
 

@@ -248,4 +248,59 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
             pod,
         });
     }
+
+    public record MarkDeliveredBody(string? RecipientName, string? DeliveryDate, string? Remarks);
+
+    /// <summary>Mark booking delivered without OTP (ops POD). Supports re-mark with a new delivery date.</summary>
+    [HttpPost("{bookingId}/mark-delivered")]
+    public async Task<IActionResult> MarkDelivered(string bookingId, [FromBody] MarkDeliveredBody? body)
+    {
+        var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
+        if (booking == null) return NotFound(new { message = "Booking not found" });
+        if (booking.Status == "Cancelled")
+            return BadRequest(new { message = "Cannot mark a cancelled booking as delivered." });
+
+        body ??= new MarkDeliveredBody(null, null, null);
+        DateTime deliveredAt = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(body.DeliveryDate) &&
+            DateOnly.TryParse(body.DeliveryDate, out var deliveryDay))
+        {
+            deliveredAt = DateTime.SpecifyKind(deliveryDay.ToDateTime(TimeOnly.FromDateTime(DateTime.UtcNow)), DateTimeKind.Utc);
+        }
+
+        var remake = booking.Status == "Delivered";
+        var pod = await TenantScope.FindPodForBookingAsync(db, tenants, bookingId);
+        if (pod == null)
+        {
+            pod = new ProofOfDelivery
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = booking.CompanyId,
+                BookingId = bookingId,
+                CreatedAt = DateTime.UtcNow,
+            };
+            db.ProofOfDeliveries.Add(pod);
+        }
+
+        pod.OtpVerified = true;
+        pod.OtpCode = null;
+        pod.RecipientName = string.IsNullOrWhiteSpace(body.RecipientName) ? (pod.RecipientName ?? "Receiver") : body.RecipientName.Trim();
+        pod.ConfirmedBy = User.Identity?.Name;
+        pod.DeliveredAt = deliveredAt;
+
+        booking.Status = "Delivered";
+        booking.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = remake ? "Delivery re-marked" : "Delivery marked",
+            bookingId,
+            bookingStatus = booking.Status,
+            deliveryDate = deliveredAt.ToString("yyyy-MM-dd"),
+            remake,
+            recipientName = pod.RecipientName,
+            remarks = body.Remarks,
+        });
+    }
 }

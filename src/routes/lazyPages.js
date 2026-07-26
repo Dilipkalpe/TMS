@@ -110,6 +110,7 @@ export const OperationsHub = lazy(() => import('../pages/operations/OperationsHu
 
 export const FuelPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.FuelPage })))
 export const EpodPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.EpodPage })))
+export const PodPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.PodPage })))
 export const CustomerPortalPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.CustomerPortalPage })))
 export const TripsPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.TripsPage })))
 export const ShipmentsPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.ShipmentsPage })))

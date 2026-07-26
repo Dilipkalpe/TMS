@@ -1,5 +1,6 @@
 export const operationsCards = [
   { title: 'Customer Portal', path: '/operations/customer-portal', icon: 'UserCircle', description: 'Customer bookings, tracking, invoices & POD' },
+  { title: 'POD', path: '/operations/pod', icon: 'PackageCheck', description: 'Mark delivery by booking (no OTP) with delivery date' },
   { title: 'ePOD', path: '/operations/epod', icon: 'ClipboardCheck', description: 'OTP-based proof of delivery' },
   { title: 'GPS Tracking', path: '/operations/gps', icon: 'MapPin', description: 'Live fleet map, history & geofencing' },
   { title: 'Fuel Management', path: '/operations/fuel', icon: 'Gauge', description: 'Fuel entries, analytics & theft alerts' },

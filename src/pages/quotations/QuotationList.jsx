@@ -48,10 +48,18 @@ export default function QuotationList() {
       onRowClick={(r) => navigate(`/quotations/${r.id}`)}
       onEdit={(r) => navigate(`/quotations/${r.id}`)}
       onDelete={async (r) => {
+        if (r.bookingId) {
+          toast({
+            title: 'Cannot delete',
+            message: `Quotation ${r.quoteNo} is linked to booking ${r.bookingId}.`,
+            type: 'warning',
+          })
+          return
+        }
         if (!window.confirm(`Delete quotation ${r.quoteNo}?`)) return
         try {
           await quotationsApi.remove(r.id)
-          toast({ title: 'Deleted', type: 'success' })
+          toast({ title: 'Deleted', message: r.quoteNo, type: 'success' })
           paged.refresh()
         } catch (err) {
           toast({ title: 'Delete failed', message: err.message, type: 'error' })
