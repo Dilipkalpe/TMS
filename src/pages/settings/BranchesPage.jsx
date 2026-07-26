@@ -34,6 +34,10 @@ export default function BranchesPage() {
       toast({ title: 'Validation', message: 'Code and name are required', type: 'error' })
       return
     }
+    if (!/^[A-Z0-9]{2}$/i.test(form.code.trim())) {
+      toast({ title: 'Validation', message: 'Branch code must be exactly 2 characters (e.g. 01 or PN)', type: 'error' })
+      return
+    }
     setSaving(true)
     try {
       if (editingId) await branchesApi.update(editingId, form)
@@ -85,7 +89,7 @@ export default function BranchesPage() {
         <Card className="space-y-3 p-4">
           <h3 className="font-semibold">{editingId ? 'Edit branch' : 'Add branch'}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Code" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="PUN" />
+            <Input label="Code" value={form.code} maxLength={2} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="01" />
             <Input label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             <Input label="City" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
             <Input label="State" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} />

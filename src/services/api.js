@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '../config/api'
 import { getStoredCompanyId } from '../context/CompanyContext'
 import { formatApiErrorBody, sanitizeApiBody } from '../utils/apiErrors'
+import { toDocPath } from '../utils/docPath'
 
 const DEMO_COMPANY_ID = '00000000-0000-4000-8000-000000000001'
 
@@ -166,10 +167,10 @@ export const documentNumberingApi = {
 
 export const bookingsApi = {
   list: (params = {}) => apiRequest(`/bookings?${new URLSearchParams(params)}`),
-  get: (id) => apiRequest(`/bookings/${id}`),
+  get: (id) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(id))}`),
   create: (data) => apiRequest('/bookings', { method: 'POST', body: data }),
-  update: (id, data) => apiRequest(`/bookings/${id}`, { method: 'PUT', body: data }),
-  remove: (id) => apiRequest(`/bookings/${id}`, { method: 'DELETE' }),
+  update: (id, data) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(id))}`, { method: 'PUT', body: data }),
+  remove: (id) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(id))}`, { method: 'DELETE' }),
 }
 
 export const vehiclesApi = {
@@ -246,11 +247,11 @@ export const expensesApi = {
 export const lrApi = {
   list: (params = {}) => apiRequest(`/lr?${new URLSearchParams(params)}`),
   recent: () => apiRequest('/lr?page=1&pageSize=15'),
-  get: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(lrNumber)}`),
-  prefillFromBooking: (bookingId) => apiRequest(`/lr/prefill/${encodeURIComponent(bookingId)}`),
+  get: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`),
+  prefillFromBooking: (bookingId) => apiRequest(`/lr/prefill/${encodeURIComponent(toDocPath(bookingId))}`),
   create: (data) => apiRequest('/lr', { method: 'POST', body: data }),
-  update: (lrNumber, data) => apiRequest(`/lr/${encodeURIComponent(lrNumber)}`, { method: 'PUT', body: data }),
-  remove: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(lrNumber)}`, { method: 'DELETE' }),
+  update: (lrNumber, data) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`, { method: 'PUT', body: data }),
+  remove: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`, { method: 'DELETE' }),
 }
 
 export const dashboardApi = {
@@ -338,14 +339,14 @@ export const accountingApi = {
 }
 
 export const bookingFinanceApi = {
-  summary: (bookingId) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/finance`),
-  listPayments: (bookingId) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/payments`),
-  recordPayment: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/payments`, { method: 'POST', body: data }),
-  addBrokerCharge: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/broker-charges`, { method: 'POST', body: data }),
-  addExpense: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/expenses`, { method: 'POST', body: data }),
-  createBill: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/bills`, { method: 'POST', body: data }),
-  deleteBill: (bookingId, billId) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/bills/${billId}`, { method: 'DELETE' }),
-  profitLoss: (bookingId) => apiRequest(`/bookings/${encodeURIComponent(bookingId)}/profit-loss`),
+  summary: (bookingId) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/finance`),
+  listPayments: (bookingId) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/payments`),
+  recordPayment: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/payments`, { method: 'POST', body: data }),
+  addBrokerCharge: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/broker-charges`, { method: 'POST', body: data }),
+  addExpense: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/expenses`, { method: 'POST', body: data }),
+  createBill: (bookingId, data) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/bills`, { method: 'POST', body: data }),
+  deleteBill: (bookingId, billId) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/bills/${billId}`, { method: 'DELETE' }),
+  profitLoss: (bookingId) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/profit-loss`),
   bookingProfitLossReport: (params = {}) => apiRequest(`/reports/booking-profit-loss?${queryString(params)}`),
   brokerOutstanding: () => apiRequest('/reports/broker-outstanding'),
   provisions: (params = {}) => apiRequest(`/provisions?${new URLSearchParams(params)}`),
@@ -460,10 +461,10 @@ export const geofenceApi = {
 }
 
 export const podApi = {
-  sendOtp: (bookingId) => apiRequest(`/pod/${bookingId}/send-otp`, { method: 'POST' }),
-  confirm: (bookingId, data) => apiRequest(`/pod/${bookingId}/confirm`, { method: 'POST', body: data }),
-  markDelivered: (bookingId, data) => apiRequest(`/pod/${bookingId}/mark-delivered`, { method: 'POST', body: data }),
-  get: (bookingId) => apiRequest(`/pod/${bookingId}`),
+  sendOtp: (bookingId) => apiRequest(`/pod/${encodeURIComponent(toDocPath(bookingId))}/send-otp`, { method: 'POST' }),
+  confirm: (bookingId, data) => apiRequest(`/pod/${encodeURIComponent(toDocPath(bookingId))}/confirm`, { method: 'POST', body: data }),
+  markDelivered: (bookingId, data) => apiRequest(`/pod/${encodeURIComponent(toDocPath(bookingId))}/mark-delivered`, { method: 'POST', body: data }),
+  get: (bookingId) => apiRequest(`/pod/${encodeURIComponent(toDocPath(bookingId))}`),
 }
 
 export const customerPortalApi = {

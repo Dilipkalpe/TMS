@@ -6,6 +6,7 @@ import { formatCurrency } from '../../components/ui/ReportFilters'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { bookingsApi } from '../../services/api'
+import { bookingPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
 
@@ -65,8 +66,8 @@ export default function BookingList() {
       error={paged.error}
       onRefreshExternal={paged.refresh}
       sortKey="date"
-      onRowClick={(r) => navigate(`/bookings/${r.id}`)}
-      onEdit={(r) => navigate(`/bookings/${r.id}/edit`)}
+      onRowClick={(r) => navigate(bookingPath(r.id))}
+      onEdit={(r) => navigate(bookingPath(r.id, 'edit'))}
       onDelete={handleDelete}
       exportFilename="bookings-export.csv"
       serverMode

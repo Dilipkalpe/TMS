@@ -7,6 +7,7 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import { lrApi } from '../../services/api'
+import { fromDocPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { Save, ArrowLeft, Printer, Loader2 } from 'lucide-react'
 import { usePrint } from '../../context/PrintContext'
@@ -46,7 +47,8 @@ function calcBalance(next) {
 }
 
 export default function EditLR() {
-  const { lrNumber } = useParams()
+  const { lrNumber: rawLrNumber } = useParams()
+  const lrNumber = fromDocPath(rawLrNumber)
   const navigate = useNavigate()
   const { toast } = useToast()
   const { company, print } = usePrint()

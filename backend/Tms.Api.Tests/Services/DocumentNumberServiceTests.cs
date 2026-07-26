@@ -25,8 +25,7 @@ public class DocumentNumberServiceTests
             FormatPattern = DocumentNumberService.DefaultFormatPattern,
             RunningNumberLength = 5,
         };
-        var no = DocumentNumberService.FormatNumber(cfg, "ABC", "PUN", "2026-27", 1);
-        no.Should().Be("ABC/PUN/2026-27/BKG/00001");
+        DocumentNumberService.FormatNumber(cfg, "01", "PN", "2026-27", 1).Should().Be("01/PN/2026-27/BKG/00001");
     }
 
     [Fact]
@@ -38,7 +37,25 @@ public class DocumentNumberServiceTests
             FormatPattern = DocumentNumberService.DefaultFormatPattern,
             RunningNumberLength = 3,
         };
-        DocumentNumberService.FormatNumber(cfg, "XYZ", "MUM", "2026-27", 12)
-            .Should().Be("XYZ/MUM/2026-27/LR/012");
+        DocumentNumberService.FormatNumber(cfg, "01", "MU", "2026-27", 12)
+            .Should().Be("01/MU/2026-27/LR/012");
+    }
+
+    [Fact]
+    public void DecodePathId_restores_slashes()
+    {
+        DocumentCodeRules.DecodePathId("01~PN~2026-27~BKG~00001").Should().Be("01/PN/2026-27/BKG/00001");
+        DocumentCodeRules.DecodePathId("BK-100").Should().Be("BK-100");
+    }
+
+    [Theory]
+    [InlineData("01", true)]
+    [InlineData("PN", true)]
+    [InlineData("A", false)]
+    [InlineData("PUN", false)]
+    [InlineData("abc", false)]
+    public void DocumentCodeRules_requires_two_chars(string code, bool ok)
+    {
+        DocumentCodeRules.IsValid(code).Should().Be(ok);
     }
 }

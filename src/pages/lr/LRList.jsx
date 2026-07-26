@@ -4,6 +4,7 @@ import Badge, { statusVariant } from '../../components/ui/Badge'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { lrApi } from '../../services/api'
+import { lrEditPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
@@ -71,8 +72,8 @@ export default function LRList() {
       error={paged.error}
       onRefreshExternal={paged.refresh}
       sortKey="lrDate"
-      onRowClick={(r) => navigate(`/lr/${encodeURIComponent(r.lrNumber)}/edit`)}
-      onEdit={(r) => navigate(`/lr/${encodeURIComponent(r.lrNumber)}/edit`)}
+      onRowClick={(r) => navigate(lrEditPath(r.lrNumber))}
+      onEdit={(r) => navigate(lrEditPath(r.lrNumber))}
       onDelete={handleDelete}
       onPrint={handlePrintLr}
       rowPrintTitle="Print LR"

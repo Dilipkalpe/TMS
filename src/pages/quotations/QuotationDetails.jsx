@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { bookingPath } from '../../utils/docPath'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -48,7 +49,7 @@ export default function QuotationDetails() {
       const res = await action()
       toast({ title: success, type: 'success' })
       if (res?.booking?.id) {
-        navigate(`/bookings/${res.booking.id}`)
+        navigate(bookingPath(res.booking.id))
         return
       }
       reload()
@@ -117,7 +118,7 @@ export default function QuotationDetails() {
             </Button>
           )}
           {quote.bookingId && (
-            <Button variant="outline" onClick={() => navigate(`/bookings/${quote.bookingId}`)}>Open Booking</Button>
+            <Button variant="outline" onClick={() => navigate(bookingPath(quote.bookingId))}>Open Booking</Button>
           )}
           {!quote.bookingId && (
             <Button

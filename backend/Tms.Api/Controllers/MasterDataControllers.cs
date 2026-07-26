@@ -423,6 +423,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     [HttpGet("{lrNumber}")]
     public async Task<ActionResult<LrDto>> Get(string lrNumber)
     {
+        lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var l = await db.LorryReceipts.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.LrNumber == lrNumber);
         if (l == null || !TenantScope.CanAccessBranchEntity(tenants, branches, l)) return NotFound();
         return Ok(EntityMappers.ToDto(l));
@@ -431,6 +432,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     [HttpGet("prefill/{bookingId}")]
     public async Task<ActionResult<object>> PrefillFromBooking(string bookingId)
     {
+        bookingId = DocumentCodeRules.DecodePathId(bookingId);
         var b = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (b == null) return NotFound();
 
@@ -593,6 +595,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     [HttpPut("{lrNumber}")]
     public async Task<ActionResult<LrDto>> Update(string lrNumber, [FromBody] Dictionary<string, object?> body)
     {
+        lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var lr = await db.LorryReceipts.FindAsync(lrNumber);
         if (lr == null || !TenantScope.CanAccessTenantEntity(tenants, lr)) return NotFound();
 
@@ -679,6 +682,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     [HttpDelete("{lrNumber}")]
     public async Task<IActionResult> Delete(string lrNumber)
     {
+        lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var lr = await db.LorryReceipts.FindAsync(lrNumber);
         if (lr == null || !TenantScope.CanAccessTenantEntity(tenants, lr)) return NotFound();
         db.LorryReceipts.Remove(lr);

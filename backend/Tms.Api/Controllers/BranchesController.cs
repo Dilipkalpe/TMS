@@ -92,6 +92,8 @@ public class BranchesController(TmsDbContext db, ITenantContext tenants, IBranch
         var companyId = TenantScope.ResolveCompanyId(tenants);
 
         var code = body.Code.Trim().ToUpperInvariant();
+        if (!DocumentCodeRules.IsValid(code))
+            return BadRequest(new { message = "Branch code must be exactly 2 characters (A–Z / 0–9), e.g. 01 or PN." });
 
         if (await tenants.Filter(db.Branches.AsQueryable()).AnyAsync(b => b.Code == code))
 
@@ -160,6 +162,9 @@ public class BranchesController(TmsDbContext db, ITenantContext tenants, IBranch
 
 
         var code = body.Code.Trim().ToUpperInvariant();
+
+        if (!DocumentCodeRules.IsValid(code))
+            return BadRequest(new { message = "Branch code must be exactly 2 characters (A–Z / 0–9), e.g. 01 or PN." });
 
         if (await tenants.Filter(db.Branches.AsQueryable()).AnyAsync(b => b.Code == code && b.Id != id))
 

@@ -41,6 +41,8 @@ public class PlatformController(TmsDbContext db) : ControllerBase
 
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
             return BadRequest(new ApiError("Company code and name are required."));
+        if (!DocumentCodeRules.IsValid(code))
+            return BadRequest(new ApiError("Company code must be exactly 2 characters (A–Z / 0–9), e.g. 01."));
         if (await db.Companies.AnyAsync(c => c.Code == code))
             return BadRequest(new ApiError($"Company code '{code}' already exists."));
 
@@ -74,7 +76,7 @@ public class PlatformController(TmsDbContext db) : ControllerBase
         {
             Id = branchId,
             CompanyId = companyId,
-            Code = "HO",
+            Code = "01",
             Name = $"{name} — Head Office",
             City = company.City,
             State = company.State,

@@ -43,6 +43,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
     [HttpGet("{id}")]
     public async Task<ActionResult<BookingDto>> Get(string id)
     {
+        id = DocumentCodeRules.DecodePathId(id);
         var b = await db.Bookings.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (b == null || !TenantAccess.CanAccess(tenants, b) || !BranchAccess.CanAccess(branches, b)) return NotFound();
         var lrNumber = await ResolveLrNumberAsync(id);
@@ -144,6 +145,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
     [HttpPut("{id}")]
     public async Task<ActionResult<BookingDto>> Update(string id, [FromBody] CreateBookingRequest req)
     {
+        id = DocumentCodeRules.DecodePathId(id);
         var booking = await db.Bookings.FindAsync(id);
         if (booking == null || !TenantScope.CanAccessBranchEntity(tenants, branches, booking)) return NotFound();
 
@@ -267,6 +269,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)
     {
+        id = DocumentCodeRules.DecodePathId(id);
         var booking = await db.Bookings.FindAsync(id);
         if (booking == null || !TenantScope.CanAccessBranchEntity(tenants, branches, booking)) return NotFound();
 

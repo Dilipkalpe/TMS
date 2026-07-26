@@ -8,13 +8,15 @@ import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import { Save, ArrowLeft, Loader2 } from 'lucide-react'
 import { bookingsApi } from '../../services/api'
+import { fromDocPath, bookingPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 
 const bookingStatuses = ['Pending', 'Confirmed', 'In Transit', 'Delivered', 'Cancelled']
 const paymentStatuses = ['Unpaid', 'Partial', 'Paid']
 
 export default function EditBooking() {
-  const { id } = useParams()
+  const { id: rawId } = useParams()
+  const id = fromDocPath(rawId)
   const navigate = useNavigate()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -85,7 +87,7 @@ export default function EditBooking() {
         remarks: form.remarks,
       })
       toast({ title: 'Booking updated', type: 'success' })
-      navigate(`/bookings/${id}`)
+      navigate(bookingPath(id))
     } catch (err) {
       toast({ title: 'Update failed', message: err.message, type: 'error' })
     } finally {
@@ -135,7 +137,7 @@ export default function EditBooking() {
         </div>
         <div className="mt-6 flex gap-2">
           <Button icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Update Booking'}</Button>
-          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate(`/bookings/${id}`)}>Cancel</Button>
+          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate(bookingPath(id))}>Cancel</Button>
         </div>
       </Card>
     </ERPContentPage>

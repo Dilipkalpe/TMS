@@ -18,6 +18,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
 
         var payments = await db.BookingPayments.Where(p => p.BookingId == bookingId)
             .OrderByDescending(p => p.PaymentDate).ToListAsync();
@@ -58,6 +59,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
         var rows = await db.BookingPayments.Where(p => p.BookingId == bookingId)
             .OrderByDescending(p => p.PaymentDate).ToListAsync();
         return Ok(new { bookingId, outstanding = booking.Balance, freight = booking.Freight, advance = booking.Advance, payments = rows.Select(MapPayment) });
@@ -68,6 +70,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
 
         var amount = ApiParseHelper.BodyDecimal(body, "amount");
         if (amount <= 0) return BadRequest(new ApiError("Payment amount must be greater than zero."));
@@ -151,6 +154,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
 
         var brokerName = ApiParseHelper.BodyString(body, "brokerName");
         if (string.IsNullOrWhiteSpace(brokerName))
@@ -213,6 +217,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
 
         var amount = ApiParseHelper.BodyDecimal(body, "amount");
         var category = ApiParseHelper.BodyString(body, "category");
@@ -249,6 +254,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
 
         var billType = (ApiParseHelper.BodyString(body, "billType") ?? "FC").ToUpperInvariant();
         if (billType is not ("RCM" or "FC"))
@@ -312,6 +318,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
 
         var bill = await db.TransportBills.FirstOrDefaultAsync(b => b.Id == billId && b.BookingId == bookingId);
         if (bill == null) return NotFound();
@@ -326,6 +333,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound();
+        bookingId = booking.Id;
         return Ok(await BookingFinanceService.BuildBookingProfitLossAsync(db, booking));
     }
 

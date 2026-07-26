@@ -111,9 +111,10 @@ export default function DocumentNumberingPage() {
     <ERPContentPage module="Settings" title="Document numbering">
       <Card className="mb-4 space-y-3 p-4">
         <p className="text-sm text-slate-600">
-          Format: <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">Company/Branch/FY/Prefix/00001</code>
+          Format: <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">01/PN/2026-27/BKG/00001</code>
           {fy ? <> · Active FY <strong>{fy}</strong></> : null}
         </p>
+        <p className="text-xs text-slate-500">Company and branch codes must be exactly 2 characters (Settings → Branch locations).</p>
         <div className="max-w-xs">
           <Select
             label="Branch"

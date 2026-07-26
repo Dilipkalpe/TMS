@@ -181,6 +181,7 @@ public static class TenantScope
     public static async Task<Booking?> FindBookingAsync(
         TmsDbContext db, ITenantContext tenants, IBranchContext branches, string bookingId, CancellationToken ct = default)
     {
+        bookingId = DocumentCodeRules.DecodePathId(bookingId);
         var b = await db.Bookings.FindAsync([bookingId], ct);
         return CanAccessBranchEntity(tenants, branches, b) ? b : null;
     }
@@ -188,6 +189,7 @@ public static class TenantScope
     public static async Task<Booking?> FindBookingByIdAsync(
         TmsDbContext db, ITenantContext tenants, string bookingId, CancellationToken ct = default)
     {
+        bookingId = DocumentCodeRules.DecodePathId(bookingId);
         var b = await db.Bookings.FindAsync([bookingId], ct);
         return CanAccessTenantEntity(tenants, b) ? b : null;
     }
@@ -195,6 +197,7 @@ public static class TenantScope
     public static async Task<ProofOfDelivery?> FindPodForBookingAsync(
         TmsDbContext db, ITenantContext tenants, string bookingId, CancellationToken ct = default)
     {
+        bookingId = DocumentCodeRules.DecodePathId(bookingId);
         var booking = await FindBookingByIdAsync(db, tenants, bookingId, ct);
         if (booking == null) return null;
         return await tenants.Filter(db.ProofOfDeliveries.AsQueryable())

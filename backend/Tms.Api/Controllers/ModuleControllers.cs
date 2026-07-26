@@ -134,6 +134,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound(new { message = "Booking not found" });
+        bookingId = booking.Id;
 
         var otp = Random.Shared.Next(100000, 999999).ToString();
         var pod = await TenantScope.FindPodForBookingAsync(db, tenants, bookingId);
@@ -167,6 +168,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound(new { message = "Booking not found" });
+        bookingId = booking.Id;
 
         var pod = await TenantScope.FindPodForBookingAsync(db, tenants, bookingId);
         if (pod?.OtpCode == null) return BadRequest(new { message = "Generate OTP first" });
@@ -253,6 +255,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound(new { message = "Booking not found" });
+        bookingId = booking.Id;
 
         var pod = await TenantScope.FindPodForBookingAsync(db, tenants, bookingId);
         return Ok(new
@@ -276,6 +279,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
     {
         var booking = await TenantScope.FindBookingAsync(db, tenants, branches, bookingId);
         if (booking == null) return NotFound(new { message = "Booking not found" });
+        bookingId = booking.Id;
         if (booking.Status == "Cancelled")
             return BadRequest(new { message = "Cannot mark a cancelled booking as delivered." });
 

@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button'
 import Input, { Select } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import { bookingsApi, bookingFinanceApi } from '../../services/api'
+import { bookingPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { Save, Loader2 } from 'lucide-react'
@@ -112,7 +113,7 @@ export default function BookingPaymentAdjustment() {
           </div>
           <div className="mt-4 flex gap-2">
             <Button icon={saving ? Loader2 : Save} disabled={saving} onClick={handleSave}>{saving ? 'Saving…' : 'Record Payment'}</Button>
-            <Button variant="outline" onClick={() => navigate(`/bookings/${booking.id}`)}>View Booking</Button>
+            <Button variant="outline" onClick={() => navigate(bookingPath(booking.id))}>View Booking</Button>
           </div>
         </Card>
       )}

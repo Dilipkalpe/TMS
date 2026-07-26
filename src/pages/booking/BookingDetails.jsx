@@ -10,9 +10,11 @@ import BookingFinancePanel from '../../components/booking/BookingFinancePanel'
 import { ArrowLeft, FileText, Pencil } from 'lucide-react'
 import PrintButton from '../../components/print/PrintButton'
 import { useDocumentFlow } from '../../hooks/useDocumentFlow'
+import { fromDocPath, bookingPath } from '../../utils/docPath'
 
 export default function BookingDetails() {
-  const { id } = useParams()
+  const { id: rawId } = useParams()
+  const id = fromDocPath(rawId)
   const navigate = useNavigate()
   const { item: booking, loading, error, setItem } = useApiItem(bookingsApi.get, id)
   const { isFirstBookingThenLr } = useDocumentFlow()
@@ -63,7 +65,7 @@ export default function BookingDetails() {
           <div className="flex flex-wrap gap-2">
             <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
             <Badge variant={statusVariant(booking.payment)}>Payment: {booking.payment}</Badge>
-            <Button variant="outline" icon={Pencil} onClick={() => navigate(`/bookings/${booking.id}/edit`)}>
+            <Button variant="outline" icon={Pencil} onClick={() => navigate(bookingPath(booking.id, 'edit'))}>
               {hasLr ? 'Edit Status' : 'Edit'}
             </Button>
             {isFirstBookingThenLr && !hasLr && (

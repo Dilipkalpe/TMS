@@ -49,12 +49,8 @@ public sealed class DocumentNumberService(TmsDbContext db)
             .FirstOrDefaultAsync(b => b.Id == branchId && b.CompanyId == companyId, ct)
             ?? throw new InvalidOperationException("Branch not found for this company.");
 
-        var companyCode = (company.Code ?? "").Trim().ToUpperInvariant();
-        var branchCode = (branch.Code ?? "").Trim().ToUpperInvariant();
-        if (string.IsNullOrWhiteSpace(companyCode))
-            throw new InvalidOperationException("Company code is required for document numbering. Set it under Companies/Settings.");
-        if (string.IsNullOrWhiteSpace(branchCode))
-            throw new InvalidOperationException("Branch code is required for document numbering. Set it under Branches.");
+        var companyCode = DocumentCodeRules.Require(company.Code, "Company");
+        var branchCode = DocumentCodeRules.Require(branch.Code, "Branch");
 
         var config = await EnsureConfigAsync(companyId, branchId, documentType, ct);
         var fyKey = string.Equals(config.ResetRule, DocumentNumberResetRules.Never, StringComparison.OrdinalIgnoreCase)
@@ -188,7 +184,7 @@ public sealed class DocumentNumberService(TmsDbContext db)
                         s.DocumentType == cfg.DocumentType &&
                         s.FinancialYear == fyKey, ct);
 
-                var preview = FormatNumber(cfg, "ABC", branch.Code, fyLabel, (seq?.CurrentNumber ?? 0) + 1);
+                var preview = FormatNumber(cfg, "01", DocumentCodeRules.Normalize(branch.Code).Length == 2 ? DocumentCodeRules.Normalize(branch.Code) : "02", fyLabel, (seq?.CurrentNumber ?? 0) + 1);
                 result.Add(new DocumentNumberConfigDto(
                     cfg.Id,
                     cfg.CompanyId,
@@ -297,7 +293,7 @@ public sealed class DocumentNumberService(TmsDbContext db)
             cfg.ResetRule,
             current?.CurrentNumber ?? 0,
             fyLabel,
-            FormatNumber(cfg, "ABC", branch.Code, fyLabel, (current?.CurrentNumber ?? 0) + 1));
+            FormatNumber(cfg, "01", DocumentCodeRules.IsValid(branch.Code) ? DocumentCodeRules.Normalize(branch.Code) : "02", fyLabel, (current?.CurrentNumber ?? 0) + 1));
     }
 }
 

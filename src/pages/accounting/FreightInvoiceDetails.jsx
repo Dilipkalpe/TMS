@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { bookingPath } from '../../utils/docPath'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -93,7 +94,7 @@ export default function FreightInvoiceDetails() {
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/accounting/freight-invoices')}>Back</Button>
           <Button variant="outline" icon={Printer} onClick={handlePrint}>Print</Button>
           {inv.bookingId && (
-            <Button variant="outline" onClick={() => navigate(`/bookings/${inv.bookingId}`)}>Open Booking</Button>
+            <Button variant="outline" onClick={() => navigate(bookingPath(inv.bookingId))}>Open Booking</Button>
           )}
           {inv.status !== 'Cancelled' && inv.amountPaid <= 0 && (
             <Button variant="outline" icon={Ban} disabled={busy} onClick={cancel}>Cancel</Button>
