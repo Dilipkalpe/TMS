@@ -455,9 +455,9 @@ export function TripsPage() {
       {loading ? <Card className="p-4 text-sm text-slate-500">Loading…</Card> : (
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50"><tr><th className="px-4 py-2 text-left">Code</th><th className="px-4 py-2 text-left">Route</th><th className="px-4 py-2 text-left">Vehicle</th><th className="px-4 py-2 text-left">Driver</th><th className="px-4 py-2 text-left">Status</th></tr></thead>
+          <thead className="bg-slate-50"><tr><th className="px-4 py-2 text-left">Code</th><th className="px-4 py-2 text-left">Branch</th><th className="px-4 py-2 text-left">Route</th><th className="px-4 py-2 text-left">Vehicle</th><th className="px-4 py-2 text-left">Driver</th><th className="px-4 py-2 text-left">Status</th></tr></thead>
           <tbody>{rows.map((r) => (
-            <tr key={r.id} className="border-t"><td className="px-4 py-2">{r.tripCode}</td><td className="px-4 py-2">{r.origin} → {r.destination}</td><td className="px-4 py-2">{r.vehicle?.registrationNo ?? '—'}</td><td className="px-4 py-2">{r.driver?.name ?? '—'}</td><td className="px-4 py-2">{r.status}</td></tr>
+            <tr key={r.id} className="border-t"><td className="px-4 py-2">{r.tripCode}</td><td className="px-4 py-2">{r.branchName || '—'}</td><td className="px-4 py-2">{r.origin} → {r.destination}</td><td className="px-4 py-2">{r.vehicle?.registrationNo ?? '—'}</td><td className="px-4 py-2">{r.driver?.name ?? '—'}</td><td className="px-4 py-2">{r.status}</td></tr>
           ))}</tbody>
         </table>
       </Card>

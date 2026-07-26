@@ -21,6 +21,7 @@ export default function LRList() {
   const columns = [
     { key: 'lrNumber', label: 'LR No.' },
     { key: 'lrDate', label: 'Date' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'consignor', label: 'Consignor' },
     { key: 'consignee', label: 'Consignee' },
     { key: 'from', label: 'From' },

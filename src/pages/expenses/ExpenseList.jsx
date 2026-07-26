@@ -21,6 +21,7 @@ export default function ExpenseList() {
   const columns = [
     { key: 'id', label: 'ID' },
     { key: 'date', label: 'Date' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'category', label: 'Category' },
     { key: 'description', label: 'Description' },
     { key: 'vehicle', label: 'Vehicle' },

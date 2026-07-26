@@ -19,6 +19,7 @@ export default function VehicleList() {
 
   const columns = [
     { key: 'number', label: 'Vehicle No.' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'type', label: 'Type' },
     { key: 'model', label: 'Model' },
     { key: 'capacity', label: 'Capacity' },

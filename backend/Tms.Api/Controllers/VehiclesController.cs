@@ -21,7 +21,7 @@ public class VehiclesController(TmsDbContext db, IBranchContext branches, ITenan
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(branches.Filter(db.Vehicles.AsNoTracking()));
+        var q = tenants.Filter(branches.Filter(db.Vehicles.AsNoTracking().Include(v => v.Branch)));
         if (!string.IsNullOrWhiteSpace(status) && status != "(All)")
             q = q.Where(v => v.Status == status);
         q = SearchHelper.Filter(q, search);
@@ -35,7 +35,7 @@ public class VehiclesController(TmsDbContext db, IBranchContext branches, ITenan
     [HttpGet("{id}")]
     public async Task<ActionResult<VehicleDto>> Get(string id)
     {
-        var v = await db.Vehicles.FindAsync(id);
+        var v = await db.Vehicles.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (v == null || !TenantScope.CanAccessBranchEntity(tenants, branches, v)) return NotFound();
         return Ok(EntityMappers.ToDto(v));
     }

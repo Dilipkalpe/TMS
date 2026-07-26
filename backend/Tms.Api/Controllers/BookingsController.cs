@@ -28,7 +28,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(branches.Filter(db.Bookings.AsNoTracking()));
+        var q = tenants.Filter(branches.Filter(db.Bookings.AsNoTracking().Include(b => b.Branch)));
         if (!string.IsNullOrWhiteSpace(status) && status != "(All)") q = q.Where(b => b.Status == status);
         q = SearchHelper.Filter(q, search);
         q = q.OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.Id);
@@ -43,7 +43,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
     [HttpGet("{id}")]
     public async Task<ActionResult<BookingDto>> Get(string id)
     {
-        var b = await db.Bookings.FindAsync(id);
+        var b = await db.Bookings.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (b == null || !TenantAccess.CanAccess(tenants, b) || !BranchAccess.CanAccess(branches, b)) return NotFound();
         var lrNumber = await ResolveLrNumberAsync(id);
         return Ok(EntityMappers.ToDto(b, lrNumber));

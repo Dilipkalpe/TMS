@@ -24,7 +24,8 @@ public record BookingDto(
     string Id, string Date, string Customer, string? Consignor, string? Consignee,
     string From, string To, string? Material, string? Quantity,
     string? Vehicle, string? Driver, decimal Freight, string Status, string Payment,
-    decimal Advance, decimal Balance, string? Remarks, string? LrNumber = null);
+    decimal Advance, decimal Balance, string? Remarks, string? LrNumber = null,
+    Guid? BranchId = null, string? BranchName = null);
 
 public record CreateBookingRequest(
     string Date, string Customer, string? Consignor, string? Consignee,
@@ -35,12 +36,14 @@ public record CreateBookingRequest(
 public record VehicleDto(
     string Id, string Number, string? Type, string? Model, string? Capacity, string? Owner,
     string Status, string? Insurance, string? Fitness, string? Permit, string? Puc,
-    string? LastMaintenance, int Trips, decimal Revenue);
+    string? LastMaintenance, int Trips, decimal Revenue,
+    Guid? BranchId = null, string? BranchName = null);
 
 public record DriverDto(
     string Id, string Name, string? License, string? LicenseExpiry, string? Phone,
     string? Email, string? Address, decimal Salary, decimal Advance, string Status,
-    int Trips, decimal Rating);
+    int Trips, decimal Rating,
+    Guid? BranchId = null, string? BranchName = null);
 
 public record CustomerDto(
     string Id, string Name, string? Contact, string? Phone, string? Email, string? Gst,
@@ -54,14 +57,16 @@ public record VendorDto(
 
 public record ExpenseDto(
     string Id, string Date, string Category, string? Description, string? Vehicle,
-    string? Vendor, decimal Amount, string? PaymentMode, string Status);
+    string? Vendor, decimal Amount, string? PaymentMode, string Status,
+    Guid? BranchId = null, string? BranchName = null);
 
 public record LrDto(
     string LrNumber, string LrDate, string? Consignor, string? Consignee,
     string From, string To, string? Vehicle, string? Driver, string? Material,
     string? Quantity, decimal Freight, decimal Gst, decimal Balance, string PaymentType,
     string? BookingId, decimal? Hamali, decimal? LoadingCharges, decimal? UnloadingCharges,
-    decimal? Insurance, decimal? Advance, string? Remarks);
+    decimal? Insurance, decimal? Advance, string? Remarks,
+    Guid? BranchId = null, string? BranchName = null);
 
 public record DashboardStatsDto(
     int TotalVehicles, int TotalDrivers, int TotalCustomers, int TotalTrips,

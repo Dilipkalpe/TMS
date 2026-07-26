@@ -15,7 +15,8 @@ public static class EntityMappers
         b.Material, b.Quantity,
         b.VehicleNumber, b.DriverName,
         b.Freight, b.Status, b.Payment,
-        b.Advance, b.Balance, b.Remarks, lrNumber);
+        b.Advance, b.Balance, b.Remarks, lrNumber,
+        b.BranchId, b.Branch?.Name);
 
     public static VehicleDto ToDto(Vehicle v) => new(
         v.Id, v.Number, v.Type, v.Model, v.Capacity, v.Owner, v.Status,
@@ -24,13 +25,15 @@ public static class EntityMappers
         v.Permit?.ToString("yyyy-MM-dd"),
         v.Puc?.ToString("yyyy-MM-dd"),
         v.LastMaintenance?.ToString("yyyy-MM-dd"),
-        v.Trips, v.Revenue);
+        v.Trips, v.Revenue,
+        v.BranchId, v.Branch?.Name);
 
     public static DriverDto ToDto(Driver d) => new(
         d.Id, d.Name, d.License,
         d.LicenseExpiry?.ToString("yyyy-MM-dd"),
         d.Phone, d.Email, d.Address,
-        d.Salary, d.Advance, d.Status, d.Trips, d.Rating);
+        d.Salary, d.Advance, d.Status, d.Trips, d.Rating,
+        d.BranchId, d.Branch?.Name);
 
     public static CustomerDto ToDto(Customer c) => new(
         c.Id, c.Name, c.Contact, c.Phone, c.Email, c.Gst, c.Address,
@@ -47,9 +50,10 @@ public static class EntityMappers
         e.ExpenseDate.ToString("yyyy-MM-dd"),
         e.Category, e.Description,
         e.VehicleNumber, e.VendorName,
-        e.Amount, e.PaymentMode, e.Status);
+        e.Amount, e.PaymentMode, e.Status,
+        e.BranchId, e.Branch?.Name);
 
-    public static LrDto ToDto(LorryReceipt l) => new(
+    public static LrDto ToDto(LorryReceipt l, Guid? branchId = null, string? branchName = null) => new(
         l.LrNumber,
         l.LrDate.ToString("yyyy-MM-dd"),
         l.Consignor, l.Consignee,
@@ -58,7 +62,8 @@ public static class EntityMappers
         l.Material, l.Quantity,
         l.Freight, l.Gst, l.Balance, l.PaymentType,
         l.BookingId, l.Hamali, l.LoadingCharges, l.UnloadingCharges,
-        l.Insurance, l.Advance, l.Remarks);
+        l.Insurance, l.Advance, l.Remarks,
+        branchId, branchName);
 }
 
 public static class IdGenerator

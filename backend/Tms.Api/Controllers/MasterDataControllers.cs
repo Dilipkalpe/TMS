@@ -21,7 +21,7 @@ public class DriversController(TmsDbContext db, IBranchContext branches, ITenant
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(branches.Filter(db.Drivers.AsNoTracking()));
+        var q = tenants.Filter(branches.Filter(db.Drivers.AsNoTracking().Include(d => d.Branch)));
         if (!string.IsNullOrWhiteSpace(status) && status != "(All)")
             q = q.Where(d => d.Status == status);
         q = SearchHelper.Filter(q, search);
@@ -35,7 +35,7 @@ public class DriversController(TmsDbContext db, IBranchContext branches, ITenant
     [HttpGet("{id}")]
     public async Task<ActionResult<DriverDto>> Get(string id)
     {
-        var d = await db.Drivers.FindAsync(id);
+        var d = await db.Drivers.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (d == null || !TenantScope.CanAccessBranchEntity(tenants, branches, d)) return NotFound();
         return Ok(EntityMappers.ToDto(d));
     }
@@ -312,7 +312,7 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(branches.Filter(db.Expenses.AsNoTracking()));
+        var q = tenants.Filter(branches.Filter(db.Expenses.AsNoTracking().Include(e => e.Branch)));
         if (!string.IsNullOrWhiteSpace(category) && category != "(All)") q = q.Where(e => e.Category == category);
         q = SearchHelper.Filter(q, search);
         q = q.OrderByDescending(e => e.ExpenseDate).ThenByDescending(e => e.Id);
@@ -325,7 +325,7 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
     [HttpGet("{id}")]
     public async Task<ActionResult<ExpenseDto>> Get(string id)
     {
-        var e = await db.Expenses.FindAsync(id);
+        var e = await db.Expenses.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (e == null || !TenantScope.CanAccessBranchEntity(tenants, branches, e)) return NotFound();
         return Ok(EntityMappers.ToDto(e));
     }
@@ -415,8 +415,26 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var bookingIds = items
+            .Select(l => l.BookingId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct()
+            .Cast<string>()
+            .ToList();
+        var branchByBooking = bookingIds.Count == 0
+            ? new Dictionary<string, (Guid? BranchId, string? BranchName)>()
+            : (await db.Bookings.AsNoTracking()
+                .Where(b => bookingIds.Contains(b.Id))
+                .Select(b => new { b.Id, b.BranchId, BranchName = b.Branch != null ? b.Branch.Name : null })
+                .ToListAsync())
+                .ToDictionary(x => x.Id, x => (BranchId: x.BranchId, BranchName: x.BranchName));
         return Ok(new PagedResult<LrDto>(
-            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+            items.Select(l =>
+            {
+                if (string.IsNullOrWhiteSpace(l.BookingId) || !branchByBooking.TryGetValue(l.BookingId, out var br))
+                    return EntityMappers.ToDto(l);
+                return EntityMappers.ToDto(l, br.BranchId, br.BranchName);
+            }).ToList(), total, p, size, hasMore, approx));
     }
 
     [HttpGet("{lrNumber}")]
@@ -424,7 +442,18 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     {
         var l = await db.LorryReceipts.FindAsync(lrNumber);
         if (l == null || !TenantScope.CanAccessTenantEntity(tenants, l)) return NotFound();
-        return Ok(EntityMappers.ToDto(l));
+        Guid? branchId = null;
+        string? branchName = null;
+        if (!string.IsNullOrWhiteSpace(l.BookingId))
+        {
+            var br = await db.Bookings.AsNoTracking()
+                .Where(b => b.Id == l.BookingId)
+                .Select(b => new { b.BranchId, Name = b.Branch != null ? b.Branch.Name : null })
+                .FirstOrDefaultAsync();
+            branchId = br?.BranchId;
+            branchName = br?.Name;
+        }
+        return Ok(EntityMappers.ToDto(l, branchId, branchName));
     }
 
     [HttpGet("prefill/{bookingId}")]

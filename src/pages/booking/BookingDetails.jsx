@@ -38,6 +38,7 @@ export default function BookingDetails() {
   const fields = [
     { label: 'Booking ID', value: booking.id },
     { label: 'Date', value: booking.date },
+    { label: 'Branch', value: booking.branchName || '—' },
     { label: 'Customer', value: booking.customer },
     { label: 'Consignor', value: booking.consignor },
     { label: 'Consignee', value: booking.consignee },

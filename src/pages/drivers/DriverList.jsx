@@ -18,6 +18,7 @@ export default function DriverList() {
 
   const columns = [
     { key: 'name', label: 'Name' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'license', label: 'License No.' },
     { key: 'phone', label: 'Contact' },
     { key: 'salary', label: 'Salary', render: (r) => formatCurrency(r.salary) },

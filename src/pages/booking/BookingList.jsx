@@ -20,6 +20,7 @@ export default function BookingList() {
   const columns = [
     { key: 'id', label: 'Booking ID' },
     { key: 'date', label: 'Date' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'customer', label: 'Customer' },
     { key: 'from', label: 'From' },
     { key: 'to', label: 'To' },

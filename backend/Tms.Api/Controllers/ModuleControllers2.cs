@@ -132,7 +132,7 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
     {
         var q = TenantScope.Trips(db, tenants, branches).AsNoTracking().AsQueryable();
         var trips = await q
-            .Include(t => t.Vehicle).Include(t => t.Driver).Include(t => t.Stops)
+            .Include(t => t.Vehicle).Include(t => t.Driver).Include(t => t.Stops).Include(t => t.Branch)
             .Where(t => status == null || t.Status == status)
             .OrderByDescending(t => t.CreatedAt).Take(100)
             .ToListAsync();
@@ -141,6 +141,8 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
         {
             t.Id, t.TripCode, t.Status, t.Origin, t.Destination,
             t.PlannedStart, t.PlannedEnd, t.ActualStart, t.ActualEnd,
+            branchId = t.BranchId,
+            branchName = t.Branch?.Name,
             vehicle = t.Vehicle == null ? null : new { registrationNo = t.Vehicle.Number },
             driver = t.Driver == null ? null : new { name = t.Driver.Name },
             stops = t.Stops.OrderBy(s => s.SequenceNo).Select(s => new

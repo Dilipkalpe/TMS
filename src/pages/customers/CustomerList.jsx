@@ -17,6 +17,7 @@ export default function CustomerList() {
 
   const columns = [
     { key: 'name', label: 'Customer' },
+    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'contact', label: 'Contact' },
     { key: 'phone', label: 'Phone' },
     { key: 'gst', label: 'GST No.' },
