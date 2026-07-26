@@ -75,6 +75,7 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var claims = new List<Claim>
         {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Role, user.Role),
             new("name", user.FullName),

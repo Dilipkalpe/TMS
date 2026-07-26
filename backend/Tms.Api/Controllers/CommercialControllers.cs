@@ -31,6 +31,8 @@ public class FreightRatesController(TmsDbContext db, ITenantContext tenants, IBr
         notes = r.Notes,
         createdAt = r.CreatedAt,
         updatedAt = r.UpdatedAt,
+        createdBy = r.CreatedBy,
+        updatedBy = r.UpdatedBy,
     };
 
     [HttpGet]
@@ -203,6 +205,8 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         freightRateId = q.FreightRateId,
         createdAt = q.CreatedAt,
         updatedAt = q.UpdatedAt,
+        createdBy = q.CreatedBy,
+        updatedBy = q.UpdatedBy,
     };
 
     [HttpGet]
@@ -467,6 +471,8 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
         invoiceData = inv.InvoiceDataJson,
         createdAt = inv.CreatedAt,
         updatedAt = inv.UpdatedAt,
+        createdBy = inv.CreatedBy,
+        updatedBy = inv.UpdatedBy,
     };
 
     [HttpGet]

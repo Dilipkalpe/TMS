@@ -35,7 +35,7 @@ public class GpsTrack
     public DateTime CreatedAt { get; set; }
 }
 
-public class Trip : IBranchScoped
+public class Trip : IBranchScoped, IAuditable
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
@@ -64,6 +64,8 @@ public class Trip : IBranchScoped
     public decimal? OptimizationSavingsPct { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
     public ICollection<TripStop> Stops { get; set; } = [];
     public ICollection<TripStatusHistory> StatusHistory { get; set; } = [];
 }

@@ -1,6 +1,6 @@
 namespace Tms.Api.Models;
 
-public class FreightRate : IBranchScoped
+public class FreightRate : IBranchScoped, IAuditable
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
@@ -18,9 +18,11 @@ public class FreightRate : IBranchScoped
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
-public class Quotation : IBranchScoped
+public class Quotation : IBranchScoped, IAuditable
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
@@ -40,6 +42,8 @@ public class Quotation : IBranchScoped
     public Guid? FreightRateId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
 public class QuotationLine : ITenantScoped
@@ -54,7 +58,7 @@ public class QuotationLine : ITenantScoped
     public int SortOrder { get; set; }
 }
 
-public class FreightInvoice : IBranchScoped
+public class FreightInvoice : IBranchScoped, IAuditable
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
@@ -80,6 +84,8 @@ public class FreightInvoice : IBranchScoped
     public string? InvoiceDataJson { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
 public class FreightInvoiceLine : ITenantScoped

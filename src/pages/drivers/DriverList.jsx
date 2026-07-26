@@ -6,6 +6,7 @@ import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { driversApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function DriverList() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export default function DriverList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'name', label: 'Name' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'license', label: 'License No.' },
@@ -26,7 +27,7 @@ export default function DriverList() {
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
     { key: 'trips', label: 'Trips' },
     { key: 'rating', label: 'Rating', render: (r) => `⭐ ${r.rating}` },
-  ]
+  ])
 
   return (
     <ERPListPage

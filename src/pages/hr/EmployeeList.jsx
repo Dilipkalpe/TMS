@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext'
 import { importTemplates } from '../../config/importTemplates'
 
 import { employeeTotalPay } from '../../config/employmentNorms'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function EmployeeList() {
   const navigate = useNavigate()
@@ -18,7 +19,7 @@ export default function EmployeeList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'employeeCode', label: 'Code' },
     { key: 'name', label: 'Name' },
     { key: 'employeeType', label: 'Role' },
@@ -31,7 +32,7 @@ export default function EmployeeList() {
       render: (r) => formatCurrency(employeeTotalPay(r)),
     },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ]
+  ])
 
   return (
     <ERPListPage

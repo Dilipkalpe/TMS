@@ -15,7 +15,7 @@ public class User
     public DateTime CreatedAt { get; set; }
 }
 
-public class Customer : IBranchScoped
+public class Customer : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
     public Guid CompanyId { get; set; }
@@ -36,9 +36,11 @@ public class Customer : IBranchScoped
     public string? PortalPhone { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
-public class Vendor : IBranchScoped
+public class Vendor : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
     public Guid CompanyId { get; set; }
@@ -55,9 +57,11 @@ public class Vendor : IBranchScoped
     public int TotalBills { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
-public class Driver : IBranchScoped
+public class Driver : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
     public Guid CompanyId { get; set; }
@@ -76,9 +80,11 @@ public class Driver : IBranchScoped
     public decimal Rating { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
-public class Vehicle : IBranchScoped
+public class Vehicle : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
     public Guid CompanyId { get; set; }
@@ -100,6 +106,8 @@ public class Vehicle : IBranchScoped
     public decimal Revenue { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
     public ICollection<MaintenanceRecord> MaintenanceRecords { get; set; } = [];
     public ICollection<MaintenanceSchedule> MaintenanceSchedules { get; set; } = [];
 }
@@ -150,7 +158,7 @@ public class SparePart : ITenantScoped
     public DateTime UpdatedAt { get; set; }
 }
 
-public class Booking : IBranchScoped
+public class Booking : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
     public Guid CompanyId { get; set; }
@@ -177,9 +185,11 @@ public class Booking : IBranchScoped
     public string? Remarks { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
-public class LorryReceipt : IBranchScoped
+public class LorryReceipt : IBranchScoped, IAuditable
 {
     public string LrNumber { get; set; } = "";
     public Guid CompanyId { get; set; }
@@ -209,9 +219,11 @@ public class LorryReceipt : IBranchScoped
     public string? Remarks { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
-public class Expense : IBranchScoped
+public class Expense : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
     public Guid CompanyId { get; set; }
@@ -229,6 +241,8 @@ public class Expense : IBranchScoped
     public string Status { get; set; } = "Approved";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
 public class LedgerAccount : ITenantScoped

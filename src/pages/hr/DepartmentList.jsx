@@ -9,6 +9,7 @@ import { useApiResource } from '../../hooks/useApiResource'
 import { hrApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { Building2, Loader2, Save } from 'lucide-react'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function DepartmentList() {
   const { toast } = useToast()
@@ -16,13 +17,13 @@ export default function DepartmentList() {
   const [saving, setSaving] = useState(false)
   const { data: departments, loading, error, refresh } = useApiResource(() => hrApi.departments(), [])
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'code', label: 'Code' },
     { key: 'name', label: 'Department' },
     { key: 'description', label: 'Description' },
     { key: 'employeeCount', label: 'Employees' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ]
+  ])
 
   const handleSave = async () => {
     setSaving(true)

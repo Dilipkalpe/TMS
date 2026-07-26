@@ -5,6 +5,7 @@ import { formatCurrency } from '../../components/ui/ReportFilters'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { useApiObject } from '../../hooks/useApiResource'
 import { payrollApi } from '../../services/api'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 const statusCards = (summary) => {
   if (!summary) return []
@@ -25,7 +26,7 @@ export default function PayrollList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'runCode', label: 'Run Code' },
     { key: 'periodLabel', label: 'Period' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge>, printValue: (r) => r.status },
@@ -35,7 +36,7 @@ export default function PayrollList() {
     { key: 'totalNet', label: 'Net Pay', render: (r) => formatCurrency(r.totalNet) },
     { key: 'voucherNo', label: 'Voucher' },
     { key: 'paymentMode', label: 'Payment Mode' },
-  ]
+  ])
 
   return (
     <ERPListPage

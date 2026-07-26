@@ -59,7 +59,12 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 var connectionString = AppConfiguration.ResolveConnectionString(builder.Configuration);
 var readOnlyConnectionString = AppConfiguration.ResolveReadOnlyConnectionString(builder.Configuration);
 
-builder.Services.AddDbContextPool<TmsDbContext>(opt => opt.UseNpgsql(connectionString));
+builder.Services.AddSingleton<AuditSaveChangesInterceptor>();
+builder.Services.AddDbContextPool<TmsDbContext>((sp, opt) =>
+{
+    opt.UseNpgsql(connectionString);
+    opt.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
+});
 builder.Services.AddDbContextPool<ReadOnlyTmsDbContext>(opt =>
     opt.UseNpgsql(readOnlyConnectionString).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
 

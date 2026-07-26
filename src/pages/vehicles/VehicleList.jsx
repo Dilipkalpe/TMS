@@ -7,6 +7,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { vehiclesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { importTemplates } from '../../config/importTemplates'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function VehicleList() {
   const navigate = useNavigate()
@@ -17,7 +18,7 @@ export default function VehicleList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'number', label: 'Vehicle No.' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'type', label: 'Type' },
@@ -26,7 +27,7 @@ export default function VehicleList() {
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
     { key: 'trips', label: 'Trips' },
     { key: 'revenue', label: 'Revenue', render: (r) => formatCurrency(r.revenue) },
-  ]
+  ])
 
   return (
     <ERPListPage

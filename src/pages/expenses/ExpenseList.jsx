@@ -6,6 +6,7 @@ import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { expensesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 const expenseCategories = ['Fuel', 'Toll', 'Maintenance', 'Salary', 'Office Expense', 'Miscellaneous']
 
@@ -18,7 +19,7 @@ export default function ExpenseList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'id', label: 'ID' },
     { key: 'date', label: 'Date' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
@@ -29,7 +30,7 @@ export default function ExpenseList() {
     { key: 'amount', label: 'Amount', render: (r) => formatCurrency(r.amount) },
     { key: 'paymentMode', label: 'Mode' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ]
+  ])
 
   return (
     <ERPListPage

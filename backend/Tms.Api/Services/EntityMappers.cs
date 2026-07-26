@@ -16,7 +16,8 @@ public static class EntityMappers
         b.VehicleNumber, b.DriverName,
         b.Freight, b.Status, b.Payment,
         b.Advance, b.Balance, b.Remarks, lrNumber,
-        b.BranchId, b.Branch?.Name);
+        b.BranchId, b.Branch?.Name,
+        b.CreatedBy, b.CreatedAt, b.UpdatedBy, b.UpdatedAt);
 
     public static VehicleDto ToDto(Vehicle v) => new(
         v.Id, v.Number, v.Type, v.Model, v.Capacity, v.Owner, v.Status,
@@ -26,25 +27,29 @@ public static class EntityMappers
         v.Puc?.ToString("yyyy-MM-dd"),
         v.LastMaintenance?.ToString("yyyy-MM-dd"),
         v.Trips, v.Revenue,
-        v.BranchId, v.Branch?.Name);
+        v.BranchId, v.Branch?.Name,
+        v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt);
 
     public static DriverDto ToDto(Driver d) => new(
         d.Id, d.Name, d.License,
         d.LicenseExpiry?.ToString("yyyy-MM-dd"),
         d.Phone, d.Email, d.Address,
         d.Salary, d.Advance, d.Status, d.Trips, d.Rating,
-        d.BranchId, d.Branch?.Name);
+        d.BranchId, d.Branch?.Name,
+        d.CreatedBy, d.CreatedAt, d.UpdatedBy, d.UpdatedAt);
 
     public static CustomerDto ToDto(Customer c) => new(
         c.Id, c.Name, c.Contact, c.Phone, c.Email, c.Gst, c.Address,
         c.Outstanding, c.CreditLimit, c.TotalTrips, c.LedgerBalance,
         c.PortalEnabled, c.PortalPhone ?? c.Phone, c.PortalPinHash != null,
-        c.BranchId, c.Branch?.Name, c.Branch?.Code);
+        c.BranchId, c.Branch?.Name, c.Branch?.Code,
+        c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt);
 
     public static VendorDto ToDto(Vendor v) => new(
         v.Id, v.Name, v.Contact, v.Phone, v.Email, v.Gst, v.Address,
         v.Outstanding, v.Category, v.TotalBills,
-        v.BranchId, v.Branch?.Name);
+        v.BranchId, v.Branch?.Name,
+        v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt);
 
     public static ExpenseDto ToDto(Expense e) => new(
         e.Id,
@@ -52,7 +57,8 @@ public static class EntityMappers
         e.Category, e.Description,
         e.VehicleNumber, e.VendorName,
         e.Amount, e.PaymentMode, e.Status,
-        e.BranchId, e.Branch?.Name);
+        e.BranchId, e.Branch?.Name,
+        e.CreatedBy, e.CreatedAt, e.UpdatedBy, e.UpdatedAt);
 
     public static LrDto ToDto(LorryReceipt l, Guid? branchId = null, string? branchName = null) => new(
         l.LrNumber,
@@ -64,7 +70,8 @@ public static class EntityMappers
         l.Freight, l.Gst, l.Balance, l.PaymentType,
         l.BookingId, l.Hamali, l.LoadingCharges, l.UnloadingCharges,
         l.Insurance, l.Advance, l.Remarks,
-        branchId ?? l.BranchId, branchName ?? l.Branch?.Name);
+        branchId ?? l.BranchId, branchName ?? l.Branch?.Name,
+        l.CreatedBy, l.CreatedAt, l.UpdatedBy, l.UpdatedAt);
 }
 
 public static class IdGenerator

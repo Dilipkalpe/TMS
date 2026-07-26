@@ -6,6 +6,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { customersApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { importTemplates } from '../../config/importTemplates'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function CustomerList() {
   const navigate = useNavigate()
@@ -15,7 +16,7 @@ export default function CustomerList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'name', label: 'Customer' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'contact', label: 'Contact' },
@@ -23,7 +24,7 @@ export default function CustomerList() {
     { key: 'gst', label: 'GST No.' },
     { key: 'totalTrips', label: 'Trips' },
     { key: 'outstanding', label: 'Outstanding', render: (r) => formatCurrency(r.outstanding) },
-  ]
+  ])
 
   return (
     <ERPListPage

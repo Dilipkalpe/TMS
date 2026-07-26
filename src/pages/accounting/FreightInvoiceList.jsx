@@ -4,6 +4,7 @@ import Badge from '../../components/ui/Badge'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { freightInvoicesApi } from '../../services/api'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 function statusVariant(status) {
   if (status === 'Paid') return 'success'
@@ -19,7 +20,7 @@ export default function FreightInvoiceList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'invoiceNo', label: 'Invoice No' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'bookingId', label: 'Booking' },
@@ -29,7 +30,7 @@ export default function FreightInvoiceList() {
     { key: 'totalAmount', label: 'Total', render: (r) => formatCurrency(r.totalAmount) },
     { key: 'balance', label: 'Balance', render: (r) => formatCurrency(r.balance) },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ]
+  ])
 
   return (
     <ERPListPage

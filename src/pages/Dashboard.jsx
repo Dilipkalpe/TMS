@@ -104,10 +104,31 @@ export default function Dashboard() {
     { key: 'branchName', label: 'Branch', render: (r) => `${r.branchCode} — ${r.branchName}` },
     { key: 'bookings', label: 'Bookings' },
     { key: 'revenue', label: 'Revenue', render: (r) => formatCurrency(r.revenue) },
+    { key: 'collection', label: 'Collection', render: (r) => formatCurrency(r.collection) },
+    { key: 'outstanding', label: 'Outstanding', render: (r) => formatCurrency(r.outstanding) },
+    { key: 'expenses', label: 'Expenses', render: (r) => formatCurrency(r.expenses) },
     { key: 'delivered', label: 'Delivered' },
     { key: 'pendingDelivery', label: 'Pending' },
     { key: 'deliveryPerformancePct', label: 'Delivery %', render: (r) => `${r.deliveryPerformancePct}%` },
+    { key: 'lrCount', label: 'LRs' },
+    { key: 'vehicles', label: 'Vehicles' },
+    { key: 'drivers', label: 'Drivers' },
+    { key: 'pendingInvoices', label: 'Open Inv.' },
+    { key: 'invoiceOutstanding', label: 'Inv. Due', render: (r) => formatCurrency(r.invoiceOutstanding) },
   ]
+
+  const branchOverviewCards = useMemo(() => {
+    const rows = overview.branchSummary || []
+    const sum = (key) => rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
+    return [
+      { label: 'Branches', count: String(rows.length), color: 'blue', icon: 'Building2' },
+      { label: 'Bookings', count: String(sum('bookings')), color: 'indigo', icon: 'CalendarPlus' },
+      { label: 'Revenue', count: formatCurrency(sum('revenue')), color: 'emerald', icon: 'TrendingUp' },
+      { label: 'Outstanding', count: formatCurrency(sum('outstanding')), color: 'red', icon: 'AlertCircle' },
+      { label: 'Expenses', count: formatCurrency(sum('expenses')), color: 'orange', icon: 'Receipt' },
+      { label: 'Pending Deliveries', count: String(sum('pendingDelivery')), color: 'amber', icon: 'Package' },
+    ]
+  }, [overview.branchSummary])
 
   const chartConfigs = useMemo(() => {
     const compareSuffix = compare ? ' · vs prev period' : ''
@@ -217,13 +238,6 @@ export default function Dashboard() {
           )}
           <StatusSummaryCards cards={overviewCards} />
 
-          <Card padding={false}>
-            <div className="p-4">
-              <CardHeader title="Branch Summary" subtitle="Compare bookings, revenue and delivery performance by branch" />
-            </div>
-            <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} />
-          </Card>
-
           <div className="grid gap-4 lg:grid-cols-2">
             <Card padding={false}>
               <div className="p-4"><CardHeader title="Top Customers" subtitle="By freight revenue" /></div>
@@ -265,6 +279,27 @@ export default function Dashboard() {
           <Card padding={false}>
             <div className="p-4"><CardHeader title="Pending Invoices" subtitle="Open balances" /></div>
             <ERPDataTable columns={invoiceColumns} data={overview.pendingInvoices} showActions={false} />
+          </Card>
+        </div>
+      ),
+    },
+    {
+      id: 'branch-wise',
+      label: 'Overview - Branch Wise',
+      content: (
+        <div className="space-y-4 p-2 sm:p-3">
+          {overview.error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{overview.error}</p>
+          )}
+          <StatusSummaryCards cards={branchOverviewCards} />
+          <Card padding={false}>
+            <div className="p-4">
+              <CardHeader
+                title="Branch-wise Operations & Finance"
+                subtitle="Consolidated bookings, revenue, collections, expenses, fleet and invoice dues by branch"
+              />
+            </div>
+            <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} />
           </Card>
         </div>
       ),

@@ -5,6 +5,7 @@ import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { freightRatesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function FreightRateList() {
   const navigate = useNavigate()
@@ -14,7 +15,7 @@ export default function FreightRateList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'fromCity', label: 'From' },
     { key: 'toCity', label: 'To' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
@@ -23,7 +24,7 @@ export default function FreightRateList() {
     { key: 'rateAmount', label: 'Rate', render: (r) => formatCurrency(r.rateAmount) },
     { key: 'rateUnit', label: 'Unit' },
     { key: 'isActive', label: 'Active', render: (r) => (r.isActive ? 'Yes' : 'No') },
-  ]
+  ])
 
   return (
     <ERPListPage

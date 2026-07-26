@@ -6,6 +6,7 @@ import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { quotationsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 function statusVariant(status) {
   if (status === 'Accepted') return 'success'
@@ -22,7 +23,7 @@ export default function QuotationList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'quoteNo', label: 'Quote No' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'customerName', label: 'Customer' },
@@ -31,7 +32,7 @@ export default function QuotationList() {
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
     { key: 'bookingId', label: 'Booking' },
-  ]
+  ])
 
   return (
     <ERPListPage

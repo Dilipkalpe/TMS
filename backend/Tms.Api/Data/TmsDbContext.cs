@@ -113,6 +113,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.PortalPhone).HasColumnName("portal_phone");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<Vendor>(e =>
@@ -132,6 +134,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.TotalBills).HasColumnName("total_bills");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<Driver>(e =>
@@ -153,6 +157,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Rating).HasColumnName("rating");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<Vehicle>(e =>
@@ -177,6 +183,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Revenue).HasColumnName("revenue");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<MaintenanceRecord>(e =>
@@ -263,6 +271,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Remarks).HasColumnName("remarks");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<LorryReceipt>(e =>
@@ -296,6 +306,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Remarks).HasColumnName("remarks");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<Expense>(e =>
@@ -316,6 +328,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Status).HasColumnName("status");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<LedgerAccount>(e =>
@@ -457,6 +471,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.OptimizationSavingsPct).HasColumnName("optimization_savings_pct");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<TripStop>(e =>
@@ -931,6 +947,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.IsActive).HasColumnName("is_active");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
     }
 
@@ -1113,6 +1131,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Notes).HasColumnName("notes");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<Quotation>(e =>
@@ -1135,6 +1155,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.FreightRateId).HasColumnName("freight_rate_id");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<QuotationLine>(e =>
@@ -1177,6 +1199,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.InvoiceDataJson).HasColumnName("invoice_data").HasColumnType("jsonb");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<FreightInvoiceLine>(e =>

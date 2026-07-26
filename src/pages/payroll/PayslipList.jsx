@@ -7,6 +7,7 @@ import { usePrint } from '../../context/PrintContext'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { payrollApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function PayslipList() {
   const navigate = useNavigate()
@@ -27,14 +28,14 @@ export default function PayslipList() {
     }
   }
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'periodLabel', label: 'Period' },
     { key: 'employeeName', label: 'Employee' },
     { key: 'employeeType', label: 'Type' },
     { key: 'grossPay', label: 'Gross', render: (r) => formatCurrency(r.grossPay) },
     { key: 'netPay', label: 'Net Pay', render: (r) => formatCurrency(r.netPay) },
     { key: 'paymentStatus', label: 'Status', render: (r) => <Badge variant={statusVariant(r.paymentStatus)}>{r.paymentStatus}</Badge> },
-  ]
+  ])
 
   return (
     <ERPListPage

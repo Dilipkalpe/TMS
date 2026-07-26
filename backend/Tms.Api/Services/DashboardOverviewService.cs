@@ -37,7 +37,15 @@ public record BranchSummaryRowDto(
     decimal Revenue,
     int Delivered,
     int PendingDelivery,
-    decimal DeliveryPerformancePct);
+    decimal DeliveryPerformancePct,
+    decimal Outstanding = 0,
+    decimal Collection = 0,
+    decimal Expenses = 0,
+    int LrCount = 0,
+    int Vehicles = 0,
+    int Drivers = 0,
+    int PendingInvoices = 0,
+    decimal InvoiceOutstanding = 0);
 
 public record NamedCountDto(string Name, int Count, decimal Amount = 0);
 public record RecentDeliveryDto(string Id, string Customer, string Route, string Date, string Status);
@@ -163,10 +171,23 @@ public class DashboardOverviewService(TmsDbContext db, ITenantContext tenants, I
         if (branchList.Count == 0) return [];
 
         var companyBookings = tenants.Filter(db.Bookings.AsNoTracking());
+        var companyExpenses = tenants.Filter(db.Expenses.AsNoTracking());
+        var companyLrs = tenants.Filter(db.LorryReceipts.AsNoTracking());
+        var companyVehicles = tenants.Filter(db.Vehicles.AsNoTracking());
+        var companyDrivers = tenants.Filter(db.Drivers.AsNoTracking());
+        var companyInvoices = tenants.Filter(db.FreightInvoices.AsNoTracking());
         if (branches.EffectiveBranchId != null)
-            companyBookings = companyBookings.Where(b => b.BranchId == branches.EffectiveBranchId);
+        {
+            var bid = branches.EffectiveBranchId;
+            companyBookings = companyBookings.Where(b => b.BranchId == bid);
+            companyExpenses = companyExpenses.Where(e => e.BranchId == bid);
+            companyLrs = companyLrs.Where(l => l.BranchId == bid);
+            companyVehicles = companyVehicles.Where(v => v.BranchId == bid);
+            companyDrivers = companyDrivers.Where(d => d.BranchId == bid);
+            companyInvoices = companyInvoices.Where(i => i.BranchId == bid);
+        }
 
-        var aggregates = await companyBookings
+        var bookingAggs = await companyBookings
             .Where(b => b.BranchId != null)
             .GroupBy(b => b.BranchId!.Value)
             .Select(g => new
@@ -176,13 +197,56 @@ public class DashboardOverviewService(TmsDbContext db, ITenantContext tenants, I
                 Revenue = g.Sum(x => x.Freight),
                 Delivered = g.Count(x => x.Status == "Delivered"),
                 PendingDelivery = g.Count(x => x.Status != "Delivered" && x.Status != "Cancelled"),
+                Outstanding = g.Where(x => x.Balance > 0 && x.Status != "Cancelled").Sum(x => x.Balance),
+                Collection = g.Where(x => x.Status != "Cancelled").Sum(x => x.Advance),
             })
             .ToListAsync(ct);
 
-        var byId = aggregates.ToDictionary(a => a.BranchId);
+        var expenseAggs = await companyExpenses
+            .Where(e => e.BranchId != null)
+            .GroupBy(e => e.BranchId!.Value)
+            .Select(g => new { BranchId = g.Key, Amount = g.Sum(x => x.Amount) })
+            .ToListAsync(ct);
+
+        var lrAggs = await companyLrs
+            .Where(l => l.BranchId != null)
+            .GroupBy(l => l.BranchId!.Value)
+            .Select(g => new { BranchId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var vehicleAggs = await companyVehicles
+            .Where(v => v.BranchId != null)
+            .GroupBy(v => v.BranchId!.Value)
+            .Select(g => new { BranchId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var driverAggs = await companyDrivers
+            .Where(d => d.BranchId != null)
+            .GroupBy(d => d.BranchId!.Value)
+            .Select(g => new { BranchId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var invoiceAggs = await companyInvoices
+            .Where(i => i.BranchId != null && i.Balance > 0 && i.Status != "Cancelled" && i.Status != "Paid")
+            .GroupBy(i => i.BranchId!.Value)
+            .Select(g => new { BranchId = g.Key, Count = g.Count(), Outstanding = g.Sum(x => x.Balance) })
+            .ToListAsync(ct);
+
+        var byBooking = bookingAggs.ToDictionary(a => a.BranchId);
+        var byExpense = expenseAggs.ToDictionary(a => a.BranchId);
+        var byLr = lrAggs.ToDictionary(a => a.BranchId);
+        var byVehicle = vehicleAggs.ToDictionary(a => a.BranchId);
+        var byDriver = driverAggs.ToDictionary(a => a.BranchId);
+        var byInvoice = invoiceAggs.ToDictionary(a => a.BranchId);
+
         return branchList.Select(b =>
         {
-            byId.TryGetValue(b.Id, out var a);
+            byBooking.TryGetValue(b.Id, out var a);
+            byExpense.TryGetValue(b.Id, out var exp);
+            byLr.TryGetValue(b.Id, out var lr);
+            byVehicle.TryGetValue(b.Id, out var veh);
+            byDriver.TryGetValue(b.Id, out var drv);
+            byInvoice.TryGetValue(b.Id, out var inv);
             var delivered = a?.Delivered ?? 0;
             var pending = a?.PendingDelivery ?? 0;
             var denom = delivered + pending;
@@ -193,7 +257,15 @@ public class DashboardOverviewService(TmsDbContext db, ITenantContext tenants, I
                 a?.Revenue ?? 0,
                 delivered,
                 pending,
-                pct);
+                pct,
+                a?.Outstanding ?? 0,
+                a?.Collection ?? 0,
+                exp?.Amount ?? 0,
+                lr?.Count ?? 0,
+                veh?.Count ?? 0,
+                drv?.Count ?? 0,
+                inv?.Count ?? 0,
+                inv?.Outstanding ?? 0);
         }).ToList();
     }
 }

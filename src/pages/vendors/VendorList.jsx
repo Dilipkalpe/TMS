@@ -6,6 +6,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { vendorsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { importTemplates } from '../../config/importTemplates'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function VendorList() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export default function VendorList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'name', label: 'Vendor' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'contact', label: 'Contact' },
@@ -24,7 +25,7 @@ export default function VendorList() {
     { key: 'phone', label: 'Phone' },
     { key: 'totalBills', label: 'Bills' },
     { key: 'outstanding', label: 'Outstanding', render: (r) => formatCurrency(r.outstanding) },
-  ]
+  ])
 
   return (
     <ERPListPage

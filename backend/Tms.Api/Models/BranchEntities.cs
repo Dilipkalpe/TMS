@@ -5,7 +5,7 @@ public interface IBranchScoped : ITenantScoped
     Guid? BranchId { get; set; }
 }
 
-public class Branch : ITenantScoped
+public class Branch : ITenantScoped, IAuditable
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
@@ -19,4 +19,6 @@ public class Branch : ITenantScoped
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }

@@ -7,6 +7,7 @@ import { lrApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function LRList() {
   const navigate = useNavigate()
@@ -18,7 +19,7 @@ export default function LRList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'lrNumber', label: 'LR No.' },
     { key: 'lrDate', label: 'Date' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
@@ -29,7 +30,7 @@ export default function LRList() {
     { key: 'vehicle', label: 'Vehicle' },
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
     { key: 'paymentType', label: 'Payment', render: (r) => <Badge variant={statusVariant(r.paymentType === 'Paid' ? 'Paid' : 'Pending')}>{r.paymentType}</Badge> },
-  ]
+  ])
 
   const handleDelete = async (row) => {
     if (!row?.lrNumber) {

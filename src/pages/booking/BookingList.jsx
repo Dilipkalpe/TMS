@@ -7,6 +7,7 @@ import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { bookingsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
+import { withAuditColumns } from '../../utils/auditColumns'
 
 export default function BookingList() {
   const navigate = useNavigate()
@@ -17,7 +18,7 @@ export default function BookingList() {
     [],
   )
 
-  const columns = [
+  const columns = withAuditColumns([
     { key: 'id', label: 'Booking ID' },
     { key: 'date', label: 'Date' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
@@ -28,7 +29,7 @@ export default function BookingList() {
     { key: 'lrNumber', label: 'LR', render: (r) => r.lrNumber || '—' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
     { key: 'payment', label: 'Payment', render: (r) => <Badge variant={statusVariant(r.payment)}>{r.payment}</Badge> },
-  ]
+  ])
 
   const handleDelete = async (row) => {
     if (!window.confirm(`Delete booking ${row.id}?`)) return
