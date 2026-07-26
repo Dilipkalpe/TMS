@@ -276,6 +276,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
             UpdatedAt = DateTime.UtcNow,
         };
         db.Quotations.Add(q);
+        await db.SaveChangesAsync();
         db.QuotationLines.Add(new QuotationLine
         {
             Id = Guid.NewGuid(),
@@ -586,6 +587,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
             UpdatedAt = DateTime.UtcNow,
         };
         db.FreightInvoices.Add(inv);
+        await db.SaveChangesAsync();
 
         var sort = 0;
         foreach (var line in built.Lines)

@@ -1144,6 +1144,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Rate).HasColumnName("rate");
             e.Property(x => x.Amount).HasColumnName("amount");
             e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.HasOne<Quotation>().WithMany().HasForeignKey(x => x.QuotationId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<FreightInvoice>(e =>
@@ -1184,6 +1185,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Rate).HasColumnName("rate");
             e.Property(x => x.Amount).HasColumnName("amount");
             e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.HasOne<FreightInvoice>().WithMany().HasForeignKey(x => x.FreightInvoiceId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
