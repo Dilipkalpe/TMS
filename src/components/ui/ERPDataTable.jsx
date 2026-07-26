@@ -8,6 +8,13 @@ function actionColumnWidth(onPrint, onEdit, onDelete) {
   return 'w-0'
 }
 
+function cellTitle(col, row) {
+  if (col.render) return undefined
+  const v = row[col.key]
+  if (v == null || v === '') return undefined
+  return String(v)
+}
+
 export default function ERPDataTable({
   columns,
   data,
@@ -28,7 +35,7 @@ export default function ERPDataTable({
 }) {
   const start = (page - 1) * pageSize
   const rows = data.slice(start, start + pageSize)
-  const cellPad = 'px-1.5 py-1.5 sm:px-2.5 sm:py-2'
+  const cellPad = 'px-2 py-1.5 sm:px-2.5 sm:py-2'
   const hasActionColumn = showActions && (onPrint || onEdit || onDelete)
   const actionWidth = actionColumnWidth(onPrint, onEdit, onDelete)
 
@@ -45,15 +52,14 @@ export default function ERPDataTable({
           fill ? 'erp-list-table-scroll min-h-0 flex-1 report-table-scroll' : 'report-table-scroll'
         }`}
       >
-        <table className="w-full table-auto border-collapse text-left text-xs sm:text-sm lg:table-fixed">
+        {/* table-auto + min-w-max: content-sized columns; scroll instead of crushing/overlapping */}
+        <table className="w-max min-w-full border-collapse text-left text-xs sm:text-sm">
           <thead className={sticky ? 'sticky top-0 z-10' : ''}>
             <tr className="border border-primary/30 bg-primary text-white">
               {allColumns.map((col) => (
                 <th
                   key={col.key}
-                  className={`border border-primary/20 ${cellPad} text-xs font-semibold ${col.width ?? ''} ${
-                    col.nowrap === false ? 'whitespace-normal' : 'whitespace-nowrap'
-                  }`}
+                  className={`border border-primary/20 ${cellPad} whitespace-nowrap text-xs font-semibold ${col.width ?? ''}`}
                 >
                   {col.label}
                   {sortKey === col.key && (
@@ -128,15 +134,20 @@ export default function ERPDataTable({
                         </td>
                       )
                     }
-                    const wrap = col.nowrap === true ? 'whitespace-nowrap' : 'break-words'
-                    const truncate = col.truncate ? 'max-w-[12rem] truncate' : ''
+
+                    // Default: nowrap + ellipsis so columns never overlap. Opt into wrap with nowrap:false.
+                    const allowWrap = col.nowrap === false
+                    const useEllipsis = !allowWrap && col.truncate !== false
+                    const maxW = col.maxWidth ?? (useEllipsis ? 'max-w-[10rem]' : '')
                     return (
                       <td
                         key={col.key}
-                        className={`border border-primary/10 ${cellPad} text-slate-700 dark:text-slate-300 ${wrap} ${truncate} ${
+                        className={`border border-primary/10 ${cellPad} text-slate-700 dark:text-slate-300 ${
+                          allowWrap ? 'whitespace-normal break-words' : 'whitespace-nowrap'
+                        } ${useEllipsis ? `${maxW} overflow-hidden text-ellipsis` : ''} ${
                           col.align === 'right' ? 'text-right' : ''
                         } ${col.width ?? ''}`}
-                        title={col.truncate && !col.render ? String(row[col.key] ?? '') : undefined}
+                        title={cellTitle(col, row)}
                       >
                         {col.render ? col.render(row) : row[col.key]}
                       </td>

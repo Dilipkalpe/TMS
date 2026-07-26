@@ -10,7 +10,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/payroll")]
-public class PayrollController(PayrollService payroll) : ControllerBase
+public class PayrollController(PayrollService payroll, ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet("summary")]
     public async Task<ActionResult<PayrollSummaryDto>> Summary(CancellationToken ct)
@@ -83,7 +83,7 @@ public class PayrollController(PayrollService payroll) : ControllerBase
     {
         try
         {
-            var user = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "system";
+            var user = currentUser.DisplayName;
             var id = await payroll.GenerateAsync(body.Month, body.Year, user, ct);
             var run = await payroll.GetRunAsync(id, ct);
             return Ok(new { id, run });

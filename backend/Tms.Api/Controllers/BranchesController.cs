@@ -22,7 +22,7 @@ namespace Tms.Api.Controllers;
 
 [Route("api/branches")]
 
-public class BranchesController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class BranchesController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 
 {
 
@@ -41,6 +41,17 @@ public class BranchesController(TmsDbContext db, ITenantContext tenants) : Contr
         var q = tenants.Filter(db.Branches.AsNoTracking().AsQueryable());
 
         if (activeOnly) q = q.Where(b => b.IsActive);
+
+        // Non-admin users only see assigned branches.
+        if (!branches.CanAccessAllBranches && branches.AllowedBranchIds.Count > 0)
+        {
+            var ids = branches.AllowedBranchIds.ToList();
+            q = q.Where(b => ids.Contains(b.Id));
+        }
+        else if (!branches.CanAccessAllBranches)
+        {
+            q = q.Where(_ => false);
+        }
 
         var rows = await q.OrderBy(b => b.IsHeadOffice ? 0 : 1).ThenBy(b => b.Name).ToListAsync();
 

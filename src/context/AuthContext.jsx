@@ -21,6 +21,7 @@ function mapProfile(res) {
     isPlatformAdmin: res.isPlatformAdmin,
     planCode: res.planCode,
     features: res.features ?? [],
+    allowedBranchIds: (res.allowedBranchIds || []).map(String),
   }
 }
 
@@ -103,6 +104,8 @@ export function AuthProvider({ children }) {
       }
       if (!res.canAccessAllBranches && res.branchId) {
         localStorage.setItem(BRANCH_KEY, res.branchId)
+      } else if (!res.canAccessAllBranches && res.allowedBranchIds?.length === 1) {
+        localStorage.setItem(BRANCH_KEY, res.allowedBranchIds[0])
       }
       return { ok: true }
     } catch (err) {

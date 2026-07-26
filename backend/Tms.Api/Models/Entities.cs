@@ -8,11 +8,24 @@ public class User
     public string Username { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public string FullName { get; set; } = "";
+    public string? Email { get; set; }
+    public string? Mobile { get; set; }
     public string Role { get; set; } = "Operator";
     public Guid? BranchId { get; set; }
     public Branch? Branch { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
+    public ICollection<UserBranch> UserBranches { get; set; } = [];
+}
+
+/// <summary>Many-to-many: staff user authorized branches within a company.</summary>
+public class UserBranch
+{
+    public Guid UserId { get; set; }
+    public User? User { get; set; }
+    public Guid BranchId { get; set; }
+    public Branch? Branch { get; set; }
+    public Guid CompanyId { get; set; }
 }
 
 public class Customer : IBranchScoped, IAuditable

@@ -11,7 +11,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/hr")]
-public class HrController(HrService hr, DriverSyncService driverSync) : ControllerBase
+public class HrController(HrService hr, DriverSyncService driverSync, ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet("summary")]
     public async Task<ActionResult<HrSummaryDto>> Summary(CancellationToken ct)
@@ -183,7 +183,7 @@ public class HrController(HrService hr, DriverSyncService driverSync) : Controll
     {
         try
         {
-            var user = User.FindFirstValue(ClaimTypes.Name) ?? "admin";
+            var user = currentUser.DisplayName;
             await hr.ApproveLeaveAsync(id, user, ct);
             return Ok(new { message = "Leave approved." });
         }
@@ -195,7 +195,7 @@ public class HrController(HrService hr, DriverSyncService driverSync) : Controll
     {
         try
         {
-            var user = User.FindFirstValue(ClaimTypes.Name) ?? "admin";
+            var user = currentUser.DisplayName;
             await hr.RejectLeaveAsync(id, user, ct);
             return Ok(new { message = "Leave rejected." });
         }

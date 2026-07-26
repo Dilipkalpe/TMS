@@ -8,6 +8,7 @@ namespace Tms.Api.Data;
 public class TmsDbContext(DbContextOptions options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserBranch> UserBranches => Set<UserBranch>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
@@ -83,6 +84,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Username).HasColumnName("username");
             e.Property(x => x.PasswordHash).HasColumnName("password_hash");
             e.Property(x => x.FullName).HasColumnName("full_name");
+            e.Property(x => x.Email).HasColumnName("email");
+            e.Property(x => x.Mobile).HasColumnName("mobile");
             e.Property(x => x.Role).HasColumnName("role");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.BranchId).HasColumnName("branch_id");
@@ -90,6 +93,17 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<UserBranch>(e =>
+        {
+            e.ToTable("user_branches");
+            e.HasKey(x => new { x.UserId, x.BranchId });
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.HasOne(x => x.User).WithMany(u => u.UserBranches).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Customer>(e =>

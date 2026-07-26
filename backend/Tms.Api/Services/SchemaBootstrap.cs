@@ -20,6 +20,7 @@ public static class SchemaBootstrap
             ("Branch", () => BranchSchemaMigrator.EnsureAsync(db, ct)),
             ("BranchIsolation", () => BranchIsolationMigrator.EnsureAsync(db, ct)),
             ("Audit", () => AuditSchemaMigrator.EnsureAsync(db, ct)),
+            ("Users", () => UserSchemaMigrator.EnsureAsync(db, ct)),
             ("Portal", () => PortalSchemaMigrator.EnsureSchemaAsync(db, ct)),
             ("Routing", () => RouteSchemaMigrator.EnsureAsync(db, ct)),
             ("BookingFinance", () => BookingFinanceSchemaMigrator.EnsureAsync(db, ct)),

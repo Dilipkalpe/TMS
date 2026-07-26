@@ -9,6 +9,7 @@ public sealed class AllBranchesContext : IBranchContext
     public Guid? EffectiveBranchId => null;
     public bool CanAccessAllBranches => true;
     public Guid? AssignBranchId => null;
+    public IReadOnlyList<Guid> AllowedBranchIds => [];
 
     public IQueryable<T> Filter<T>(IQueryable<T> query) where T : class, IBranchScoped => query;
 }

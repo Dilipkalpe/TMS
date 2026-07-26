@@ -150,6 +150,14 @@ export const branchesApi = {
   remove: (id) => apiRequest(`/branches/${id}`, { method: 'DELETE' }),
 }
 
+export const usersApi = {
+  list: (params = {}) => apiRequest(`/users?${queryString(params)}`),
+  get: (id) => apiRequest(`/users/${id}`),
+  create: (data) => apiRequest('/users', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/users/${id}`, { method: 'PUT', body: data }),
+  remove: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
+}
+
 export const bookingsApi = {
   list: (params = {}) => apiRequest(`/bookings?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/bookings/${id}`),

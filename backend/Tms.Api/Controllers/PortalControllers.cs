@@ -151,6 +151,7 @@ public class PortalAuthController(TmsDbContext db, IConfiguration config, IHostE
             new(ClaimTypes.Name, name),
             new(ClaimTypes.Role, role),
             new("portal_scope", scope),
+            new("full_name", name),
             new("name", name),
             new("company_id", companyId.ToString()),
         };

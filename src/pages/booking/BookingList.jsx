@@ -27,8 +27,8 @@ export default function BookingList() {
     { key: 'to', label: 'To' },
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
     { key: 'lrNumber', label: 'LR', render: (r) => r.lrNumber || '—' },
-    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-    { key: 'payment', label: 'Payment', render: (r) => <Badge variant={statusVariant(r.payment)}>{r.payment}</Badge> },
+    { key: 'status', label: 'Status', width: 'w-28', nowrap: true, render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
+    { key: 'payment', label: 'Payment', width: 'w-28', nowrap: true, render: (r) => <Badge variant={statusVariant(r.payment)}>{r.payment}</Badge> },
   ])
 
   const handleDelete = async (row) => {

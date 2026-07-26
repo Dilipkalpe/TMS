@@ -17,7 +17,8 @@ public record LoginResponse(
     bool CanAccessAllBranches,
     bool IsPlatformAdmin,
     string? PlanCode,
-    IReadOnlyList<string>? Features);
+    IReadOnlyList<string>? Features,
+    IReadOnlyList<Guid>? AllowedBranchIds = null);
 public record ApiError(string Message);
 
 public record BookingDto(

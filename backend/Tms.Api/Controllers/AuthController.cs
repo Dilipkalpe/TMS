@@ -1,11 +1,11 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.RateLimiting;
 using Tms.Api.Data;
 using Tms.Api.DTOs;
 using Tms.Api.Services;
@@ -26,8 +26,9 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
         if (user == null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
             return Unauthorized(new ApiError("Invalid username or password."));
 
-        var token = GenerateToken(user);
-        return Ok(await ToResponseAsync(user, token));
+        var allowed = await LoadAllowedBranchIdsAsync(user);
+        var token = GenerateToken(user, allowed);
+        return Ok(await ToResponseAsync(user, token, allowed));
     }
 
     [HttpGet("me")]
@@ -39,10 +40,22 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
         var user = await db.Users.Include(u => u.Branch).Include(u => u.Company)
             .FirstOrDefaultAsync(u => u.Username == username);
         if (user == null) return Unauthorized();
-        return Ok(await ToResponseAsync(user, ""));
+        var allowed = await LoadAllowedBranchIdsAsync(user);
+        return Ok(await ToResponseAsync(user, "", allowed));
     }
 
-    async Task<LoginResponse> ToResponseAsync(Models.User user, string token)
+    async Task<List<Guid>> LoadAllowedBranchIdsAsync(Models.User user)
+    {
+        var ids = await db.UserBranches.AsNoTracking()
+            .Where(x => x.UserId == user.Id)
+            .Select(x => x.BranchId)
+            .ToListAsync();
+        if (ids.Count == 0 && user.BranchId.HasValue)
+            ids.Add(user.BranchId.Value);
+        return ids.Distinct().ToList();
+    }
+
+    async Task<LoginResponse> ToResponseAsync(Models.User user, string token, IReadOnlyList<Guid> allowed)
     {
         var isPlatform = TenantRoles.IsPlatformAdmin(user.Role);
         IReadOnlyList<string>? features = null;
@@ -66,10 +79,11 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
             TenantRoles.CanAccessAllBranches(user.Role),
             isPlatform,
             planCode,
-            features);
+            features,
+            allowed);
     }
 
-    string GenerateToken(Models.User user)
+    string GenerateToken(Models.User user, IReadOnlyList<Guid> allowedBranchIds)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(AppConfiguration.ResolveJwtKey(config)));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -77,13 +91,18 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
+            new("username", user.Username),
             new(ClaimTypes.Role, user.Role),
+            new(ClaimTypes.GivenName, user.FullName),
+            new("full_name", user.FullName),
             new("name", user.FullName),
         };
         if (user.CompanyId.HasValue)
             claims.Add(new Claim("company_id", user.CompanyId.Value.ToString()));
         if (user.BranchId.HasValue)
             claims.Add(new Claim("branch_id", user.BranchId.Value.ToString()));
+        if (allowedBranchIds.Count > 0)
+            claims.Add(new Claim("allowed_branch_ids", string.Join(",", allowedBranchIds)));
 
         var token = new JwtSecurityToken(
             issuer: config["Jwt:Issuer"],

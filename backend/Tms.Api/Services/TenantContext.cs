@@ -62,12 +62,22 @@ public static class TenantRoles
     public const string CompanyAdmin = "Admin";
     public const string Accountant = "Accountant";
     public const string Operator = "Operator";
+    public const string BranchManager = "Branch Manager";
 
     public static bool IsPlatformAdmin(string? role) =>
         role is PlatformSuperAdmin or SuperAdmin;
 
     public static bool CanAccessAllBranches(string? role) =>
         IsPlatformAdmin(role) || role is CompanyAdmin;
+
+    public static bool CanManageUsers(string? role) =>
+        IsPlatformAdmin(role) || role is CompanyAdmin;
+
+    public static readonly string[] AssignableRoles =
+    [
+        CompanyAdmin, BranchManager, Accountant, Operator
+    ];
+
 
     public static bool CanAccessAccounting(string? role) =>
         IsPlatformAdmin(role) || role is CompanyAdmin or Accountant;

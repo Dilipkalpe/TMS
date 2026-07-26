@@ -59,6 +59,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 var connectionString = AppConfiguration.ResolveConnectionString(builder.Configuration);
 var readOnlyConnectionString = AppConfiguration.ResolveReadOnlyConnectionString(builder.Configuration);
 
+builder.Services.AddSingleton<ICurrentUser, CurrentUserService>();
 builder.Services.AddSingleton<AuditSaveChangesInterceptor>();
 builder.Services.AddDbContextPool<TmsDbContext>((sp, opt) =>
 {

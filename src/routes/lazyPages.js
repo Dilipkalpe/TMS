@@ -30,6 +30,7 @@ export const NewExpense = lazy(() => import('../pages/expenses/NewExpense'))
 export const Settings = lazy(() => import('../pages/settings/Settings'))
 export const BranchesPage = lazy(() => import('../pages/settings/BranchesPage'))
 export const PortalUsersPage = lazy(() => import('../pages/settings/PortalUsersPage'))
+export const UsersPage = lazy(() => import('../pages/settings/UsersPage'))
 export const NotificationSettings = lazy(() => import('../pages/settings/NotificationSettings'))
 
 // Portal

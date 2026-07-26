@@ -1,12 +1,14 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Tms.Api.Models;
 
 namespace Tms.Api.Services;
 
-/// <summary>Stamps CreatedAt/By and UpdatedAt/By on IAuditable entities during SaveChanges.</summary>
-public sealed class AuditSaveChangesInterceptor(IHttpContextAccessor http) : SaveChangesInterceptor
+/// <summary>
+/// Stamps CreatedAt/By and UpdatedAt/By on IAuditable entities during SaveChanges.
+/// Actor always comes from auth context — never from request body.
+/// </summary>
+public sealed class AuditSaveChangesInterceptor(ICurrentUser currentUser) : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -27,7 +29,8 @@ public sealed class AuditSaveChangesInterceptor(IHttpContextAccessor http) : Sav
     {
         if (db == null) return;
         var now = DateTime.UtcNow;
-        var actor = ResolveActor();
+        // Display name (FullName) for CBy / MBy list columns.
+        var actor = currentUser.DisplayName;
 
         foreach (var entry in db.ChangeTracker.Entries<IAuditable>())
         {
@@ -36,7 +39,8 @@ public sealed class AuditSaveChangesInterceptor(IHttpContextAccessor http) : Sav
                 if (entry.Entity.CreatedAt == default)
                     entry.Entity.CreatedAt = now;
                 entry.Entity.UpdatedAt = now;
-                entry.Entity.CreatedBy ??= actor;
+                // Always overwrite — do not accept client-supplied CreatedBy/UpdatedBy.
+                entry.Entity.CreatedBy = actor;
                 entry.Entity.UpdatedBy = actor;
             }
             else if (entry.State == EntityState.Modified)
@@ -47,20 +51,5 @@ public sealed class AuditSaveChangesInterceptor(IHttpContextAccessor http) : Sav
                 entry.Property(x => x.CreatedBy).IsModified = false;
             }
         }
-    }
-
-    string ResolveActor()
-    {
-        var user = http.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
-            return "system";
-
-        // Prefer username for list display (CBy / ModBy); fall back to user id.
-        var username = user.Identity?.Name ?? user.FindFirstValue(ClaimTypes.Name);
-        if (!string.IsNullOrWhiteSpace(username))
-            return username;
-
-        var uid = user.FindFirstValue(ClaimTypes.NameIdentifier);
-        return string.IsNullOrWhiteSpace(uid) ? "system" : uid;
     }
 }
