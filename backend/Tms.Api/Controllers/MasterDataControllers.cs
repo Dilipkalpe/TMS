@@ -392,7 +392,7 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
 [Authorize]
 [ApiController]
 [Route("api/lr")]
-public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync, DocumentFlowService documentFlow) : ControllerBase
+public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers) : ControllerBase
 {
     async Task<Driver?> ResolveDriverAsync(string? driverName, CancellationToken ct = default)
     {
@@ -517,7 +517,20 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         if (!string.IsNullOrEmpty(bookingId) && booking == null)
             return BadRequest(new ApiError("Booking not found in your company."));
 
-        var lrNumber = await IdGenerator.NextLrNumber(db);
+        var companyId = booking?.CompanyId ?? TenantScope.ResolveCompanyId(tenants);
+        Guid branchId;
+        DateOnly lrDate;
+        string lrNumber;
+        try
+        {
+            branchId = DocumentNumberService.RequireBranchId(booking?.BranchId ?? branches.AssignBranchId);
+            lrDate = ApiParseHelper.BodyDate(body, "lrDate", DateOnly.FromDateTime(DateTime.UtcNow));
+            lrNumber = await documentNumbers.NextAsync(DocumentNumberTypes.LR, companyId, branchId, lrDate);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
         var vehicleNum = ApiParseHelper.BodyString(body, "vehicle");
         var vehicle = !string.IsNullOrEmpty(vehicleNum)
             ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleNum) : null;
@@ -545,9 +558,9 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         var lr = new LorryReceipt
         {
             LrNumber = lrNumber,
-            CompanyId = booking?.CompanyId ?? TenantScope.ResolveCompanyId(tenants),
-            BranchId = booking?.BranchId ?? branches.AssignBranchId,
-            LrDate = ApiParseHelper.BodyDate(body, "lrDate", DateOnly.FromDateTime(DateTime.UtcNow)),
+            CompanyId = companyId,
+            BranchId = branchId,
+            LrDate = lrDate,
             BookingId = booking?.Id,
             Consignor = ApiParseHelper.BodyString(body, "consignor"),
             Consignee = ApiParseHelper.BodyString(body, "consignee"),

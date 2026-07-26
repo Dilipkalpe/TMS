@@ -184,7 +184,7 @@ public class FreightRatesController(TmsDbContext db, ITenantContext tenants, IBr
 [Authorize]
 [ApiController]
 [Route("api/quotations")]
-public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
+public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DocumentNumberService documentNumbers) : ControllerBase
 {
     static object Map(Quotation q) => new
     {
@@ -266,12 +266,24 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         if (Guid.TryParse(ApiParseHelper.BodyString(body, "freightRateId"), out var rid))
             rateId = rid;
 
+        Guid branchId;
+        string quoteNo;
+        try
+        {
+            branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId);
+            quoteNo = await documentNumbers.NextAsync(DocumentNumberTypes.Quotation, companyId, branchId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
         var q = new Quotation
         {
             Id = Guid.NewGuid(),
             CompanyId = companyId,
-            BranchId = branches.AssignBranchId,
-            QuoteNo = await IdGenerator.NextQuoteNo(db),
+            BranchId = branchId,
+            QuoteNo = quoteNo,
             CustomerId = ApiParseHelper.BodyString(body, "customerId"),
             CustomerName = customerName.Trim(),
             FromCity = fromCity.Trim(),
@@ -394,9 +406,21 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
             customerId = cust?.Id;
         }
 
+        Guid branchId;
+        string bookingId;
+        try
+        {
+            branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId ?? q.BranchId);
+            bookingId = await documentNumbers.NextAsync(DocumentNumberTypes.Booking, companyId, branchId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
         var booking = new Booking
         {
-            Id = await IdGenerator.NextBookingId(db),
+            Id = bookingId,
             BookingDate = DateOnly.FromDateTime(DateTime.UtcNow),
             CustomerId = customerId,
             CustomerName = q.CustomerName,
@@ -409,7 +433,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
             Payment = "Unpaid",
             Remarks = $"From quotation {q.QuoteNo}",
             CompanyId = companyId,
-            BranchId = branches.AssignBranchId,
+            BranchId = branchId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
@@ -444,7 +468,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
 [Authorize]
 [ApiController]
 [Route("api/freight-invoices")]
-public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
+public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DocumentNumberService documentNumbers) : ControllerBase
 {
     static object Map(FreightInvoice inv) => new
     {
@@ -577,12 +601,27 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
             lines = built.Lines.Select(l => new { description = l.Description, amount = l.Amount, detail = l.Detail })
         });
 
+        Guid invBranchId;
+        string invoiceNo;
+        DateOnly invoiceDate;
+        try
+        {
+            invBranchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+            invoiceDate = ApiParseHelper.BodyDate(body, "invoiceDate", DateOnly.FromDateTime(DateTime.UtcNow));
+            invoiceNo = await documentNumbers.NextAsync(
+                DocumentNumberTypes.Invoice, booking.CompanyId, invBranchId, invoiceDate);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
         var inv = new FreightInvoice
         {
             Id = Guid.NewGuid(),
             CompanyId = booking.CompanyId,
-            BranchId = booking.BranchId ?? branches.AssignBranchId,
-            InvoiceNo = await IdGenerator.NextFreightInvoiceNo(db, billType),
+            BranchId = invBranchId,
+            InvoiceNo = invoiceNo,
             BookingId = bookingId,
             LrNumber = lr?.LrNumber,
             CustomerId = booking.CustomerId,
@@ -590,7 +629,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
             Gstin = ApiParseHelper.BodyString(body, "gstin"),
             PlaceOfSupply = ApiParseHelper.BodyString(body, "placeOfSupply") ?? booking.ToCity,
             BillType = billType,
-            InvoiceDate = ApiParseHelper.BodyDate(body, "invoiceDate", DateOnly.FromDateTime(DateTime.UtcNow)),
+            InvoiceDate = invoiceDate,
             DueDate = DateOnly.TryParse(ApiParseHelper.BodyString(body, "dueDate"), out var due) ? due : null,
             TaxableAmount = taxable,
             GstAmount = gst,

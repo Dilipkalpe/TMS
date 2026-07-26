@@ -21,9 +21,14 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
     [HttpPost("login")]
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest req)
     {
+        var username = (req.Username ?? "").Trim();
+        var password = (req.Password ?? "").Trim();
+        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            return Unauthorized(new ApiError("Invalid username or password."));
+
         var user = await db.Users.Include(u => u.Branch).Include(u => u.Company)
-            .FirstOrDefaultAsync(u => u.Username == req.Username && u.IsActive);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
+            .FirstOrDefaultAsync(u => u.IsActive && u.Username.ToLower() == username.ToLower());
+        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
             return Unauthorized(new ApiError("Invalid username or password."));
 
         var allowed = await LoadAllowedBranchIdsAsync(user);
@@ -35,11 +40,16 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
     [Authorize]
     public async Task<ActionResult<LoginResponse>> Me()
     {
-        var username = User.Identity?.Name;
+        // Prefer explicit username claim (Identity.Name can be polluted by JWT "name" = FullName).
+        var username = User.FindFirstValue("username")
+            ?? User.FindFirstValue(ClaimTypes.Name)
+            ?? User.Identity?.Name;
         if (string.IsNullOrEmpty(username)) return Unauthorized();
+
         var user = await db.Users.Include(u => u.Branch).Include(u => u.Company)
-            .FirstOrDefaultAsync(u => u.Username == username);
-        if (user == null) return Unauthorized();
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+        if (user == null || !user.IsActive) return Unauthorized();
+
         var allowed = await LoadAllowedBranchIdsAsync(user);
         return Ok(await ToResponseAsync(user, "", allowed));
     }
@@ -95,7 +105,7 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
             new(ClaimTypes.Role, user.Role),
             new(ClaimTypes.GivenName, user.FullName),
             new("full_name", user.FullName),
-            new("name", user.FullName),
+            // Do not emit short "name" — JWT inbound mapping overwrites Identity.Name and breaks /auth/me.
         };
         if (user.CompanyId.HasValue)
             claims.Add(new Claim("company_id", user.CompanyId.Value.ToString()));

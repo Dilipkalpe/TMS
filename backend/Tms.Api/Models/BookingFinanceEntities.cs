@@ -47,6 +47,7 @@ public class BookingPayment : ITenantScoped
     public Guid CompanyId { get; set; }
     public string BookingId { get; set; } = "";
     public Guid? FreightInvoiceId { get; set; }
+    public string? ReceiptNo { get; set; }
     public DateOnly PaymentDate { get; set; }
     public decimal Amount { get; set; }
     public string? PaymentMode { get; set; }

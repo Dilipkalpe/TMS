@@ -14,7 +14,7 @@ import {
   QuotationList, NewQuotation, QuotationDetails,
   VendorList, VendorDetails, NewVendor,
   ExpenseList, NewExpense,
-  Settings, BranchesPage, PortalUsersPage, UsersPage, NotificationSettings,
+  Settings, BranchesPage, PortalUsersPage, UsersPage, DocumentNumberingPage, NotificationSettings,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
   AdminHub,
@@ -173,6 +173,7 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="settings/branches" element={<BranchesPage />} />
         <Route path="settings/users" element={<UsersPage />} />
+        <Route path="settings/document-numbering" element={<DocumentNumberingPage />} />
         <Route path="settings/portal-users" element={<PortalUsersPage />} />
         <Route path="settings/notifications" element={<NotificationSettings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -11,7 +11,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class BookingsController(TmsDbContext db, NotificationDispatcher notifications, IBranchContext branches, ITenantContext tenants, SubscriptionService subscriptions, DriverSyncService driverSync, DocumentFlowService documentFlow) : ControllerBase
+public class BookingsController(TmsDbContext db, NotificationDispatcher notifications, IBranchContext branches, ITenantContext tenants, SubscriptionService subscriptions, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers) : ControllerBase
 {
     async Task<Driver?> ResolveDriverAsync(string? driverName, CancellationToken ct = default)
     {
@@ -63,15 +63,16 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
             await documentFlow.EnsureCanCreateBookingAsync(req.LrNumber, ct);
             await subscriptions.EnsureCanCreateBookingAsync(companyId);
 
-            var id = await IdGenerator.NextBookingId(db);
+            if (!ApiParseHelper.TryParseDate(req.Date, out var bookingDate))
+                return BadRequest(new ApiError("Invalid booking date. Use YYYY-MM-DD."));
+
+            var branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId);
+            var id = await documentNumbers.NextAsync(DocumentNumberTypes.Booking, companyId, branchId, bookingDate, ct);
             var vehicle = !string.IsNullOrEmpty(req.Vehicle)
                 ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, req.Vehicle) : null;
             var driver = !string.IsNullOrEmpty(req.Driver)
                 ? await ResolveDriverAsync(req.Driver, ct) : null;
             var customer = await TenantScope.FindCustomerByNameAsync(db, tenants, branches, req.Customer);
-
-            if (!ApiParseHelper.TryParseDate(req.Date, out var bookingDate))
-                return BadRequest(new ApiError("Invalid booking date. Use YYYY-MM-DD."));
 
             LorryReceipt? linkedLr = null;
             if (!string.IsNullOrWhiteSpace(req.LrNumber))
@@ -108,7 +109,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
                 Balance = balance,
                 Remarks = req.Remarks,
                 CompanyId = companyId,
-                BranchId = branches.AssignBranchId,
+                BranchId = branchId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };

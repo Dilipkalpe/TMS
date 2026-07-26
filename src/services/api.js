@@ -158,6 +158,12 @@ export const usersApi = {
   remove: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
 }
 
+export const documentNumberingApi = {
+  list: (params = {}) => apiRequest(`/document-numbering?${queryString(params)}`),
+  update: (id, data) => apiRequest(`/document-numbering/${id}`, { method: 'PUT', body: data }),
+  ensureDefaults: (params = {}) => apiRequest(`/document-numbering/ensure-defaults?${queryString(params)}`, { method: 'POST' }),
+}
+
 export const bookingsApi = {
   list: (params = {}) => apiRequest(`/bookings?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/bookings/${id}`),

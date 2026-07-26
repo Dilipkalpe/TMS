@@ -125,7 +125,7 @@ public class ShipmentsController(TmsDbContext db, ITenantContext tenants, IBranc
 [Authorize]
 [ApiController]
 [Route("api/trips")]
-public class TripsController(TmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
+public class TripsController(TmsDbContext db, IBranchContext branches, ITenantContext tenants, DocumentNumberService documentNumbers) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? status)
@@ -152,7 +152,7 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
         }));
     }
 
-    public record CreateTrip(string TripCode, string Origin, string Destination, string? VehicleId, string? DriverId, string? BookingId, DateTime? PlannedStart, DateTime? PlannedEnd, List<TripStopInput>? Stops);
+    public record CreateTrip(string? TripCode, string Origin, string Destination, string? VehicleId, string? DriverId, string? BookingId, DateTime? PlannedStart, DateTime? PlannedEnd, List<TripStopInput>? Stops);
     public record TripStopInput(int Sequence, string Address, decimal? Latitude, decimal? Longitude);
 
     [HttpPost]
@@ -174,32 +174,43 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
             if (booking == null) return BadRequest(new { message = "Booking not found in your company" });
         }
 
-        var trip = new Trip
+        try
         {
-            Id = Guid.NewGuid(),
-            CompanyId = TenantScope.ResolveCompanyId(tenants),
-            TripCode = body.TripCode,
-            Origin = body.Origin,
-            Destination = body.Destination,
-            VehicleId = body.VehicleId,
-            DriverId = body.DriverId,
-            BookingId = body.BookingId,
-            Status = body.VehicleId != null && body.DriverId != null ? "ASSIGNED" : "PLANNED",
-            PlannedStart = body.PlannedStart,
-            PlannedEnd = body.PlannedEnd,
-            BranchId = branches.AssignBranchId,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-        };
-        if (body.Stops?.Count > 0)
-        {
-            foreach (var s in body.Stops)
-                trip.Stops.Add(new TripStop { Id = Guid.NewGuid(), SequenceNo = s.Sequence, Address = s.Address, Latitude = s.Latitude, Longitude = s.Longitude });
+            var companyId = TenantScope.ResolveCompanyId(tenants);
+            var branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId);
+            var tripCode = await documentNumbers.NextAsync(DocumentNumberTypes.Trip, companyId, branchId);
+
+            var trip = new Trip
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyId,
+                TripCode = tripCode,
+                Origin = body.Origin,
+                Destination = body.Destination,
+                VehicleId = body.VehicleId,
+                DriverId = body.DriverId,
+                BookingId = body.BookingId,
+                Status = body.VehicleId != null && body.DriverId != null ? "ASSIGNED" : "PLANNED",
+                PlannedStart = body.PlannedStart,
+                PlannedEnd = body.PlannedEnd,
+                BranchId = branchId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            if (body.Stops?.Count > 0)
+            {
+                foreach (var s in body.Stops)
+                    trip.Stops.Add(new TripStop { Id = Guid.NewGuid(), SequenceNo = s.Sequence, Address = s.Address, Latitude = s.Latitude, Longitude = s.Longitude });
+            }
+            db.Trips.Add(trip);
+            db.TripStatusHistories.Add(new TripStatusHistory { Id = Guid.NewGuid(), TripId = trip.Id, Status = trip.Status, ChangedBy = User.Identity?.Name, CreatedAt = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+            return CreatedAtAction(nameof(List), new { id = trip.Id }, trip);
         }
-        db.Trips.Add(trip);
-        db.TripStatusHistories.Add(new TripStatusHistory { Id = Guid.NewGuid(), TripId = trip.Id, Status = trip.Status, ChangedBy = User.Identity?.Name, CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(List), new { id = trip.Id }, trip);
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     public record UpdateTripStatus(string Status, string? Note);

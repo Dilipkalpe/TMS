@@ -11,7 +11,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api")]
-public class BookingFinanceController(TmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
+public class BookingFinanceController(TmsDbContext db, IBranchContext branches, ITenantContext tenants, DocumentNumberService documentNumbers) : ControllerBase
 {
     [HttpGet("bookings/{bookingId}/finance")]
     public async Task<ActionResult<object>> GetFinanceSummary(string bookingId)
@@ -100,13 +100,27 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
                 freightInvoiceId = invoice.Id;
         }
 
+        var paymentDate = ApiParseHelper.BodyDate(body, "paymentDate", DateOnly.FromDateTime(DateTime.UtcNow));
+        string receiptNo;
+        try
+        {
+            var branchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+            receiptNo = await documentNumbers.NextAsync(
+                DocumentNumberTypes.Receipt, booking.CompanyId, branchId, paymentDate);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
         var payment = new BookingPayment
         {
             Id = Guid.NewGuid(),
             CompanyId = booking.CompanyId,
             BookingId = bookingId,
             FreightInvoiceId = freightInvoiceId,
-            PaymentDate = ApiParseHelper.BodyDate(body, "paymentDate", DateOnly.FromDateTime(DateTime.UtcNow)),
+            ReceiptNo = receiptNo,
+            PaymentDate = paymentDate,
             Amount = amount,
             PaymentMode = ApiParseHelper.BodyString(body, "paymentMode") ?? "Cash",
             ReferenceNo = ApiParseHelper.BodyString(body, "referenceNo"),
@@ -446,6 +460,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
         id = p.Id,
         bookingId = p.BookingId,
         freightInvoiceId = p.FreightInvoiceId,
+        receiptNo = p.ReceiptNo,
         paymentDate = p.PaymentDate.ToString("yyyy-MM-dd"),
         amount = p.Amount,
         paymentMode = p.PaymentMode,

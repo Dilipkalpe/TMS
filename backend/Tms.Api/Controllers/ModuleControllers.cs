@@ -127,7 +127,7 @@ public class FuelController(TmsDbContext db, FuelService fuelService, ITenantCon
 [Authorize]
 [ApiController]
 [Route("api/pod")]
-public class PodController(TmsDbContext db, NotificationDispatcher notifications, IConfiguration config, IHostEnvironment env, ITenantContext tenants, IBranchContext branches) : ControllerBase
+public class PodController(TmsDbContext db, NotificationDispatcher notifications, IConfiguration config, IHostEnvironment env, ITenantContext tenants, IBranchContext branches, DocumentNumberService documentNumbers) : ControllerBase
 {
     [HttpPost("{bookingId}/send-otp")]
     public async Task<IActionResult> SendOtp(string bookingId)
@@ -188,6 +188,23 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         pod.ConfirmedBy = User.Identity?.Name;
         pod.DeliveredAt = deliveredAt;
 
+        if (string.IsNullOrWhiteSpace(pod.PodNo))
+        {
+            try
+            {
+                var branchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+                pod.PodNo = await documentNumbers.NextAsync(
+                    DocumentNumberTypes.Pod,
+                    booking.CompanyId,
+                    branchId,
+                    DateOnly.FromDateTime(deliveredAt));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         booking.Status = "Delivered";
         booking.UpdatedAt = DateTime.UtcNow;
         var customer = booking.CustomerId != null
@@ -223,6 +240,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
             {
                 pod.Id,
                 pod.BookingId,
+                pod.PodNo,
                 pod.OtpVerified,
                 pod.RecipientName,
                 deliveredAt = pod.DeliveredAt,
@@ -245,6 +263,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
             deliveryDate = pod?.DeliveredAt?.ToString("yyyy-MM-dd"),
             recipientName = pod?.RecipientName,
             otpVerified = pod?.OtpVerified ?? false,
+            podNo = pod?.PodNo,
             pod,
         });
     }
@@ -288,6 +307,23 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         pod.ConfirmedBy = User.Identity?.Name;
         pod.DeliveredAt = deliveredAt;
 
+        if (string.IsNullOrWhiteSpace(pod.PodNo))
+        {
+            try
+            {
+                var branchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+                pod.PodNo = await documentNumbers.NextAsync(
+                    DocumentNumberTypes.Pod,
+                    booking.CompanyId,
+                    branchId,
+                    DateOnly.FromDateTime(deliveredAt));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         booking.Status = "Delivered";
         booking.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
@@ -300,6 +336,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
             deliveryDate = deliveredAt.ToString("yyyy-MM-dd"),
             remake,
             recipientName = pod.RecipientName,
+            podNo = pod.PodNo,
             remarks = body.Remarks,
         });
     }

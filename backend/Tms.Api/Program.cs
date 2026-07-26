@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Security.Claims;
 using System.Text;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -137,6 +138,7 @@ builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<LookupQuickCreateService>();
 builder.Services.AddScoped<DriverSyncService>();
 builder.Services.AddScoped<DocumentFlowService>();
+builder.Services.AddScoped<DocumentNumberService>();
 
 builder.Services.AddHttpClient();
 
@@ -150,34 +152,22 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
 var jwtKey = AppConfiguration.ResolveJwtKey(builder.Configuration);
 
-
-
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-
     .AddJwtBearer(opt =>
-
     {
-
         opt.TokenValidationParameters = new TokenValidationParameters
-
         {
-
             ValidateIssuer = true,
-
             ValidateAudience = true,
-
             ValidateLifetime = true,
-
             ValidateIssuerSigningKey = true,
-
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
-
             ValidAudience = builder.Configuration["Jwt:Audience"],
-
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
-
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            // Use explicit "username" claim — short JWT "name" is FullName and must not become Identity.Name.
+            NameClaimType = "username",
+            RoleClaimType = ClaimTypes.Role,
         };
-
     });
 
 if (!builder.Environment.IsEnvironment("Testing"))

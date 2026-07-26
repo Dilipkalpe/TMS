@@ -99,6 +99,7 @@ public class ProofOfDelivery : ITenantScoped
     public Guid CompanyId { get; set; }
     public string BookingId { get; set; } = "";
     public Booking? Booking { get; set; }
+    public string? PodNo { get; set; }
     public string? OtpCode { get; set; }
     public bool OtpVerified { get; set; }
     public string? RecipientName { get; set; }

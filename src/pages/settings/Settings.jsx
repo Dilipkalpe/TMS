@@ -9,7 +9,7 @@ import { usePrint } from '../../context/PrintContext'
 import { settingsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { getStoredPrintLogoUrl, resolveCompanyLogoUrl } from '../../utils/printLogo'
-import { Save, Download, Shield, Building2, Loader2, Upload, X, ImageIcon, Bell, GitBranch, Users } from 'lucide-react'
+import { Save, Download, Shield, Building2, Loader2, Upload, X, ImageIcon, Bell, GitBranch, Users, Hash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { DOCUMENT_FLOW, DOCUMENT_FLOW_LABELS } from '../../hooks/useDocumentFlow'
 
@@ -341,6 +341,13 @@ export default function Settings() {
         >
           <Building2 className="h-4 w-4" />
           Branch locations
+        </Link>
+        <Link
+          to="/settings/document-numbering"
+          className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/10"
+        >
+          <Hash className="h-4 w-4" />
+          Document numbering
         </Link>
         <Link
           to="/settings/notifications"

@@ -91,7 +91,7 @@ export function AuthProvider({ children }) {
     }
     try {
       localStorage.removeItem(BRANCH_KEY)
-      const res = await authApi.login(username.trim(), password)
+      const res = await authApi.login(username.trim(), password.trim())
       setToken(res.token)
       const profile = mapProfile(res)
       setUser(profile)

@@ -74,6 +74,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<CompanySubscription> CompanySubscriptions => Set<CompanySubscription>();
     public DbSet<CompanyUsage> CompanyUsages => Set<CompanyUsage>();
+    public DbSet<DocumentNumberConfig> DocumentNumberConfigs => Set<DocumentNumberConfig>();
+    public DbSet<DocumentNumberSequence> DocumentNumberSequences => Set<DocumentNumberSequence>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -519,6 +521,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.BookingId).HasColumnName("booking_id");
+            e.Property(x => x.PodNo).HasColumnName("pod_no").HasMaxLength(64);
             e.Property(x => x.OtpCode).HasColumnName("otp_code");
             e.Property(x => x.OtpVerified).HasColumnName("otp_verified");
             e.Property(x => x.RecipientName).HasColumnName("recipient_name");
@@ -529,6 +532,38 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.ConfirmedBy).HasColumnName("confirmed_by");
             e.Property(x => x.DeliveredAt).HasColumnName("delivered_at");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<DocumentNumberConfig>(e =>
+        {
+            e.ToTable("document_number_configs");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.DocumentType).HasColumnName("document_type").HasMaxLength(40);
+            e.Property(x => x.Prefix).HasColumnName("prefix").HasMaxLength(20);
+            e.Property(x => x.FormatPattern).HasColumnName("format_pattern").HasMaxLength(120);
+            e.Property(x => x.FyFormat).HasColumnName("fy_format").HasMaxLength(20);
+            e.Property(x => x.RunningNumberLength).HasColumnName("running_number_length");
+            e.Property(x => x.ResetRule).HasColumnName("reset_rule").HasMaxLength(20);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => new { x.CompanyId, x.BranchId, x.DocumentType }).IsUnique();
+        });
+
+        modelBuilder.Entity<DocumentNumberSequence>(e =>
+        {
+            e.ToTable("document_number_sequences");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.DocumentType).HasColumnName("document_type").HasMaxLength(40);
+            e.Property(x => x.FinancialYear).HasColumnName("financial_year").HasMaxLength(20);
+            e.Property(x => x.CurrentNumber).HasColumnName("current_number");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => new { x.CompanyId, x.BranchId, x.DocumentType, x.FinancialYear }).IsUnique();
         });
 
         modelBuilder.Entity<Document>(e =>
@@ -1084,6 +1119,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.BookingId).HasColumnName("booking_id");
             e.Property(x => x.FreightInvoiceId).HasColumnName("freight_invoice_id");
+            e.Property(x => x.ReceiptNo).HasColumnName("receipt_no").HasMaxLength(64);
             e.Property(x => x.PaymentDate).HasColumnName("payment_date");
             e.Property(x => x.Amount).HasColumnName("amount");
             e.Property(x => x.PaymentMode).HasColumnName("payment_mode");

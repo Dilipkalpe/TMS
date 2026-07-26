@@ -452,6 +452,7 @@ export function TripsPage() {
   }, [toast])
   return (
     <ERPContentPage module="Operations" title="Trips">
+      <p className="mb-3 text-sm text-slate-500">Trip numbers are auto-generated on save (Company/Branch/FY/TRP/00001).</p>
       {loading ? <Card className="p-4 text-sm text-slate-500">Loading…</Card> : (
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">

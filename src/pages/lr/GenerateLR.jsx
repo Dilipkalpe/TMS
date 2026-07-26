@@ -213,7 +213,7 @@ export default function GenerateLR() {
         <Card>
           <CardHeader title="Generate New LR" subtitle="Fill in the LR details below" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Input label="LR Number" value={form.lrNumber} placeholder="Auto-generated on save" onChange={(e) => update('lrNumber', e.target.value)} />
+            <Input label="LR Number" value={form.lrNumber} placeholder="Auto-generated on save" readOnly />
             {isFirstBookingThenLr ? (
               <Select
                 label="Booking No. (required)"
