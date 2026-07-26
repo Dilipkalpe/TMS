@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Tms.Api.Data;
+using Tms.Api.DTOs;
 using Tms.Api.Models;
 
 namespace Tms.Api.Services;
@@ -55,6 +56,18 @@ public sealed class AccountingRegisterJobService(
             logger.LogWarning(ex, "Failed to enqueue {ReportType} register job for company {CompanyId}", reportType, companyId);
         }
         return data;
+    }
+
+    public async Task<PagedResult<object>> GetRegisterPagedAsync(
+        string reportType,
+        int page = 1,
+        int pageSize = QueryExtensions.DefaultPageSize,
+        string? search = null,
+        bool includeTotal = true,
+        CancellationToken ct = default)
+    {
+        var data = await GetRegisterAsync(reportType, ct);
+        return PagingHelper.PageRows(PagingHelper.AsObjectList(data), page, pageSize, search, includeTotal);
     }
 
     public async Task<object?> GetJobStatusAsync(Guid jobId, CancellationToken ct = default)

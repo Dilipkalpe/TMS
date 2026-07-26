@@ -89,7 +89,7 @@ export default function ERPListToolbar({
       </div>
       {extra}
       <p className="text-xs text-slate-500 sm:text-sm dark:text-slate-400">
-        {recordCount.toLocaleString('en-IN')} record(s) found.
+        {recordCount.toLocaleString('en-IN')} rows found
       </p>
     </div>
   )

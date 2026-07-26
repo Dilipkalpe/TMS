@@ -3,13 +3,17 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { useApiResource } from '../../hooks/useApiResource'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { serverListProps } from '../../utils/serverListProps'
 
 export default function DayBook() {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useApiResource(() => accountingApi.dayBook())
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search }) => accountingApi.dayBook(buildListParams({ page, pageSize, search })),
+    [],
+  )
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'voucherNo', label: 'Voucher No.' },
@@ -24,17 +28,14 @@ export default function DayBook() {
       onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Day Book"
-      statusCards={registerStatusCards('Total Entries', data.length, 'violet', 'BookOpen')}
+      statusCards={registerStatusCards('Total Entries', paged.total, 'violet', 'BookOpen')}
       showActions={false}
       searchPlaceholder="Voucher no., ledger..."
       searchKeys={['voucherNo', 'ledger', 'type']}
       columns={columns}
-      data={data}
       sortKey="date"
-      loading={loading}
-      error={error}
-      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow />}
+      {...serverListProps(paged)}
     />
   )
 }

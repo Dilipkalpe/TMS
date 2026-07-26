@@ -77,6 +77,11 @@ export function usePagedApiResource(fetchPage, deps = []) {
     setFilter(v)
   }, [])
 
+  const setPageSizeAndReset = useCallback((size) => {
+    setPage(1)
+    setPageSize(size)
+  }, [])
+
   return {
     items,
     total,
@@ -89,7 +94,7 @@ export function usePagedApiResource(fetchPage, deps = []) {
     loading,
     error,
     setPage,
-    setPageSize,
+    setPageSize: setPageSizeAndReset,
     setSearch: setSearchAndReset,
     setFilter: setFilterAndReset,
     refresh,

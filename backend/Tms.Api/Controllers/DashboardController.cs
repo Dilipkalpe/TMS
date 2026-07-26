@@ -517,21 +517,87 @@ public class LookupsController(
 public class ReportsController(ReadOnlyTmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
 {
     [HttpGet("trips")]
-    public async Task<ActionResult<object>> Trips()
+    public async Task<ActionResult<object>> Trips(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
     {
-        var list = await tenants.Filter(db.LorryReceipts.AsQueryable()).OrderByDescending(l => l.LrDate).Take(50).ToListAsync();
-        return Ok(list.Select(l => new
+        var q = tenants.Filter(db.LorryReceipts.AsNoTracking()).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            lr = l.LrNumber,
-            date = l.LrDate.ToString("yyyy-MM-dd"),
-            vehicle = l.VehicleNumber,
-            driver = l.DriverName,
-            route = $"{l.FromCity} → {l.ToCity}",
-            distance = "—",
-            freight = l.Freight,
-            expense = 0,
-            profit = l.Freight
-        }));
+            var s = search.Trim().ToLowerInvariant();
+            q = q.Where(l =>
+                l.LrNumber.ToLower().Contains(s) ||
+                (l.VehicleNumber != null && l.VehicleNumber.ToLower().Contains(s)) ||
+                (l.DriverName != null && l.DriverName.ToLower().Contains(s)) ||
+                l.FromCity.ToLower().Contains(s) ||
+                l.ToCity.ToLower().Contains(s));
+        }
+        q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize, QueryExtensions.ReportMaxPageSize);
+        var (list, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+
+        var bookingIds = list
+            .Select(l => l.BookingId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct()
+            .Cast<string>()
+            .ToList();
+
+        var pods = bookingIds.Count == 0
+            ? new Dictionary<string, DateTime?>()
+            : await tenants.Filter(db.ProofOfDeliveries.AsNoTracking())
+                .Where(x => bookingIds.Contains(x.BookingId) && x.DeliveredAt != null)
+                .GroupBy(x => x.BookingId)
+                .Select(g => new { BookingId = g.Key, DeliveredAt = g.Max(x => x.DeliveredAt) })
+                .ToDictionaryAsync(x => x.BookingId, x => x.DeliveredAt);
+
+        var deliveredBookings = bookingIds.Count == 0
+            ? new Dictionary<string, DateOnly?>()
+            : await tenants.Filter(db.Bookings.AsNoTracking())
+                .Where(b => bookingIds.Contains(b.Id) && b.Status == "Delivered")
+                .Select(b => new { b.Id, b.UpdatedAt })
+                .ToDictionaryAsync(b => b.Id, b => (DateOnly?)DateOnly.FromDateTime(b.UpdatedAt));
+
+        var rows = list.Select(l =>
+        {
+            DateOnly? deliveryDate = null;
+            if (!string.IsNullOrWhiteSpace(l.BookingId) &&
+                pods.TryGetValue(l.BookingId, out var deliveredAt) &&
+                deliveredAt != null)
+            {
+                deliveryDate = DateOnly.FromDateTime(deliveredAt.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(l.BookingId) &&
+                     deliveredBookings.TryGetValue(l.BookingId, out var bookingDelivered))
+            {
+                deliveryDate = bookingDelivered;
+            }
+
+            int? deliveryDays = null;
+            if (deliveryDate != null)
+                deliveryDays = deliveryDate.Value.DayNumber - l.LrDate.DayNumber;
+
+            return (object)new
+            {
+                lr = l.LrNumber,
+                date = l.LrDate.ToString("yyyy-MM-dd"),
+                lrDate = l.LrDate.ToString("yyyy-MM-dd"),
+                deliveryDate = deliveryDate?.ToString("yyyy-MM-dd"),
+                deliveryDays,
+                vehicle = l.VehicleNumber,
+                driver = l.DriverName,
+                route = $"{l.FromCity} → {l.ToCity}",
+                distance = "—",
+                freight = l.Freight,
+                expense = 0,
+                profit = l.Freight,
+                bookingId = l.BookingId,
+            };
+        }).ToList();
+
+        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }
 
     [HttpGet("income")]

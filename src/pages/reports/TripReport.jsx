@@ -4,16 +4,26 @@ import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
-import { useApiResource } from '../../hooks/useApiResource'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { reportsApi } from '../../services/api'
+import { serverListProps } from '../../utils/serverListProps'
 
 export default function TripReport() {
   const navigate = useNavigate()
-  const { data: tripReport, loading, error, refresh } = useApiResource(() => reportsApi.trips(), [])
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search }) => reportsApi.trips(buildListParams({ page, pageSize, search })),
+    [],
+  )
 
   const columns = [
     { key: 'lr', label: 'LR No.' },
-    { key: 'date', label: 'Date' },
+    { key: 'date', label: 'LR Date' },
+    { key: 'deliveryDate', label: 'Delivery Date', render: (r) => r.deliveryDate || '—' },
+    {
+      key: 'deliveryDays',
+      label: 'Delivery Days',
+      render: (r) => (r.deliveryDays == null ? '—' : `${r.deliveryDays}`),
+    },
     { key: 'vehicle', label: 'Vehicle' },
     { key: 'driver', label: 'Driver' },
     { key: 'route', label: 'Route' },
@@ -28,17 +38,14 @@ export default function TripReport() {
       onAdd={() => navigate(addRecordRoutes.bookings)}
       module="Reports"
       title="Trip Report"
-      statusCards={registerStatusCards('Total Trips', tripReport.length, 'violet', 'Route')}
+      statusCards={registerStatusCards('Total Trips', paged.total, 'violet', 'Route')}
       showActions={false}
       searchPlaceholder="LR No., vehicle, driver..."
-      searchKeys={['lr', 'vehicle', 'driver', 'route']}
+      searchKeys={['lr', 'vehicle', 'driver', 'route', 'deliveryDate']}
       columns={columns}
-      data={tripReport}
-      loading={loading}
-      error={error}
-      onRefreshExternal={refresh}
       sortKey="date"
       filterRow={<ReportFilterRow />}
+      {...serverListProps(paged)}
     />
   )
 }

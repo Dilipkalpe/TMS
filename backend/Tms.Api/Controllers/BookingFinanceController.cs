@@ -358,13 +358,29 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     }
 
     [HttpGet("provisions")]
-    public async Task<ActionResult<object>> ListProvisions([FromQuery] string? type)
+    public async Task<ActionResult<object>> ListProvisions(
+        [FromQuery] string? type,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.Provisions.AsQueryable());
+        var q = tenants.Filter(db.Provisions.AsNoTracking()).AsQueryable();
         if (!string.IsNullOrWhiteSpace(type))
             q = q.Where(p => p.ProvisionType == type);
-        var rows = await q.OrderByDescending(p => p.ProvisionDate).Take(500).ToListAsync();
-        return Ok(rows.Select(MapProvision));
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLowerInvariant();
+            q = q.Where(p =>
+                p.PartyName.ToLower().Contains(s) ||
+                (p.ReferenceNo != null && p.ReferenceNo.ToLower().Contains(s)) ||
+                (p.Remarks != null && p.Remarks.ToLower().Contains(s)));
+        }
+        q = q.OrderByDescending(p => p.ProvisionDate).ThenByDescending(p => p.CreatedAt);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var rows = items.Select(MapProvision).Cast<object>().ToList();
+        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }
 
     [HttpPost("provisions")]

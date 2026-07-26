@@ -3,13 +3,17 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { useApiResource } from '../../hooks/useApiResource'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { serverListProps } from '../../utils/serverListProps'
 
 export default function BankBook() {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useApiResource(() => accountingApi.bankBook())
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search }) => accountingApi.bankBook(buildListParams({ page, pageSize, search })),
+    [],
+  )
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'particular', label: 'Particular' },
@@ -23,17 +27,14 @@ export default function BankBook() {
       onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Bank Book"
-      statusCards={registerStatusCards('Total Entries', data.length, 'blue', 'Landmark')}
+      statusCards={registerStatusCards('Total Entries', paged.total, 'blue', 'Landmark')}
       showActions={false}
       searchPlaceholder="Particular..."
       searchKeys={['particular']}
       columns={columns}
-      data={data}
       sortKey="date"
-      loading={loading}
-      error={error}
-      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow />}
+      {...serverListProps(paged)}
     />
   )
 }

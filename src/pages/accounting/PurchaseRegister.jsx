@@ -3,13 +3,17 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { useApiResource } from '../../hooks/useApiResource'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { serverListProps } from '../../utils/serverListProps'
 
 export default function PurchaseRegister() {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useApiResource(() => accountingApi.purchaseRegister())
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search }) => accountingApi.purchaseRegister(buildListParams({ page, pageSize, search })),
+    [],
+  )
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'billNo', label: 'Bill No.' },
@@ -21,20 +25,17 @@ export default function PurchaseRegister() {
 
   return (
     <ERPListPage
-      onAdd={() => navigate(addRecordRoutes.expense)}
+      onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Purchase Register"
-      statusCards={registerStatusCards('Total Bills', data.length, 'orange', 'ShoppingCart')}
+      statusCards={registerStatusCards('Total Purchases', paged.total, 'violet', 'ShoppingCart')}
       showActions={false}
-      searchPlaceholder="Vendor, bill no..."
-      searchKeys={['vendor', 'billNo']}
+      searchPlaceholder="Bill no., vendor..."
+      searchKeys={['billNo', 'vendor']}
       columns={columns}
-      data={data}
       sortKey="date"
-      loading={loading}
-      error={error}
-      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow showVendor />}
+      {...serverListProps(paged)}
     />
   )
 }

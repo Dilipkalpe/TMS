@@ -3,13 +3,17 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { useApiResource } from '../../hooks/useApiResource'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { serverListProps } from '../../utils/serverListProps'
 
 export default function ReceiptRegister() {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useApiResource(() => accountingApi.receiptRegister())
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search }) => accountingApi.receiptRegister(buildListParams({ page, pageSize, search })),
+    [],
+  )
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'voucherNo', label: 'Voucher No.' },
@@ -24,17 +28,14 @@ export default function ReceiptRegister() {
       onAdd={() => navigate(addRecordRoutes.voucher)}
       module="Accounting"
       title="Receipt Register"
-      statusCards={registerStatusCards('Total Receipts', data.length, 'green', 'ArrowDownLeft')}
+      statusCards={registerStatusCards('Total Receipts', paged.total, 'green', 'ArrowDownLeft')}
       showActions={false}
       searchPlaceholder="Party, voucher no..."
       searchKeys={['party', 'voucherNo', 'narration']}
       columns={columns}
-      data={data}
       sortKey="date"
-      loading={loading}
-      error={error}
-      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow />}
+      {...serverListProps(paged)}
     />
   )
 }

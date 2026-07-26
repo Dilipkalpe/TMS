@@ -3,13 +3,17 @@ import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
 import { registerStatusCards } from '../../config/listStatusCards'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { useApiResource } from '../../hooks/useApiResource'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { serverListProps } from '../../utils/serverListProps'
 
 export default function SalesRegister() {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useApiResource(() => accountingApi.salesRegister())
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search }) => accountingApi.salesRegister(buildListParams({ page, pageSize, search })),
+    [],
+  )
   const columns = [
     { key: 'date', label: 'Date' },
     { key: 'lrNo', label: 'Invoice / LR No.' },
@@ -27,17 +31,14 @@ export default function SalesRegister() {
       onAdd={() => navigate(addRecordRoutes.lr)}
       module="Accounting"
       title="Sales Register"
-      statusCards={registerStatusCards('Total Sales', data.length, 'green', 'TrendingUp')}
+      statusCards={registerStatusCards('Total Sales', paged.total, 'green', 'TrendingUp')}
       showActions={false}
       searchPlaceholder="LR no., customer..."
       searchKeys={['lrNo', 'customer', 'route']}
       columns={columns}
-      data={data}
       sortKey="date"
-      loading={loading}
-      error={error}
-      onRefreshExternal={refresh}
       filterRow={<ReportFilterRow showCustomer />}
+      {...serverListProps(paged)}
     />
   )
 }

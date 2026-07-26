@@ -2,13 +2,18 @@ import { useNavigate } from 'react-router-dom'
 import ERPListPage from '../../components/ui/ERPListPage'
 import Badge from '../../components/ui/Badge'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { useApiResource } from '../../hooks/useApiResource'
+import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { serverListProps } from '../../utils/serverListProps'
 
 export default function LedgerMaster() {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useApiResource(() => accountingApi.ledgerMaster())
+  const paged = usePagedApiResource(
+    ({ page, pageSize, search, filter }) =>
+      accountingApi.ledgerMaster(buildListParams({ page, pageSize, search, filter, filterKey: 'type' })),
+    [],
+  )
   const columns = [
     { key: 'code', label: 'Code' },
     { key: 'name', label: 'Ledger Name' },
@@ -26,11 +31,8 @@ export default function LedgerMaster() {
       filterOptions={['(All)', 'Asset', 'Liability', 'Income', 'Expense', 'Capital']}
       filterKey="type"
       columns={columns}
-      data={data}
       sortKey="code"
-      loading={loading}
-      error={error}
-      onRefreshExternal={refresh}
+      {...serverListProps(paged)}
     />
   )
 }

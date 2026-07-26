@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tms.Api.Data;
+using Tms.Api.DTOs;
 using Tms.Api.Models;
 using Tms.Api.Services;
 
@@ -23,10 +24,32 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
     }
 
     [HttpGet("ledger-master")]
-    public async Task<ActionResult<object>> LedgerMaster()
+    public async Task<ActionResult<object>> LedgerMaster(
+        [FromQuery] string? search,
+        [FromQuery] string? type,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
     {
-        var list = await tenants.Filter(db.LedgerAccounts.AsQueryable()).OrderBy(l => l.Code).ToListAsync();
-        return Ok(list.Select(l => new { code = l.Code, name = l.Name, type = l.AccountType, balance = Math.Abs(l.Balance) }));
+        var q = tenants.Filter(db.LedgerAccounts.AsNoTracking()).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(type))
+            q = q.Where(l => l.AccountType == type);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLowerInvariant();
+            q = q.Where(l => l.Code.ToLower().Contains(s) || l.Name.ToLower().Contains(s));
+        }
+        q = q.OrderBy(l => l.Code);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var rows = items.Select(l => (object)new
+        {
+            code = l.Code,
+            name = l.Name,
+            type = l.AccountType,
+            balance = Math.Abs(l.Balance),
+        }).ToList();
+        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }
 
     [HttpPost("ledger-master")]
@@ -108,37 +131,103 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
     }
 
     [HttpGet("cash-book")]
-    public async Task<ActionResult<object>> CashBook() =>
-        Ok(await AccountingBalanceService.BuildCashBookAsync(db, tenants));
+    public async Task<ActionResult<object>> CashBook(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true) =>
+        Ok(PagingHelper.PageRows(
+            PagingHelper.AsObjectList(await AccountingBalanceService.BuildCashBookAsync(db, tenants)),
+            page, pageSize, search, includeTotal));
 
     [HttpGet("bank-book")]
-    public async Task<ActionResult<object>> BankBook() =>
-        Ok(await AccountingBalanceService.BuildBankBookAsync(db, tenants));
+    public async Task<ActionResult<object>> BankBook(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true) =>
+        Ok(PagingHelper.PageRows(
+            PagingHelper.AsObjectList(await AccountingBalanceService.BuildBankBookAsync(db, tenants)),
+            page, pageSize, search, includeTotal));
 
     [HttpGet("day-book")]
-    public async Task<ActionResult<object>> DayBook() =>
-        Ok((await tenants.Filter(db.Vouchers.AsQueryable()).OrderByDescending(v => v.VoucherDate).Take(50).ToListAsync())
-            .Select(v => new { date = v.VoucherDate.ToString("yyyy-MM-dd"), voucherNo = v.VoucherNo, type = v.VoucherType, ledger = v.PartyName ?? "", debit = v.VoucherType == "Payment" ? v.TotalAmount : 0m, credit = v.VoucherType == "Receipt" ? v.TotalAmount : v.TotalAmount }));
+    public async Task<ActionResult<object>> DayBook(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
+    {
+        var q = tenants.Filter(db.Vouchers.AsNoTracking()).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLowerInvariant();
+            q = q.Where(v =>
+                v.VoucherNo.ToLower().Contains(s) ||
+                (v.PartyName != null && v.PartyName.ToLower().Contains(s)) ||
+                (v.Narration != null && v.Narration.ToLower().Contains(s)));
+        }
+        q = q.OrderByDescending(v => v.VoucherDate).ThenByDescending(v => v.CreatedAt);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var rows = items.Select(v => (object)new
+        {
+            date = v.VoucherDate.ToString("yyyy-MM-dd"),
+            voucherNo = v.VoucherNo,
+            type = v.VoucherType,
+            ledger = v.PartyName ?? "",
+            debit = v.VoucherType == "Payment" ? v.TotalAmount : 0m,
+            credit = v.VoucherType == "Receipt" ? v.TotalAmount : (v.VoucherType == "Payment" ? 0m : v.TotalAmount),
+        }).ToList();
+        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
+    }
+
+    async Task<ActionResult<object>> PagedRegister(
+        string type,
+        string? search,
+        int page,
+        int pageSize,
+        bool includeTotal) =>
+        Ok(await registers.GetRegisterPagedAsync(type, page, pageSize, search, includeTotal));
 
     [HttpGet("journal-register")]
-    public async Task<ActionResult<object>> JournalRegister() =>
-        Ok(await registers.GetRegisterAsync("journal"));
+    public Task<ActionResult<object>> JournalRegister(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true) =>
+        PagedRegister("journal", search, page, pageSize, includeTotal);
 
     [HttpGet("receipt-register")]
-    public async Task<ActionResult<object>> ReceiptRegister() =>
-        Ok(await registers.GetRegisterAsync("receipt"));
+    public Task<ActionResult<object>> ReceiptRegister(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true) =>
+        PagedRegister("receipt", search, page, pageSize, includeTotal);
 
     [HttpGet("payment-register")]
-    public async Task<ActionResult<object>> PaymentRegister() =>
-        Ok(await registers.GetRegisterAsync("payment"));
+    public Task<ActionResult<object>> PaymentRegister(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true) =>
+        PagedRegister("payment", search, page, pageSize, includeTotal);
 
     [HttpGet("purchase-register")]
-    public async Task<ActionResult<object>> PurchaseRegister() =>
-        Ok(await registers.GetRegisterAsync("purchase"));
+    public Task<ActionResult<object>> PurchaseRegister(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true) =>
+        PagedRegister("purchase", search, page, pageSize, includeTotal);
 
     [HttpGet("sales-register")]
-    public async Task<ActionResult<object>> SalesRegister() =>
-        Ok(await registers.GetRegisterAsync("sales"));
+    public Task<ActionResult<object>> SalesRegister(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true) =>
+        PagedRegister("sales", search, page, pageSize, includeTotal);
 
     [HttpGet("register-jobs/{id:guid}")]
     public async Task<ActionResult<object>> RegisterJobStatus(Guid id)
