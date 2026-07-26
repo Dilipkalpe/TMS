@@ -525,7 +525,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         string lrNumber;
         try
         {
-            branchId = DocumentNumberService.RequireBranchId(booking?.BranchId ?? branches.AssignBranchId);
+            branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, booking?.BranchId);
             lrDate = ApiParseHelper.BodyDate(body, "lrDate", DateOnly.FromDateTime(DateTime.UtcNow));
             lrNumber = await documentNumbers.NextAsync(DocumentNumberTypes.LR, companyId, branchId, lrDate);
         }

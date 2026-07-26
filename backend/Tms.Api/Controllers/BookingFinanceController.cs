@@ -107,7 +107,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
         string receiptNo;
         try
         {
-            var branchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+            var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, booking.BranchId);
             receiptNo = await documentNumbers.NextAsync(
                 DocumentNumberTypes.Receipt, booking.CompanyId, branchId, paymentDate);
         }

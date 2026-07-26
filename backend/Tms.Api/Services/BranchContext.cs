@@ -25,11 +25,14 @@ public class BranchContext : IBranchContext
         var user = ctx?.User;
         if (user?.Identity?.IsAuthenticated != true) return;
 
-        var role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+        // RoleClaimType / inbound mapping can leave role under "role" or ClaimTypes.Role.
+        var role = user.FindFirstValue(ClaimTypes.Role)
+            ?? user.FindFirstValue("role")
+            ?? "";
         CanAccessAllBranches = TenantRoles.CanAccessAllBranches(role);
 
-        Guid? userBranch = Guid.TryParse(user.FindFirst("branch_id")?.Value, out var ub) ? ub : null;
-        var allowed = ParseAllowed(user.FindFirst("allowed_branch_ids")?.Value);
+        Guid? userBranch = Guid.TryParse(user.FindFirstValue("branch_id"), out var ub) ? ub : null;
+        var allowed = ParseAllowed(user.FindFirstValue("allowed_branch_ids"));
         if (allowed.Count == 0 && userBranch.HasValue)
             allowed.Add(userBranch.Value);
         AllowedBranchIds = allowed;
@@ -41,23 +44,22 @@ public class BranchContext : IBranchContext
             && Guid.TryParse(header, out var selected))
             headerBranch = selected;
 
-        if (CanAccessAllBranches)
+        // Prefer explicit UI branch for document numbering / writes.
+        if (headerBranch.HasValue)
         {
-            if (headerBranch.HasValue)
+            var headerAllowed = CanAccessAllBranches
+                || AllowedBranchIds.Count == 0
+                || AllowedBranchIds.Contains(headerBranch.Value);
+            if (headerAllowed)
             {
                 EffectiveBranchId = headerBranch;
                 AssignBranchId = headerBranch;
+                return;
             }
-            return;
         }
 
-        // Scoped users: header must be in allowed set; otherwise use single branch or multi IN-filter.
-        if (headerBranch.HasValue && AllowedBranchIds.Contains(headerBranch.Value))
-        {
-            EffectiveBranchId = headerBranch;
-            AssignBranchId = headerBranch;
+        if (CanAccessAllBranches)
             return;
-        }
 
         if (AllowedBranchIds.Count == 1)
         {
@@ -68,7 +70,6 @@ public class BranchContext : IBranchContext
 
         if (AllowedBranchIds.Count > 1)
         {
-            // All assigned branches (no single EffectiveBranchId).
             AssignBranchId = AllowedBranchIds[0];
             return;
         }

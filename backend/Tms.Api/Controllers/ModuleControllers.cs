@@ -194,7 +194,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         {
             try
             {
-                var branchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+                var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, booking.BranchId);
                 pod.PodNo = await documentNumbers.NextAsync(
                     DocumentNumberTypes.Pod,
                     booking.CompanyId,
@@ -315,7 +315,7 @@ public class PodController(TmsDbContext db, NotificationDispatcher notifications
         {
             try
             {
-                var branchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+                var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, booking.BranchId);
                 pod.PodNo = await documentNumbers.NextAsync(
                     DocumentNumberTypes.Pod,
                     booking.CompanyId,

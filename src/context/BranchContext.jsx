@@ -8,7 +8,7 @@ const BRANCH_KEY = 'tms-branch-id'
 const BranchContext = createContext(null)
 
 export function BranchProvider({ children }) {
-  const { isAuthenticated, booting } = useAuth()
+  const { isAuthenticated, booting, user } = useAuth()
   const [branches, setBranches] = useState([])
   const [selectedBranchId, setSelectedBranchIdState] = useState(() => localStorage.getItem(BRANCH_KEY) || 'all')
   const [loading, setLoading] = useState(true)
@@ -50,6 +50,16 @@ export function BranchProvider({ children }) {
       setSelectedBranchId('all')
     }
   }, [branches, selectedBranchId])
+
+  // Keep API X-Branch-Id set for single-branch users (UI shows label only, not a select).
+  useEffect(() => {
+    if (!isAuthenticated || !branches.length) return
+    if (user?.canAccessAllBranches) return
+    if ((user?.allowedBranchIds?.length || 0) > 1) return
+    if (branches.length === 1 && (!selectedBranchId || selectedBranchId === 'all')) {
+      setSelectedBranchId(String(branches[0].id))
+    }
+  }, [isAuthenticated, user, branches, selectedBranchId])
 
   const selectedBranch = branches.find((b) => String(b.id) === String(selectedBranchId)) ?? null
 

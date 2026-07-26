@@ -25,7 +25,9 @@ public class TenantContext : ITenantContext
         var user = ctx?.User;
         if (user?.Identity?.IsAuthenticated != true) return;
 
-        var role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+        var role = user.FindFirstValue(ClaimTypes.Role)
+            ?? user.FindFirstValue("role")
+            ?? "";
         IsPlatformAdmin = TenantRoles.IsPlatformAdmin(role);
 
         Guid? userCompany = Guid.TryParse(user.FindFirst("company_id")?.Value, out var uc) ? uc : null;

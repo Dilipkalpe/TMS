@@ -67,7 +67,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
             if (!ApiParseHelper.TryParseDate(req.Date, out var bookingDate))
                 return BadRequest(new ApiError("Invalid booking date. Use YYYY-MM-DD."));
 
-            var branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId);
+            var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, ct: ct);
             var id = await documentNumbers.NextAsync(DocumentNumberTypes.Booking, companyId, branchId, bookingDate, ct);
             var vehicle = !string.IsNullOrEmpty(req.Vehicle)
                 ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, req.Vehicle) : null;

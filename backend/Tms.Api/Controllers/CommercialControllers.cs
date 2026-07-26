@@ -270,7 +270,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         string quoteNo;
         try
         {
-            branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId);
+            branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches);
             quoteNo = await documentNumbers.NextAsync(DocumentNumberTypes.Quotation, companyId, branchId);
         }
         catch (InvalidOperationException ex)
@@ -410,7 +410,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         string bookingId;
         try
         {
-            branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId ?? q.BranchId);
+            branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, q.BranchId);
             bookingId = await documentNumbers.NextAsync(DocumentNumberTypes.Booking, companyId, branchId);
         }
         catch (InvalidOperationException ex)
@@ -606,7 +606,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
         DateOnly invoiceDate;
         try
         {
-            invBranchId = DocumentNumberService.RequireBranchId(booking.BranchId ?? branches.AssignBranchId);
+            invBranchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, booking.BranchId);
             invoiceDate = ApiParseHelper.BodyDate(body, "invoiceDate", DateOnly.FromDateTime(DateTime.UtcNow));
             invoiceNo = await documentNumbers.NextAsync(
                 DocumentNumberTypes.Invoice, booking.CompanyId, invBranchId, invoiceDate);

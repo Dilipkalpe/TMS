@@ -11,6 +11,32 @@ public sealed class DocumentNumberService(TmsDbContext db)
     public static Guid RequireBranchId(Guid? branchId) =>
         branchId ?? throw new InvalidOperationException("Branch is required for document numbering. Select a branch and try again.");
 
+    /// <summary>Resolve branch for document numbering — header / assign, else company head office.</summary>
+    public async Task<Guid> ResolveBranchIdForNumberingAsync(
+        ITenantContext tenants,
+        IBranchContext branches,
+        Guid? preferredBranchId = null,
+        CancellationToken ct = default)
+    {
+        if (preferredBranchId.HasValue && preferredBranchId.Value != Guid.Empty)
+            return preferredBranchId.Value;
+        if (branches.AssignBranchId.HasValue && branches.AssignBranchId.Value != Guid.Empty)
+            return branches.AssignBranchId.Value;
+
+        var companyId = tenants.AssignCompanyId ?? TenantContext.DefaultCompanyId;
+        var fallback = await db.Branches.AsNoTracking()
+            .Where(b => b.CompanyId == companyId && b.IsActive)
+            .OrderByDescending(b => b.IsHeadOffice)
+            .ThenBy(b => b.Code)
+            .Select(b => (Guid?)b.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (fallback == null || fallback == Guid.Empty)
+            throw new InvalidOperationException("Branch is required for document numbering. Select a branch and try again.");
+
+        return fallback.Value;
+    }
+
     /// <summary>Indian financial year label (1 Apr – 31 Mar). July 2026 → 2026-27.</summary>
     public static string GetFinancialYear(DateOnly date)
     {

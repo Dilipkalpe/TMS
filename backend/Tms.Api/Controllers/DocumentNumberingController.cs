@@ -55,7 +55,7 @@ public class DocumentNumberingController(
         var companyId = tenants.AssignCompanyId ?? TenantContext.DefaultCompanyId;
         try
         {
-            var bid = DocumentNumberService.RequireBranchId(branchId ?? branches.AssignBranchId);
+            var bid = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, branchId, ct);
             await documentNumbers.EnsureDefaultsForBranchAsync(companyId, bid, ct);
             var rows = await documentNumbers.ListConfigsAsync(companyId, bid, ct);
             return Ok(new { items = rows });

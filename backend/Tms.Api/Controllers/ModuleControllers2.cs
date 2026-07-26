@@ -177,7 +177,7 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
         try
         {
             var companyId = TenantScope.ResolveCompanyId(tenants);
-            var branchId = DocumentNumberService.RequireBranchId(branches.AssignBranchId);
+            var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches);
             var tripCode = await documentNumbers.NextAsync(DocumentNumberTypes.Trip, companyId, branchId);
 
             var trip = new Trip
