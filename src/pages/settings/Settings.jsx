@@ -103,6 +103,13 @@ export default function Settings() {
       content: (
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Company Name" value={settings.companyName ?? ''} onChange={(e) => update('companyName', e.target.value)} />
+          <Input
+            label="Company Code (2 chars)"
+            value={settings.companyCode ?? ''}
+            maxLength={2}
+            onChange={(e) => update('companyCode', e.target.value.toUpperCase().slice(0, 2))}
+            placeholder="01"
+          />
           <Input label="GSTIN" value={settings.gstin ?? ''} onChange={(e) => update('gstin', e.target.value)} />
           <Input label="PAN" value={settings.pan ?? ''} onChange={(e) => update('pan', e.target.value)} />
           <Input label="Phone" value={settings.phone ?? ''} onChange={(e) => update('phone', e.target.value)} />
@@ -142,7 +149,9 @@ export default function Settings() {
             />
           </div>
           <Button icon={saving ? Loader2 : Save} disabled={saving} onClick={() => saveSettings({
-            companyName: settings.companyName, gstin: settings.gstin, pan: settings.pan,
+            companyName: settings.companyName,
+            companyCode: settings.companyCode,
+            gstin: settings.gstin, pan: settings.pan,
             address: settings.address, phone: settings.phone, email: settings.email,
             transportLicenseNo: settings.transportLicenseNo, fleetSize: settings.fleetSize ? Number(settings.fleetSize) : null,
           })}>Save Profile</Button>

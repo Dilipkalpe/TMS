@@ -65,7 +65,7 @@ ON CONFLICT (code) DO UPDATE SET
     is_custom = EXCLUDED.is_custom, sort_order = EXCLUDED.sort_order;
 
 INSERT INTO companies (id, code, name, legal_name, is_active)
-VALUES ('00000000-0000-4000-8000-000000000001', 'DEFAULT', 'Demo Company', 'Demo Company Pvt Ltd', TRUE)
+VALUES ('00000000-0000-4000-8000-000000000001', '01', 'Demo Company', 'Demo Company Pvt Ltd', TRUE)
 ON CONFLICT (code) DO NOTHING;
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id);

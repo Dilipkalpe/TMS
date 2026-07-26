@@ -19,12 +19,15 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
     public async Task<ActionResult<object>> Get(CancellationToken ct)
     {
         var flow = await documentFlow.GetFlowAsync(ct);
+        var companyId = tenants.AssignCompanyId ?? TenantContext.DefaultCompanyId;
+        var company = await db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId, ct);
         var s = await FindSettingsAsync(ct);
         if (s == null)
         {
             return Ok(new
             {
                 companyName = "TMS Pro Logistics Pvt Ltd",
+                companyCode = company?.Code ?? "01",
                 financialYear = "2025-26",
                 gstRate = 18,
                 documentFlow = flow,
@@ -35,6 +38,7 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
         return Ok(new
         {
             companyName = s.CompanyName,
+            companyCode = company?.Code ?? "",
             address = s.Address,
             gstin = s.Gstin,
             pan = s.Pan,
@@ -112,12 +116,35 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
                 return BadRequest(new { message = $"Invalid documentFlow. Use '{DocumentFlow.FirstLRThenBooking}' or '{DocumentFlow.FirstBookingThenLR}'." });
             s.DocumentFlow = DocumentFlow.Normalize(raw);
         }
+
+        string? savedCompanyCode = null;
+        if (body.ContainsKey("companyCode"))
+        {
+            var code = DocumentCodeRules.Normalize(body["companyCode"]?.ToString());
+            if (!DocumentCodeRules.IsValid(code))
+                return BadRequest(new { message = "Company code must be exactly 2 characters (A–Z / 0–9), e.g. 01 or PN." });
+
+            var companyId = tenants.AssignCompanyId ?? TenantContext.DefaultCompanyId;
+            var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct);
+            if (company == null)
+                return BadRequest(new { message = "Company record not found." });
+
+            var taken = await db.Companies.AnyAsync(c => c.Code == code && c.Id != companyId, ct);
+            if (taken)
+                return BadRequest(new { message = $"Company code '{code}' is already used." });
+
+            company.Code = code;
+            company.UpdatedAt = DateTime.UtcNow;
+            savedCompanyCode = code;
+        }
+
         s.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         return Ok(new
         {
             message = "Settings saved successfully.",
             logoUrl = s.LogoUrl,
+            companyCode = savedCompanyCode,
             documentFlow = DocumentFlow.Normalize(s.DocumentFlow),
         });
     }

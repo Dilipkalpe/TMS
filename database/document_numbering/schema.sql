@@ -224,3 +224,41 @@ BEGIN
         END;
     END IF;
 END $$;
+
+-- Normalize demo / legacy company codes that are not 2 characters.
+UPDATE companies
+SET code = '01', updated_at = NOW()
+WHERE UPPER(TRIM(code)) IN ('DEFAULT', 'DEMO', 'TMS')
+   OR LENGTH(TRIM(code)) <> 2;
+
+-- Shorten branch codes longer than 2 chars to first 2 characters when unique within company.
+DO $$
+DECLARE
+    r RECORD;
+    new_code TEXT;
+BEGIN
+    FOR r IN
+        SELECT id, company_id, UPPER(TRIM(code)) AS code
+        FROM branches
+        WHERE LENGTH(TRIM(code)) <> 2
+    LOOP
+        new_code := LEFT(r.code, 2);
+        IF new_code IS NULL OR LENGTH(new_code) < 2 THEN
+            new_code := '01';
+        END IF;
+        -- Avoid unique collisions within the same company.
+        IF EXISTS (
+            SELECT 1 FROM branches b
+            WHERE b.company_id = r.company_id AND b.id <> r.id AND UPPER(TRIM(b.code)) = new_code
+        ) THEN
+            new_code := LPAD((ABS(HASHTEXT(r.id::text)) % 100)::text, 2, '0');
+            WHILE EXISTS (
+                SELECT 1 FROM branches b
+                WHERE b.company_id = r.company_id AND b.id <> r.id AND UPPER(TRIM(b.code)) = new_code
+            ) LOOP
+                new_code := LPAD(((ABS(HASHTEXT(r.id::text || new_code)) % 100))::text, 2, '0');
+            END LOOP;
+        END IF;
+        UPDATE branches SET code = new_code, updated_at = NOW() WHERE id = r.id;
+    END LOOP;
+END $$;
