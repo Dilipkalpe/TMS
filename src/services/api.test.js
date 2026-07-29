@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { platformApi, portalApi, notificationsApi } from './api'
+import { platformApi, portalApi, notificationsApi, unwrapPaginated } from './api'
+
+describe('unwrapPaginated', () => {
+  it('returns rows from paginated object', () => {
+    expect(unwrapPaginated({ rows: [{ id: 1 }], total: 1 })).toEqual([{ id: 1 }])
+  })
+  it('returns array as-is', () => {
+    expect(unwrapPaginated([{ id: 1 }])).toEqual([{ id: 1 }])
+  })
+  it('returns empty array for invalid input', () => {
+    expect(unwrapPaginated(null)).toEqual([])
+    expect(unwrapPaginated({})).toEqual([])
+  })
+})
 
 describe('API service exports', () => {
   it('platformApi has all required methods', () => {

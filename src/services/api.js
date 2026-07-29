@@ -42,6 +42,13 @@ export class ApiError extends Error {
   }
 }
 
+/** Normalize paginated API responses ({ rows, total }) or legacy plain arrays. */
+export function unwrapPaginated(res) {
+  if (Array.isArray(res)) return res
+  if (res && Array.isArray(res.rows)) return res.rows
+  return []
+}
+
 async function readApiError(res, fallbackMessage) {
   let message = fallbackMessage || res.statusText
   let details = null

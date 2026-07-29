@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Building2 } from 'lucide-react'
 import { useCompany } from '../../context/CompanyContext'
-import { platformApi } from '../../services/api'
+import { platformApi, unwrapPaginated } from '../../services/api'
 
 export default function CompanySelector() {
   const { effectiveCompanyId, setSelectedCompanyId } = useCompany()
@@ -9,8 +9,8 @@ export default function CompanySelector() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    platformApi.companies()
-      .then(setCompanies)
+    platformApi.companies({ pageSize: 100 })
+      .then((res) => setCompanies(unwrapPaginated(res)))
       .catch(() => setCompanies([]))
       .finally(() => setLoading(false))
   }, [])
