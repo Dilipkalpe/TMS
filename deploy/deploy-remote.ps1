@@ -209,7 +209,7 @@ echo
 echo 'DEPLOY_OK'
 "@
 
-    Write-Step "Connecting and deploying (this can take 5–15 minutes)..."
+    Write-Step "Connecting and deploying (this can take 5-15 minutes)..."
     $result = Invoke-Ssh $remoteCmd
     Write-Host $result
 
