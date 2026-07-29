@@ -64,6 +64,49 @@ public class CustomerTrackingService(TmsDbContext db, IConfiguration config)
         return rows.Select(b => MapShipment(b, pods.ContainsKey(b.Id))).ToList();
     }
 
+    public async Task<object> ListShipmentsPagedAsync(Guid? companyId, string? customerId, string? bookingIdScope,
+        int page, int pageSize, string? search, string? statusFilter, string? sort, CancellationToken ct = default)
+    {
+        var q = ScopeBookings(db, companyId, customerId, bookingIdScope);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            q = q.Where(b => b.Id.ToLower().Contains(s)
+                || b.FromCity.ToLower().Contains(s)
+                || b.ToCity.ToLower().Contains(s)
+                || b.CustomerName.ToLower().Contains(s)
+                || (b.VehicleNumber != null && b.VehicleNumber.ToLower().Contains(s)));
+        }
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+            q = q.Where(b => b.Status == statusFilter);
+
+        var total = await q.CountAsync(ct);
+
+        q = sort?.ToLower() switch
+        {
+            "date_asc" => q.OrderBy(b => b.BookingDate),
+            "freight_desc" => q.OrderByDescending(b => b.Freight),
+            "freight_asc" => q.OrderBy(b => b.Freight),
+            "status" => q.OrderBy(b => b.Status).ThenByDescending(b => b.BookingDate),
+            _ => q.OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.Id),
+        };
+
+        var rows = await q.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var ids = rows.Select(r => r.Id).ToList();
+        var pods = await db.ProofOfDeliveries.AsNoTracking()
+            .Where(p => ids.Contains(p.BookingId))
+            .ToDictionaryAsync(p => p.BookingId, ct);
+
+        return new
+        {
+            rows = rows.Select(b => MapShipment(b, pods.ContainsKey(b.Id))).ToList(),
+            total,
+            page,
+            pageSize,
+        };
+    }
+
     public async Task<PortalTrackingDto?> GetTrackingAsync(string bookingId, Guid? companyId, string? customerId, string? bookingIdScope, CancellationToken ct = default)
     {
         if (bookingIdScope != null && bookingIdScope != bookingId) return null;

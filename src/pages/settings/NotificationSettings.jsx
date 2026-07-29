@@ -16,17 +16,21 @@ export default function NotificationSettingsPage() {
   const [tab, setTab] = useState('channels')
   const [testPhone, setTestPhone] = useState('')
   const [testMessage, setTestMessage] = useState('TMS Pro test notification')
+  const [preferences, setPreferences] = useState([])
+  const [savingPrefs, setSavingPrefs] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [s, t, o] = await Promise.all([
+      const [s, t, o, p] = await Promise.all([
         notificationsApi.channelSettings(),
         notificationsApi.templates(),
         notificationsApi.outbox({ limit: 30 }),
+        notificationsApi.preferences().catch(() => []),
       ])
       setSettings(s)
       setTemplates(t)
       setOutbox(o)
+      setPreferences(p ?? [])
       setTestPhone(s.adminPhone ?? '')
     } catch (e) {
       toast({ title: 'Load failed', message: e.message, type: 'error' })
@@ -78,7 +82,7 @@ export default function NotificationSettingsPage() {
         Without a key, messages run in stub mode (logged as SENT).
       </p>
       <div className="mb-4 flex flex-wrap gap-2">
-        {['channels', 'templates', 'outbox'].map((t) => (
+        {['channels', 'templates', 'preferences', 'outbox'].map((t) => (
           <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-lg px-4 py-2 text-sm font-medium capitalize ${tab === t ? 'bg-primary text-white' : 'border'}`}>{t}</button>
         ))}
         <Link to="/operations/notifications" className="ml-auto text-sm text-primary hover:underline">In-app notifications →</Link>
@@ -117,6 +121,73 @@ export default function NotificationSettingsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {tab === 'preferences' && (
+        <Card className="max-w-2xl space-y-4 p-6">
+          <p className="text-sm text-slate-500">Toggle which events trigger SMS / WhatsApp notifications. Events without a preference row default to ON for all channels.</p>
+          {(() => {
+            const eventCodes = [...new Set(templates.map((t) => t.code))]
+            const channels = ['SMS', 'WHATSAPP']
+            return (
+              <div className="space-y-3">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Event</th>
+                      {channels.map((ch) => <th key={ch} className="px-4 py-2 text-center">{ch}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eventCodes.map((code) => (
+                      <tr key={code} className="border-t">
+                        <td className="px-4 py-2 font-medium">{code.replace(/_/g, ' ')}</td>
+                        {channels.map((ch) => {
+                          const pref = preferences.find((p) => p.eventCode === code && p.channel === ch)
+                          const enabled = pref ? pref.enabled : true
+                          return (
+                            <td key={ch} className="px-4 py-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={enabled}
+                                onChange={(e) => {
+                                  setPreferences((prev) => {
+                                    const idx = prev.findIndex((p) => p.eventCode === code && p.channel === ch)
+                                    if (idx >= 0) {
+                                      const copy = [...prev]
+                                      copy[idx] = { ...copy[idx], enabled: e.target.checked }
+                                      return copy
+                                    }
+                                    return [...prev, { eventCode: code, channel: ch, enabled: e.target.checked }]
+                                  })
+                                }}
+                              />
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Button disabled={savingPrefs} onClick={async () => {
+                  setSavingPrefs(true)
+                  try {
+                    const items = preferences.map(({ eventCode, channel, enabled }) => ({ eventCode, channel, enabled }))
+                    const saved = await notificationsApi.savePreferences(items)
+                    setPreferences(saved ?? [])
+                    toast({ title: 'Preferences saved', type: 'success' })
+                  } catch (e) {
+                    toast({ title: 'Save failed', message: e.message, type: 'error' })
+                  } finally {
+                    setSavingPrefs(false)
+                  }
+                }}>
+                  {savingPrefs ? 'Saving…' : 'Save preferences'}
+                </Button>
+              </div>
+            )
+          })()}
+        </Card>
       )}
 
       {tab === 'outbox' && (

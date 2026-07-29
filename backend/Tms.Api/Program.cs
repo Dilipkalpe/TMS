@@ -18,6 +18,8 @@ using Tms.Api.Data;
 
 using Tms.Api.DTOs;
 
+using Tms.Api.Middleware;
+
 using Tms.Api.Services;
 
 
@@ -122,6 +124,7 @@ builder.Services.AddScoped<NotificationOutboxProcessor>();
 builder.Services.AddSingleton<NotificationChannelRouter>();
 
 builder.Services.AddSingleton<INotificationChannelSender, Msg91NotificationSender>();
+builder.Services.AddSingleton<INotificationChannelSender, SmtpEmailNotificationSender>();
 
 builder.Services.AddHttpClient("Msg91");
 
@@ -348,34 +351,38 @@ app.UseMiddleware<TenantScopeMiddleware>();
 
 app.UseAuthorization();
 
+app.UseMiddleware<AuditLogMiddleware>();
+
 app.MapControllers();
 
-app.MapGet("/api/health", async (TmsDbContext db) =>
-
+app.MapGet("/api/health", async (TmsDbContext db, IConfiguration config) =>
 {
-
     try
-
     {
+        var dbOk = await db.Database.CanConnectAsync();
+        var msg91Configured = !string.IsNullOrWhiteSpace(config["Notifications:Msg91:AuthKey"]);
+        var smtpConfigured = !string.IsNullOrWhiteSpace(config["Notifications:Smtp:Host"]);
+        var notificationsEnabled = config.GetValue("Notifications:Enabled", true);
 
-        var ok = await db.Database.CanConnectAsync();
-
-        return ok
-
-            ? Results.Ok(new { status = "healthy", service = "TMS Pro API", database = "connected", build = "2026-07-26-phase1-commercial" })
-
-            : Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "disconnected", build = "2026-07-26-phase1-commercial" }, statusCode: 503);
-
+        var result = new
+        {
+            status = dbOk ? "healthy" : "unhealthy",
+            service = "TMS Pro API",
+            database = dbOk ? "connected" : "disconnected",
+            build = "2026-07-29-cx-platform",
+            notifications = new
+            {
+                enabled = notificationsEnabled,
+                sms = msg91Configured ? "configured" : "stub",
+                email = smtpConfigured ? "configured" : "stub",
+            },
+        };
+        return dbOk ? Results.Ok(result) : Results.Json(result, statusCode: 503);
     }
-
     catch (Exception ex)
-
     {
-
         return Results.Json(new { status = "unhealthy", service = "TMS Pro API", database = "error", message = ex.Message }, statusCode: 503);
-
     }
-
 });
 
 

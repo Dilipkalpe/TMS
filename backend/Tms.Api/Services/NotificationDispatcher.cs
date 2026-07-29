@@ -58,6 +58,14 @@ public class NotificationDispatcher(TmsDbContext db, IConfiguration config, ITen
             if (!string.IsNullOrWhiteSpace(phone))
                 await QueueExternalAsync(request, "WHATSAPP", phone, settings, companyId, ct);
         }
+
+        if (await IsChannelEnabledAsync(request.EventCode, "EMAIL", companyId, ct))
+        {
+            var email = request.Variables.GetValueOrDefault("email") 
+                ?? await GetCompanyEmailAsync(companyId, ct);
+            if (!string.IsNullOrWhiteSpace(email))
+                await QueueExternalAsync(request, "EMAIL", email, settings, companyId, ct);
+        }
     }
 
     async Task QueueExternalAsync(
@@ -130,6 +138,12 @@ public class NotificationDispatcher(TmsDbContext db, IConfiguration config, ITen
         var company = await db.CompanySettings.AsNoTracking().FirstOrDefaultAsync(c => c.CompanyId == companyId, ct);
         return company?.Phone;
     }
+
+    async Task<string?> GetCompanyEmailAsync(Guid companyId, CancellationToken ct)
+    {
+        var company = await db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId, ct);
+        return company?.Email;
+    }
 }
 
 public class NotificationOutboxProcessor(
@@ -149,11 +163,20 @@ public class NotificationOutboxProcessor(
         var maxAttempts = config.GetValue("Notifications:MaxAttempts", 3);
         var batchSize = config.GetValue("Notifications:BatchSize", 20);
 
+        var now = DateTime.UtcNow;
         var pending = await db.NotificationOutbox
             .Where(o => o.Status == "PENDING" && o.AttemptCount < maxAttempts)
             .OrderBy(o => o.CreatedAt)
-            .Take(batchSize)
+            .Take(batchSize * 2)
             .ToListAsync(ct);
+        
+        // Exponential backoff: skip items that were recently attempted
+        pending = pending.Where(o =>
+        {
+            if (o.AttemptCount == 0 || o.SentAt == null) return true;
+            var backoffSeconds = Math.Pow(2, o.AttemptCount) * 30; // 60s, 120s, 240s...
+            return (now - o.SentAt.Value).TotalSeconds >= backoffSeconds;
+        }).Take(batchSize).ToList();
 
         foreach (var item in pending)
         {
@@ -173,6 +196,7 @@ public class NotificationOutboxProcessor(
             {
                 item.ErrorMessage = result.Error;
                 item.Status = item.AttemptCount >= maxAttempts ? "FAILED" : "PENDING";
+                item.SentAt = DateTime.UtcNow;
             }
         }
 

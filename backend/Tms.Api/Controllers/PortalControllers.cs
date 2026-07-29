@@ -169,6 +169,7 @@ public class PortalAuthController(TmsDbContext db, IConfiguration config, IHostE
 }
 
 [Authorize(Policy = AuthorizationPolicies.PortalUser)]
+[EnableRateLimiting(AuthRateLimiting.PortalPolicyName)]
 [ApiController]
 [Route("api/portal")]
 public class PortalController(TmsDbContext db, CustomerTrackingService tracking, ITenantContext tenants) : ControllerBase
@@ -181,8 +182,14 @@ public class PortalController(TmsDbContext db, CustomerTrackingService tracking,
         return tenants.EffectiveCompanyId;
     }
 
+    /// <summary>List portal shipments with pagination, search, and filtering.</summary>
     [HttpGet("shipments")]
-    public async Task<IActionResult> Shipments()
+    [ProducesResponseType(typeof(object), 200)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> Shipments(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null, [FromQuery] string? status = null,
+        [FromQuery] string? sort = null)
     {
         if (!Access.CanUsePortal) return Forbid();
         var companyId = ResolveCompanyId();
@@ -192,8 +199,9 @@ public class PortalController(TmsDbContext db, CustomerTrackingService tracking,
             && Access.Role is not ("Super Admin" or "Admin" or "Platform Super Admin"))
             return Forbid();
 
-        var rows = await tracking.ListShipmentsAsync(companyId, Access.CustomerId, Access.BookingId);
-        return Ok(rows);
+        var result = await tracking.ListShipmentsPagedAsync(companyId, Access.CustomerId, Access.BookingId,
+            page, Math.Clamp(pageSize, 1, 100), search, status, sort);
+        return Ok(result);
     }
 
     [HttpGet("shipments/{id}/tracking")]
@@ -207,8 +215,13 @@ public class PortalController(TmsDbContext db, CustomerTrackingService tracking,
         return data == null ? NotFound() : Ok(data);
     }
 
+    /// <summary>List portal invoices with pagination, search, and status filtering.</summary>
     [HttpGet("invoices")]
-    public async Task<IActionResult> Invoices()
+    [ProducesResponseType(typeof(object), 200)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> Invoices(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null, [FromQuery] string? status = null)
     {
         if (!Access.CanUsePortal) return Forbid();
         var companyId = ResolveCompanyId();
@@ -224,9 +237,21 @@ public class PortalController(TmsDbContext db, CustomerTrackingService tracking,
             q = q.Where(i => i.CustomerId == Access.CustomerId);
         if (Access.BookingId != null)
             q = q.Where(i => i.BookingId == Access.BookingId);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            q = q.Where(i => (i.InvoiceNo != null && i.InvoiceNo.ToLower().Contains(s))
+                || (i.Customer != null && i.Customer.Name.ToLower().Contains(s)));
+        }
+        if (!string.IsNullOrWhiteSpace(status))
+            q = q.Where(i => i.Status == status);
 
-        var rows = await q.OrderByDescending(i => i.IssuedAt).Take(50).ToListAsync();
-        return Ok(rows.Select(PortalInvoiceMapper.Map));
+        var total = await q.CountAsync();
+        var rows = await q.OrderByDescending(i => i.IssuedAt)
+            .Skip((Math.Max(1, page) - 1) * pageSize)
+            .Take(Math.Clamp(pageSize, 1, 100))
+            .ToListAsync();
+        return Ok(new { rows = rows.Select(PortalInvoiceMapper.Map), total, page, pageSize });
     }
 
     [HttpGet("invoices/{id:guid}")]

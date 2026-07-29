@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { Clock, MapPin, Package, Truck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, MapPin, Package, Search, Truck } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import { portalApi } from '../../services/api'
 import { formatCurrency } from '../../components/ui/ReportFilters'
@@ -14,28 +14,51 @@ const statusTone = {
   Pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
 }
 
+const STATUSES = ['All', 'Pending', 'Confirmed', 'In Transit', 'Delivered', 'Cancelled']
+const PAGE_SIZE = 20
+
 export default function PortalDashboard() {
   const { profile } = usePortalAuth()
-  const [rows, setRows] = useState([])
+  const [data, setData] = useState({ rows: [], total: 0 })
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   useEffect(() => {
-    portalApi.shipments()
-      .then(setRows)
-      .finally(() => setLoading(false))
-  }, [])
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = { page, pageSize: PAGE_SIZE }
+      if (debouncedSearch) params.search = debouncedSearch
+      if (statusFilter) params.status = statusFilter
+      const res = await portalApi.shipments(params)
+      setData(res.rows ? res : { rows: Array.isArray(res) ? res : [], total: Array.isArray(res) ? res.length : 0 })
+    } finally {
+      setLoading(false)
+    }
+  }, [page, debouncedSearch, statusFilter])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => { setPage(1) }, [debouncedSearch, statusFilter])
+
+  const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
+  const rows = data.rows ?? []
 
   const stats = useMemo(() => ({
-    total: rows.length,
+    total: data.total ?? rows.length,
     active: rows.filter((r) => !['Delivered', 'Cancelled'].includes(r.status)).length,
     delivered: rows.filter((r) => r.status === 'Delivered').length,
-  }), [rows])
+  }), [rows, data.total])
 
   if (profile?.scope === 'booking' && profile.bookingId) {
     return <Navigate to={`/portal/track/${profile.bookingId}`} replace />
   }
-
-  if (loading) return <p className="text-sm text-slate-500">Loading your shipments…</p>
 
   return (
     <div>
@@ -63,8 +86,33 @@ export default function PortalDashboard() {
         ))}
       </div>
 
-      {!rows.length ? (
-        <PortalEmptyState title="No shipments yet">Your active bookings will appear here once dispatched.</PortalEmptyState>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            placeholder="Search by ID, city, vehicle…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          {STATUSES.map((s) => (
+            <option key={s} value={s === 'All' ? '' : s}>{s}</option>
+          ))}
+        </select>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-slate-500">Loading your shipments…</p>
+      ) : !rows.length ? (
+        <PortalEmptyState title="No shipments found">
+          {search || statusFilter ? 'Try adjusting your search or filters.' : 'Your active bookings will appear here once dispatched.'}
+        </PortalEmptyState>
       ) : (
         <>
           <h2 className="mb-3 text-lg font-semibold">My shipments</h2>
@@ -100,6 +148,20 @@ export default function PortalDashboard() {
               </Card>
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+                className="rounded-lg border px-2 py-1 text-sm disabled:opacity-40">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm text-slate-600">Page {page} of {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                className="rounded-lg border px-2 py-1 text-sm disabled:opacity-40">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

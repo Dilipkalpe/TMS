@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Tms.Api.Data;
 using Tms.Api.DTOs;
@@ -9,26 +10,44 @@ using Tms.Api.Services;
 namespace Tms.Api.Controllers;
 
 [Authorize(Roles = $"{TenantRoles.PlatformSuperAdmin},{TenantRoles.SuperAdmin}")]
+[EnableRateLimiting(AuthRateLimiting.PlatformPolicyName)]
 [ApiController]
 [Route("api/platform")]
 public class PlatformController(TmsDbContext db) : ControllerBase
 {
+    /// <summary>List companies with optional search and pagination.</summary>
     [HttpGet("companies")]
-    public async Task<ActionResult<object>> ListCompanies() =>
-        Ok(await db.Companies.OrderBy(c => c.Name).Select(c => new
+    [ProducesResponseType(typeof(object), 200)]
+    public async Task<ActionResult<object>> ListCompanies(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null, [FromQuery] string? active = null)
+    {
+        var q = db.Companies.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            c.Id,
-            c.Code,
-            c.Name,
-            c.Email,
-            c.Phone,
-            c.City,
-            c.IsActive,
-            plan = db.CompanySubscriptions
-                .Where(s => s.CompanyId == c.Id && s.Status == "active")
-                .Select(s => s.Plan!.Name)
-                .FirstOrDefault()
-        }).ToListAsync());
+            var s = search.Trim().ToLower();
+            q = q.Where(c => c.Name.ToLower().Contains(s) || c.Code.ToLower().Contains(s)
+                || (c.City != null && c.City.ToLower().Contains(s))
+                || (c.Email != null && c.Email.ToLower().Contains(s)));
+        }
+        if (active == "true") q = q.Where(c => c.IsActive);
+        else if (active == "false") q = q.Where(c => !c.IsActive);
+
+        var total = await q.CountAsync();
+        var rows = await q.OrderBy(c => c.Name)
+            .Skip((Math.Max(1, page) - 1) * pageSize)
+            .Take(Math.Clamp(pageSize, 1, 100))
+            .Select(c => new
+            {
+                c.Id, c.Code, c.Name, c.Email, c.Phone, c.City, c.State,
+                c.LegalName, c.Gstin, c.IsActive,
+                plan = db.CompanySubscriptions
+                    .Where(s => s.CompanyId == c.Id && s.Status == "active")
+                    .Select(s => s.Plan!.Name)
+                    .FirstOrDefault()
+            }).ToListAsync();
+        return Ok(new { rows, total, page, pageSize });
+    }
 
     [HttpPost("companies")]
     public async Task<ActionResult<object>> CreateCompany([FromBody] Dictionary<string, object?> body)
@@ -133,6 +152,46 @@ public class PlatformController(TmsDbContext db) : ControllerBase
         return Ok(new { message = "Company created.", companyId, branchId, plan = plan.Code });
     }
 
+    /// <summary>Update company details (name, email, phone, city, etc.).</summary>
+    [HttpPut("companies/{companyId:guid}")]
+    [ProducesResponseType(typeof(object), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<object>> UpdateCompany(Guid companyId, [FromBody] Dictionary<string, object?> body)
+    {
+        var company = await db.Companies.FindAsync(companyId);
+        if (company == null) return NotFound();
+
+        if (body.ContainsKey("name")) company.Name = ApiParseHelper.BodyString(body, "name") ?? company.Name;
+        if (body.ContainsKey("legalName")) company.LegalName = ApiParseHelper.BodyString(body, "legalName");
+        if (body.ContainsKey("email")) company.Email = ApiParseHelper.BodyString(body, "email");
+        if (body.ContainsKey("phone")) company.Phone = ApiParseHelper.BodyString(body, "phone");
+        if (body.ContainsKey("city")) company.City = ApiParseHelper.BodyString(body, "city");
+        if (body.ContainsKey("state")) company.State = ApiParseHelper.BodyString(body, "state");
+        if (body.ContainsKey("gstin")) company.Gstin = ApiParseHelper.BodyString(body, "gstin");
+        company.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Company updated.", companyId });
+    }
+
+    /// <summary>Activate or deactivate a company.</summary>
+    [HttpPatch("companies/{companyId:guid}/status")]
+    [ProducesResponseType(typeof(object), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<object>> ToggleCompanyStatus(Guid companyId, [FromBody] Dictionary<string, object?> body)
+    {
+        var company = await db.Companies.FindAsync(companyId);
+        if (company == null) return NotFound();
+
+        var isActive = ApiParseHelper.BodyBool(body, "isActive");
+        if (isActive == null) return BadRequest(new ApiError("isActive is required."));
+        company.IsActive = isActive.Value;
+        company.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(new { message = company.IsActive ? "Company activated." : "Company deactivated.", companyId });
+    }
+
     [HttpGet("plans")]
     public async Task<ActionResult<object>> ListPlans() =>
         Ok(await db.SubscriptionPlans.Where(p => p.IsActive).OrderBy(p => p.SortOrder).Select(p => new
@@ -180,21 +239,28 @@ public class PlatformController(TmsDbContext db) : ControllerBase
     }
 
     [HttpGet("billing")]
-    public async Task<ActionResult<object>> BillingSummary() =>
-        Ok(await db.CompanySubscriptions
-            .Include(s => s.Company)
-            .Include(s => s.Plan)
-            .Where(s => s.Status == "active")
-            .OrderBy(s => s.Company!.Name)
-            .Select(s => new
-            {
-                company = s.Company!.Name,
-                companyCode = s.Company.Code,
-                plan = s.Plan!.Name,
-                s.AmountInr,
-                s.StartedAt,
-                s.ExpiresAt
-            }).ToListAsync());
+    public async Task<ActionResult<object>> BillingSummary(
+        [FromQuery] string? status = "active", [FromQuery] string? from = null, [FromQuery] string? to = null)
+    {
+        var q = db.CompanySubscriptions.Include(s => s.Company).Include(s => s.Plan).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(status) && status != "all")
+            q = q.Where(s => s.Status == status);
+        if (DateOnly.TryParse(from, out var fromDate))
+            q = q.Where(s => s.StartedAt >= fromDate);
+        if (DateOnly.TryParse(to, out var toDate))
+            q = q.Where(s => s.StartedAt <= toDate);
+
+        return Ok(await q.OrderBy(s => s.Company!.Name).Select(s => new
+        {
+            company = s.Company!.Name,
+            companyCode = s.Company.Code,
+            plan = s.Plan!.Name,
+            s.AmountInr,
+            s.StartedAt,
+            s.ExpiresAt,
+            s.Status
+        }).ToListAsync());
+    }
 }
 
 [Authorize]

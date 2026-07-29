@@ -132,10 +132,12 @@ export const authApi = {
 }
 
 export const platformApi = {
-  companies: () => apiRequest('/platform/companies'),
+  companies: (params = {}) => apiRequest(`/platform/companies?${new URLSearchParams(params)}`),
   createCompany: (data) => apiRequest('/platform/companies', { method: 'POST', body: data }),
+  updateCompany: (id, data) => apiRequest(`/platform/companies/${id}`, { method: 'PUT', body: data }),
+  toggleCompanyStatus: (id, isActive) => apiRequest(`/platform/companies/${id}/status`, { method: 'PATCH', body: { isActive } }),
   plans: () => apiRequest('/platform/plans'),
-  billing: () => apiRequest('/platform/billing'),
+  billing: (params = {}) => apiRequest(`/platform/billing?${new URLSearchParams(params)}`),
   changePlan: (companyId, data) => apiRequest(`/platform/companies/${companyId}/subscription`, { method: 'PUT', body: data }),
 }
 
@@ -540,9 +542,9 @@ export const portalApi = {
   },
   me: () => portalRequest('/portal/auth/me'),
   logout: () => setPortalToken(null),
-  shipments: () => portalRequest('/portal/shipments'),
+  shipments: (params = {}) => portalRequest(`/portal/shipments?${new URLSearchParams(params)}`),
   tracking: (id) => portalRequest(`/portal/shipments/${id}/tracking`),
-  invoices: () => portalRequest('/portal/invoices'),
+  invoices: (params = {}) => portalRequest(`/portal/invoices?${new URLSearchParams(params)}`),
   invoice: (id) => portalRequest(`/portal/invoices/${id}`),
   pod: (bookingId) => portalRequest(`/portal/pod/${bookingId}`),
   shareLink: (id) => portalRequest(`/portal/shipments/${id}/share-link`, { method: 'POST' }),

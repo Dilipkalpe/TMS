@@ -30,7 +30,8 @@ public class TmsWebApplicationFactory : WebApplicationFactory<Program>
                 services.Remove(d);
 
             services.AddDbContext<TmsDbContext>(opt =>
-                opt.UseInMemoryDatabase(_databaseName));
+                opt.UseInMemoryDatabase(_databaseName)
+                   .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
         });
     }
 
@@ -93,6 +94,29 @@ public class TmsWebApplicationFactory : WebApplicationFactory<Program>
             Number = "MH12AB1234",
             Type = "Truck",
             Status = "Active",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+
+        db.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = Guid.Parse("00000000-0000-4000-8000-000000000030"),
+            Code = "starter",
+            Name = "Starter",
+            PriceInr = 999,
+            MaxUsers = 5,
+            MaxBookingsMonth = 100,
+            SortOrder = 1,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        db.Companies.Add(new Company
+        {
+            Id = TestCompanyId,
+            Code = "TC",
+            Name = "Test Company",
+            IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         });

@@ -325,7 +325,8 @@ public class TenantIsolationIntegrationTests(TmsWebApplicationFactory factory)
         var response = await _client.SendAsync(request);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.EnumerateArray().Select(i => i.GetProperty("invoiceNo").GetString())
+        var rows = json.TryGetProperty("rows", out var r) ? r : json;
+        rows.EnumerateArray().Select(i => i.GetProperty("invoiceNo").GetString())
             .Should().Contain("INV-TENANT-TEST-A").And.NotContain("INV-TENANT-TEST-B");
     }
 

@@ -45,4 +45,19 @@ public static class ApiParseHelper
         var s = BodyString(body, key);
         return !string.IsNullOrWhiteSpace(s) && DateOnly.TryParse(s, out var dt) ? dt : defaultValue;
     }
+
+    public static bool? BodyBool(Dictionary<string, object?> body, string key)
+    {
+        if (!body.TryGetValue(key, out var val) || val is null) return null;
+        if (val is JsonElement el)
+        {
+            return el.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => bool.TryParse(el.GetRawText(), out var b) ? b : null,
+            };
+        }
+        return bool.TryParse(val.ToString(), out var result) ? result : null;
+    }
 }
