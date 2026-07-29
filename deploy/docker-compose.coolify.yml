@@ -16,6 +16,14 @@ services:
       DemoData__Enabled: ${DemoData__Enabled:-false}
       Gps__AllowSimulator: ${Gps__AllowSimulator:-false}
       Cors__Origins__0: ${Cors__Origins__0:-http://144.91.98.218}
+      Notifications__Smtp__Host: ${Notifications__Smtp__Host:-}
+      Notifications__Smtp__Port: ${Notifications__Smtp__Port:-587}
+      Notifications__Smtp__Username: ${Notifications__Smtp__Username:-}
+      Notifications__Smtp__Password: ${Notifications__Smtp__Password:-}
+      Notifications__Smtp__From: ${Notifications__Smtp__From:-}
+      Notifications__Smtp__FromName: ${Notifications__Smtp__FromName:-TMS Pro}
+      Notifications__Smtp__UseSsl: ${Notifications__Smtp__UseSsl:-true}
+      Notifications__Msg91__AuthKey: ${Notifications__Msg91__AuthKey:-}
     expose:
       - "5000"
     healthcheck:
