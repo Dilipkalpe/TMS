@@ -7,6 +7,9 @@
 # First time on server:
 #   cd /var/www/tms && git pull && chmod +x deploy/deploy-contabo.sh
 #
+# If git pull says "would be overwritten by merge" on deploy/*:
+#   cd /var/www/tms && git checkout -- deploy/ && git pull && bash deploy/deploy-contabo.sh
+#
 # Full deploy (pull + DB patch + rebuild API + Web + verify):
 #   bash /var/www/tms/deploy/deploy-contabo.sh
 #
@@ -69,6 +72,10 @@ cd "$REPO_DIR"
 log "Repo: $REPO_DIR ($(git rev-parse --short HEAD 2>/dev/null || echo 'unknown'))"
 
 if [[ "$SKIP_PULL" -eq 0 ]]; then
+  if ! git diff --quiet deploy/deploy-contabo.sh deploy/verify-deploy.sh deploy/force-rebuild.sh 2>/dev/null; then
+    log "Reset local edits to deploy scripts (server must match git)"
+    git checkout -- deploy/deploy-contabo.sh deploy/verify-deploy.sh deploy/force-rebuild.sh 2>/dev/null || git checkout -- deploy/
+  fi
   log "git pull --ff-only"
   git pull --ff-only
 fi
