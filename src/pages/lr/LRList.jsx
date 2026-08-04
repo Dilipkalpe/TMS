@@ -111,15 +111,18 @@ export default function LRList() {
     <ERPListPage
       module="LR Management"
       title="LR List"
-      statusCards={[{ label: 'Total LR', color: 'violet', icon: 'Files', count: paged.total }]}
+      headerBanner={(
+        <Card className="border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900 dark:bg-violet-950/20">
+          <LrStatusFlow highlightCurrent={false} layout="horizontal" />
+        </Card>
+      )}
       onAdd={() => navigate('/lr/generate')}
       searchPlaceholder="LR No., consignor, route..."
       filterOptions={['(All)', 'To Pay', 'Paid', 'TBB']}
       filterKey="paymentType"
       filterRow={(
         <Card className="border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900 dark:bg-violet-950/20">
-          <LrStatusFlow highlightCurrent={false} layout="horizontal" />
-          <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-violet-200 pt-3 dark:border-violet-800">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[12rem] flex-1">
               <Select
                 label="Filter by LR status"
@@ -128,12 +131,6 @@ export default function LRList() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               />
             </div>
-            <Button variant="outline" onClick={() => navigate('/consignors')}>
-              Consignor master
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/consignees')}>
-              Consignee master
-            </Button>
             <Button variant="outline" onClick={() => navigate('/lr/expenses/approval')}>
               Pending expense approvals
             </Button>

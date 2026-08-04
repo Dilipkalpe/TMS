@@ -17,6 +17,7 @@ export default function ERPListPage({
   module,
   title,
   statusCards = [],
+  headerBanner = null,
   addLabel,
   onAdd,
   showAdd = true,
@@ -192,11 +193,15 @@ export default function ERPListPage({
       <ERPPageTitle module={module} title={title} />
 
       <div className="erp-list-card flex min-h-0 flex-1 flex-col overflow-visible rounded-lg border border-primary/20 bg-white shadow-sm lg:overflow-hidden dark:bg-slate-900">
-        {statusCards.length > 0 && (
+        {headerBanner ? (
+          <div className="shrink-0 border-x border-primary/20 p-2 sm:p-3">
+            {headerBanner}
+          </div>
+        ) : statusCards.length > 0 ? (
           <div className="shrink-0 border-x border-primary/20 p-2 sm:p-3">
             <StatusSummaryCards cards={statusCards} />
           </div>
-        )}
+        ) : null}
 
         <div className="shrink-0">
         <ERPListToolbar
