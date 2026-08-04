@@ -8,6 +8,8 @@ import PageFallback from './components/ui/PageFallback'
 import {
   Dashboard, BookingList, NewBooking, BookingDetails, EditBooking,
   GenerateLR, LRList, EditLR, LRProcessPage, LrExpenseApprovalPage,
+  LrManagementQueue, LoadingManagementQueue, TransitPassQueue, DeliveryManagementQueue,
+  InvoiceManagementQueue, LrExpenseManagementQueue, LrClosingQueue,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
   FreightRateList, NewFreightRate, FreightRateDetails,
@@ -72,7 +74,7 @@ export default function App() {
         <Route path="bookings/:id" element={<BookingDetails />} />
         <Route path="lr" element={<LRList />} />
         <Route path="lr/generate" element={<GenerateLR />} />
-        <Route path="lr/expenses/approval" element={<LrExpenseApprovalPage />} />
+        <Route path="lr/expenses/approval" element={<Navigate to="/operations/expense-approval" replace />} />
         <Route path="lr/:lrNumber/process" element={<LRProcessPage />} />
         <Route path="lr/:lrNumber/edit" element={<EditLR />} />
         <Route path="vehicles" element={<VehicleList />} />
@@ -81,6 +83,14 @@ export default function App() {
         <Route path="vehicles/:id" element={<VehicleDetails />} />
         <Route path="maintenance" element={<MaintenancePage />} />
         <Route path="operations" element={<OperationsHub />} />
+        <Route path="operations/lr-management" element={<LrManagementQueue />} />
+        <Route path="operations/loading" element={<LoadingManagementQueue />} />
+        <Route path="operations/transit-pass" element={<TransitPassQueue />} />
+        <Route path="operations/delivery" element={<DeliveryManagementQueue />} />
+        <Route path="operations/invoice" element={<InvoiceManagementQueue />} />
+        <Route path="operations/lr-expenses" element={<LrExpenseManagementQueue />} />
+        <Route path="operations/expense-approval" element={<LrExpenseApprovalPage />} />
+        <Route path="operations/lr-closing" element={<LrClosingQueue />} />
         <Route path="operations/fuel" element={<FuelPage />} />
         <Route path="operations/gps" element={<FleetMapPage />} />
         <Route path="operations/gps/geofences" element={<GeofenceManagerPage />} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -23,10 +23,21 @@ const SHIPMENT_STATUSES = ['In Transit', 'Delivered', 'POD Received', 'Closed']
 
 const inputClass = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800'
 
+const STEP_SECTION_IDS = {
+  loading: 'step-loading',
+  transit: 'step-transit',
+  delivery: 'step-delivery',
+  invoice: 'step-invoice',
+  expense: 'step-expense',
+  close: 'step-close',
+}
+
 export default function LRProcessPage() {
   const { lrNumber: rawLrNumber } = useParams()
   const lrNumber = fromDocPath(rawLrNumber)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const focusStep = searchParams.get('step')
   const { toast } = useToast()
   const { company, print } = usePrint()
 
@@ -103,6 +114,20 @@ export default function LRProcessPage() {
       })
       .catch(() => {})
   }, [process?.businessType, lrNumber, lr?.vehicle])
+
+  useEffect(() => {
+    if (!focusStep || loading) return
+    const id = STEP_SECTION_IDS[focusStep]
+    const el = id ? document.getElementById(id) : null
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [focusStep, loading, process?.status])
+
+  const sectionClass = (step) =>
+    focusStep === step
+      ? 'ring-2 ring-violet-500 ring-offset-2 dark:ring-offset-slate-900'
+      : ''
 
   const toggleLrSelection = (num) => {
     setSelectedLrNumbers((prev) => {
@@ -223,7 +248,8 @@ export default function LRProcessPage() {
       title={`LR Process — ${lrNumber}`}
       toolbar={(
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/lr')}>Back to list</Button>
+          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/operations')}>Operations desks</Button>
+          <Button variant="outline" onClick={() => navigate('/lr')}>All LRs</Button>
           <Link to={lrEditPath(lrNumber)}>
             <Button variant="outline" icon={FileText}>Edit LR</Button>
           </Link>
@@ -257,7 +283,7 @@ export default function LRProcessPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card id="step-loading" className={sectionClass('loading')}>
           <CardHeader
             title="2. Loading Sheet"
             subtitle={
@@ -317,7 +343,7 @@ export default function LRProcessPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card id="step-transit" className={sectionClass('transit')}>
           <CardHeader title="3. Transit Pass / Memo" subtitle={process.transitPass ? process.transitPass.passNumber : 'After loading completed'} />
           <div className="space-y-3 p-4 pt-0">
             {process.transitPass ? (
@@ -336,7 +362,7 @@ export default function LRProcessPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card id="step-delivery-docs" className={sectionClass('delivery')}>
           <CardHeader title="4. Delivery Documents" subtitle="POD, signed LR, confirmations" />
           <div className="space-y-3 p-4 pt-0">
             <Select label="Document Type" options={DOC_TYPES} value={docForm.docType} onChange={(e) => setDocForm({ ...docForm, docType: e.target.value })} />
@@ -356,7 +382,7 @@ export default function LRProcessPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card id="step-delivery" className={sectionClass('delivery')}>
           <CardHeader title="5. Delivery Sheet" subtitle={process.deliverySheet ? process.deliverySheet.sheetNumber : 'Update shipment status'} />
           <div className="space-y-3 p-4 pt-0">
             <Select label="Shipment Status" options={SHIPMENT_STATUSES} value={deliveryForm.shipmentStatus} onChange={(e) => setDeliveryForm({ ...deliveryForm, shipmentStatus: e.target.value })} />
@@ -367,7 +393,7 @@ export default function LRProcessPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card id="step-invoice" className={sectionClass('invoice')}>
           <CardHeader title="6. Invoice" subtitle={process.invoice ? process.invoice.invoiceNo : 'Generate after delivery'} />
           <div className="space-y-3 p-4 pt-0">
             {process.invoice ? (
@@ -382,7 +408,7 @@ export default function LRProcessPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card id="step-expense" className={sectionClass('expense')}>
           <CardHeader title="7–8. LR Expenses & Approval" subtitle="Add expenses; admin approves" />
           <div className="space-y-3 p-4 pt-0">
             <Select label="Category" options={process.expenseCategories} value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })} />
@@ -417,7 +443,7 @@ export default function LRProcessPage() {
         </Card>
       </div>
 
-      <Card className="mt-4 p-4">
+      <Card id="step-close" className={`mt-4 p-4 ${sectionClass('close')}`}>
         <CardHeader title="9. Close LR" subtitle="After invoice and expense approval" />
         <Button icon={CheckCircle2} disabled={saving || process.status === 'Closed'} onClick={closeLr}>
           {process.status === 'Closed' ? 'LR Closed' : 'Close LR'}

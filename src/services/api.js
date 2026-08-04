@@ -279,6 +279,12 @@ export const lrApi = {
   remove: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`, { method: 'DELETE' }),
 }
 
+export const lrOperationsApi = {
+  summary: () => apiRequest('/lr/operations/summary'),
+  queue: (stage, params = {}) =>
+    apiRequest(`/lr/operations/queue?stage=${encodeURIComponent(stage)}&${new URLSearchParams(params)}`),
+}
+
 function lrPath(lrNumber, suffix = '') {
   const base = `/lr/${encodeURIComponent(toDocPath(lrNumber))}`
   return suffix ? `${base}/${suffix}` : base

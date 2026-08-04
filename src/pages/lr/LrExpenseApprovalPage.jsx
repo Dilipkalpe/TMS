@@ -9,7 +9,7 @@ import { formatCurrency } from '../../components/ui/ReportFilters'
 import { lrProcessApi } from '../../services/api'
 import { lrProcessPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
-import { CheckCircle2, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react'
 
 export default function LrExpenseApprovalPage() {
   const { toast } = useToast()
@@ -60,7 +60,15 @@ export default function LrExpenseApprovalPage() {
   }
 
   return (
-    <ERPContentPage module="LR Management" title="Pending LR Expenses">
+    <ERPContentPage
+      module="Operations"
+      title="Expense Approval"
+      toolbar={(
+        <Link to="/operations">
+          <Button variant="outline" icon={ArrowLeft}>Operations desks</Button>
+        </Link>
+      )}
+    >
       <Card className="p-4">
         {loading ? (
           <p className="text-sm text-slate-500">Loading…</p>
@@ -72,7 +80,7 @@ export default function LrExpenseApprovalPage() {
               <li key={row.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <Link to={lrProcessPath(row.lrNumber)} className="font-semibold text-violet-600 hover:underline">
+                    <Link to={lrProcessPath(row.lrNumber, 'expense')} className="font-semibold text-violet-600 hover:underline">
                       LR {row.lrNumber}
                     </Link>
                     <p className="text-sm">{row.category} · {formatCurrency(row.amount)} · {row.expenseDate}</p>

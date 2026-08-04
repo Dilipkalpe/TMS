@@ -23,6 +23,7 @@ export function lrEditPath(lrNumber) {
   return `/lr/${toDocPath(lrNumber)}/edit`
 }
 
-export function lrProcessPath(lrNumber) {
-  return `/lr/${toDocPath(lrNumber)}/process`
+export function lrProcessPath(lrNumber, step) {
+  const base = `/lr/${toDocPath(lrNumber)}/process`
+  return step ? `${base}?step=${encodeURIComponent(step)}` : base
 }
