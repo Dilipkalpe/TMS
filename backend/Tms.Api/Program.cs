@@ -369,7 +369,7 @@ app.MapGet("/api/health", async (TmsDbContext db, IConfiguration config) =>
             status = dbOk ? "healthy" : "unhealthy",
             service = "TMS Pro API",
             database = dbOk ? "connected" : "disconnected",
-            build = "2026-08-04-lr-status-flow-ui",
+            build = "2026-08-04-lr-utc-datetime-fix",
             notifications = new
             {
                 enabled = notificationsEnabled,

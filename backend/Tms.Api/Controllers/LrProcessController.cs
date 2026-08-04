@@ -118,7 +118,7 @@ public class LrProcessController(
         }
 
         var loadingAt = body.ContainsKey("loadingAt")
-            ? DateTime.Parse(ApiParseHelper.BodyString(body, "loadingAt") ?? DateTime.UtcNow.ToString("O"))
+            ? ApiParseHelper.BodyUtcDateTime(body, "loadingAt")
             : DateTime.UtcNow;
 
         if (existing == null)

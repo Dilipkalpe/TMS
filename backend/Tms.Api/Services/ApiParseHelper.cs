@@ -46,6 +46,40 @@ public static class ApiParseHelper
         return !string.IsNullOrWhiteSpace(s) && DateOnly.TryParse(s, out var dt) ? dt : defaultValue;
     }
 
+    /// <summary>Parse request datetime as UTC for PostgreSQL timestamptz columns.</summary>
+    public static DateTime BodyUtcDateTime(Dictionary<string, object?> body, string key, DateTime? defaultValue = null)
+    {
+        var s = BodyString(body, key);
+        if (string.IsNullOrWhiteSpace(s))
+            return defaultValue ?? DateTime.UtcNow;
+        return ParseUtcDateTime(s, defaultValue);
+    }
+
+    public static DateTime ParseUtcDateTime(string? value, DateTime? defaultValue = null)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return defaultValue ?? DateTime.UtcNow;
+
+        if (DateTime.TryParse(
+                value,
+                null,
+                System.Globalization.DateTimeStyles.RoundtripKind,
+                out var dt))
+            return EnsureUtc(dt);
+
+        if (DateTime.TryParse(value, out dt))
+            return EnsureUtc(dt);
+
+        return defaultValue ?? DateTime.UtcNow;
+    }
+
+    public static DateTime EnsureUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+    };
+
     public static bool? BodyBool(Dictionary<string, object?> body, string key)
     {
         if (!body.TryGetValue(key, out var val) || val is null) return null;

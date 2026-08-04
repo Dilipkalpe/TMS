@@ -59,4 +59,16 @@ public class ApiParseHelperTests
         ApiParseHelper.BodyDecimal(body, "missing", 9).Should().Be(9);
         ApiParseHelper.BodyDate(body, "when", new DateOnly(2020, 1, 1)).Should().Be(new DateOnly(2026, 1, 10));
     }
+
+    [Fact]
+    public void ParseUtcDateTime_normalizes_to_utc_kind()
+    {
+        var iso = "2026-08-04T10:30:00.000Z";
+        var parsed = ApiParseHelper.ParseUtcDateTime(iso);
+        parsed.Kind.Should().Be(DateTimeKind.Utc);
+        parsed.Should().Be(new DateTime(2026, 8, 4, 10, 30, 0, DateTimeKind.Utc));
+
+        var unspecified = ApiParseHelper.EnsureUtc(new DateTime(2026, 8, 4, 10, 30, 0, DateTimeKind.Unspecified));
+        unspecified.Kind.Should().Be(DateTimeKind.Utc);
+    }
 }

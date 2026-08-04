@@ -4,7 +4,7 @@
 set -euo pipefail
 
 WEB_PORT="${TMS_WEB_PORT:-8080}"
-EXPECTED_BUILD="${EXPECTED_BUILD:-2026-08-04-lr-status-flow-ui}"
+EXPECTED_BUILD="${EXPECTED_BUILD:-2026-08-04-lr-utc-datetime-fix}"
 
 echo "=== Git (local repo on server) ==="
 git rev-parse --short HEAD 2>/dev/null || echo "Not a git repo"
