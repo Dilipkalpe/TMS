@@ -264,6 +264,9 @@ if (!app.Environment.IsEnvironment("Testing"))
 
         logger.LogInformation("TMS API: preparing database…");
 
+        logger.LogInformation("Ensuring critical schema (branches PK, users email/mobile)…");
+        await SchemaMigrationHelper.EnsureCriticalSchemaAsync(db);
+
         if (runStartupMigrations)
         {
             logger.LogInformation("Running full schema migrations…");
@@ -285,8 +288,15 @@ if (!app.Environment.IsEnvironment("Testing"))
                 logger.LogInformation("Ensuring branch isolation columns…");
                 await BranchIsolationMigrator.EnsureAsync(db);
 
-                logger.LogInformation("Ensuring users schema…");
-                await UserSchemaMigrator.EnsureAsync(db);
+                try
+                {
+                    logger.LogInformation("Ensuring users extended schema…");
+                    await UserSchemaMigrator.EnsureAsync(db);
+                }
+                catch (Exception userEx)
+                {
+                    logger.LogWarning(userEx, "Users extended schema skipped (user_branches); core columns already ensured.");
+                }
 
                 logger.LogInformation("Ensuring LR process schema…");
                 await LrSchemaMigrator.EnsureAsync(db);

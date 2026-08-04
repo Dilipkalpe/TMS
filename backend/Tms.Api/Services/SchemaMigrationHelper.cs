@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Tms.Api.Data;
 
 namespace Tms.Api.Services;
 
@@ -117,6 +119,35 @@ public static class SchemaMigrationHelper
         await ExecuteNonQueryAsync(conn, """
             ALTER TABLE branches ADD CONSTRAINT branches_pkey PRIMARY KEY (id)
             """, ct);
+    }
+
+    public static async Task EnsureUsersProfileColumnsAsync(NpgsqlConnection conn, CancellationToken ct = default)
+    {
+        if (!await TableExistsAsync(conn, "users", ct)) return;
+
+        await ExecuteNonQueryAsync(conn, """
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(200)
+            """, ct);
+        await ExecuteNonQueryAsync(conn, """
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile VARCHAR(40)
+            """, ct);
+        await ExecuteNonQueryAsync(conn, """
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_id UUID
+            """, ct);
+        await ExecuteNonQueryAsync(conn, """
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID
+            """, ct);
+    }
+
+    /// <summary>Minimum schema required before EF seeder / login can run.</summary>
+    public static async Task EnsureCriticalSchemaAsync(TmsDbContext db, CancellationToken ct = default)
+    {
+        var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync(ct);
+
+        await EnsureBranchesPrimaryKeyAsync(conn, ct);
+        await EnsureUsersProfileColumnsAsync(conn, ct);
     }
 
     static async Task<bool> BranchesPrimaryKeyExistsAsync(NpgsqlConnection conn, CancellationToken ct)

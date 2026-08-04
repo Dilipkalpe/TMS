@@ -12,11 +12,17 @@ public static class UserSchemaMigrator
         if (conn.State != System.Data.ConnectionState.Open)
             await conn.OpenAsync(ct);
 
-        var text = await LoadSqlAsync(ct);
-        foreach (var stmt in ParseSql(text))
+        await SchemaMigrationHelper.EnsureBranchesPrimaryKeyAsync(conn, ct);
+        await SchemaMigrationHelper.EnsureUsersProfileColumnsAsync(conn, ct);
+
+        try
         {
-            await using var cmd = new NpgsqlCommand(stmt, conn);
-            await cmd.ExecuteNonQueryAsync(ct);
+            var text = await LoadSqlAsync(ct);
+            await SchemaMigrationHelper.ExecuteStatementsAsync(conn, ParseSql(text), ct);
+        }
+        catch (FileNotFoundException)
+        {
+            // Core columns already added above; SQL file optional for user_branches.
         }
     }
 
