@@ -123,3 +123,15 @@ public class LrExpense : ITenantScoped
     public string? RejectionRemarks { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+public class LrStatusHistory : ITenantScoped
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string LrNumber { get; set; } = "";
+    public string? OldStatus { get; set; }
+    public string NewStatus { get; set; } = "";
+    public string? ChangedBy { get; set; }
+    public DateTime ChangedAt { get; set; }
+    public string? Remarks { get; set; }
+}

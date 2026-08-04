@@ -27,16 +27,19 @@ export default function ERPListToolbar({
   onPrint,
   recordCount = 0,
   extra,
+  addPosition = 'start',
 }) {
+  const addButton = showAdd && onAdd ? (
+    <Button icon={Plus} onClick={onAdd} className="w-full sm:w-auto">
+      {addLabel}
+    </Button>
+  ) : null
+
   return (
     <div className="shrink-0 space-y-2 border-x border-primary/20 bg-white px-2 py-2 sm:px-3 sm:py-3 dark:bg-slate-900">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          {showAdd && onAdd && (
-            <Button icon={Plus} onClick={onAdd} className="w-full sm:w-auto">
-              {addLabel}
-            </Button>
-          )}
+          {addPosition === 'start' && addButton}
           <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -62,6 +65,7 @@ export default function ERPListToolbar({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+          {addPosition === 'end' && addButton}
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={onRefresh} className="!px-2 sm:!px-3">
             <span className="hidden min-[400px]:inline">Refresh</span>
           </Button>

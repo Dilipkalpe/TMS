@@ -60,6 +60,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<LrTransitPass> LrTransitPasses => Set<LrTransitPass>();
     public DbSet<LrDeliverySheet> LrDeliverySheets => Set<LrDeliverySheet>();
     public DbSet<LrExpense> LrExpenses => Set<LrExpense>();
+    public DbSet<LrStatusHistory> LrStatusHistories => Set<LrStatusHistory>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
     public DbSet<Voucher> Vouchers => Set<Voucher>();
@@ -1267,6 +1268,19 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.ApprovedAt).HasColumnName("approved_at");
             e.Property(x => x.RejectionRemarks).HasColumnName("rejection_remarks");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<LrStatusHistory>(e =>
+        {
+            e.ToTable("lr_status_history");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number");
+            e.Property(x => x.OldStatus).HasColumnName("old_status");
+            e.Property(x => x.NewStatus).HasColumnName("new_status");
+            e.Property(x => x.ChangedBy).HasColumnName("changed_by");
+            e.Property(x => x.ChangedAt).HasColumnName("changed_at");
+            e.Property(x => x.Remarks).HasColumnName("remarks");
         });
 
         modelBuilder.Entity<BookingPayment>(e =>

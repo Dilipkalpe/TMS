@@ -20,20 +20,13 @@ public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBr
     [HttpGet("summary")]
     public async Task<ActionResult<object>> Summary(CancellationToken ct)
     {
-        var counts = await LrOperationsService.CountByStageAsync(BaseLrs(), db, ct);
-        counts[LrOperationStages.Closed] = await LrOperationsService
-            .ApplyStageFilter(BaseLrs(true), db, LrOperationStages.Closed)
-            .CountAsync(ct);
-
-        var stages = LrOperationStages.WorkflowFlow.Select(stage => new
-        {
-            stage,
-            count = counts.GetValueOrDefault(stage),
-            nextAction = LrOperationsService.NextActionLabel(stage),
-            processStep = LrOperationsService.ResolveProcessStep(stage),
-        });
-        return Ok(new { counts, stages });
+        var all = tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking()));
+        var summary = await LrOperationsService.BuildStatusSummaryAsync(all, db, ct);
+        return Ok(summary);
     }
+
+    [HttpGet("status-summary")]
+    public Task<ActionResult<object>> StatusSummary(CancellationToken ct) => Summary(ct);
 
     [HttpGet("queue")]
     public async Task<ActionResult<PagedResult<LrQueueItemDto>>> Queue(

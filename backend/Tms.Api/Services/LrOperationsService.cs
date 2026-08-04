@@ -152,4 +152,64 @@ public static class LrOperationsService
             counts[stage] = await ApplyStageFilter(baseLrs, db, stage).CountAsync(ct);
         return counts;
     }
+
+    public static async Task<object> BuildStatusSummaryAsync(
+        IQueryable<LorryReceipt> allLrs,
+        TmsDbContext db,
+        CancellationToken ct = default)
+    {
+        var open = allLrs.Where(l => l.Status != LrStatuses.Closed);
+        var counts = await CountByStageAsync(open, db, ct);
+        counts[LrOperationStages.Closed] = await ApplyStageFilter(allLrs, db, LrOperationStages.Closed).CountAsync(ct);
+
+        var totalLr = await allLrs.CountAsync(ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var todaysLr = await allLrs.CountAsync(l => l.LrDate == today, ct);
+
+        var pendingLoading = counts.GetValueOrDefault(LrOperationStages.LoadingPending)
+            + counts.GetValueOrDefault(LrOperationStages.LrCreated);
+        var inTransit = counts.GetValueOrDefault(LrOperationStages.Dispatched);
+        var delivered = counts.GetValueOrDefault(LrOperationStages.Delivered);
+        var pendingPod = counts.GetValueOrDefault(LrOperationStages.Delivered);
+        var pendingInvoice = counts.GetValueOrDefault(LrOperationStages.PodUploaded);
+        var pendingExpense = counts.GetValueOrDefault(LrOperationStages.ExpensePending);
+
+        var notifications = new List<object>();
+        void Notify(int n, string message, string stage)
+        {
+            if (n > 0) notifications.Add(new { count = n, message, stage });
+        }
+
+        Notify(counts.GetValueOrDefault(LrOperationStages.VehicleAssigned), "LR waiting for vehicle assignment", LrOperationStages.VehicleAssigned);
+        Notify(pendingLoading, "LR pending loading", LrOperationStages.LoadingPending);
+        Notify(inTransit, "LR in transit", LrOperationStages.Dispatched);
+        Notify(pendingPod, "LR pending POD upload", LrOperationStages.Delivered);
+        Notify(pendingInvoice, "LR pending invoice", LrOperationStages.PodUploaded);
+        Notify(pendingExpense, "LR pending expense approval", LrOperationStages.ExpensePending);
+
+        return new
+        {
+            totalLR = totalLr,
+            todaysLR = todaysLr,
+            pendingLoading,
+            inTransit,
+            delivered,
+            pendingPOD = pendingPod,
+            pendingInvoice,
+            pendingExpense,
+            created = counts.GetValueOrDefault(LrOperationStages.LrCreated),
+            loadingPending = counts.GetValueOrDefault(LrOperationStages.LoadingPending),
+            loadingCompleted = counts.GetValueOrDefault(LrOperationStages.LoadingCompleted),
+            vehicleAssigned = counts.GetValueOrDefault(LrOperationStages.VehicleAssigned),
+            transit = counts.GetValueOrDefault(LrOperationStages.TransitPassGenerated),
+            dispatched = counts.GetValueOrDefault(LrOperationStages.Dispatched),
+            podUploaded = counts.GetValueOrDefault(LrOperationStages.PodUploaded),
+            invoiceGenerated = counts.GetValueOrDefault(LrOperationStages.InvoiceGenerated),
+            expensePending = pendingExpense,
+            expenseApproved = counts.GetValueOrDefault(LrOperationStages.ExpenseApproved),
+            closed = counts.GetValueOrDefault(LrOperationStages.Closed),
+            counts,
+            notifications,
+        };
+    }
 }

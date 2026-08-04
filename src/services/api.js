@@ -270,7 +270,10 @@ export const expensesApi = {
 }
 
 export const lrApi = {
-  list: (params = {}) => apiRequest(`/lr?${new URLSearchParams(params)}`),
+  list: (params = {}) => apiRequest(`/lr/list?${new URLSearchParams(params)}`),
+  listLegacy: (params = {}) => apiRequest(`/lr?${new URLSearchParams(params)}`),
+  statusSummary: () => apiRequest('/lr/status-summary'),
+  statusHistory: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}/status-history`),
   recent: () => apiRequest('/lr?page=1&pageSize=15'),
   get: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`),
   prefillFromBooking: (bookingId) => apiRequest(`/lr/prefill/${encodeURIComponent(toDocPath(bookingId))}`),
@@ -281,6 +284,7 @@ export const lrApi = {
 
 export const lrOperationsApi = {
   summary: () => apiRequest('/lr/operations/summary'),
+  statusSummary: () => apiRequest('/lr/status-summary'),
   queue: (stage, params = {}) =>
     apiRequest(`/lr/operations/queue?stage=${encodeURIComponent(stage)}&${new URLSearchParams(params)}`),
 }

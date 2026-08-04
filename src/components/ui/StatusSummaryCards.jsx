@@ -42,14 +42,19 @@ export default function StatusSummaryCards({ cards = [] }) {
   if (!cards.length) return null
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-8">
       {cards.map((card) => {
         const Icon = Icons[card.icon] || Icons.Circle
         const style = colorStyles[card.color] || colorStyles.blue
+        const Tag = card.onClick ? 'button' : 'div'
         return (
-          <div
+          <Tag
             key={card.label}
-            className={`flex items-center justify-between rounded-lg border-2 px-3 py-2.5 sm:px-4 sm:py-3 ${style.card}`}
+            type={card.onClick ? 'button' : undefined}
+            onClick={card.onClick}
+            className={`flex w-full items-center justify-between rounded-lg border-2 px-3 py-2.5 text-left sm:px-4 sm:py-3 ${style.card} ${
+              card.onClick ? 'cursor-pointer transition hover:shadow-md' : ''
+            }`}
           >
             <div>
               <p className={`text-xs font-semibold sm:text-sm ${style.text}`}>{card.label}</p>
@@ -58,7 +63,7 @@ export default function StatusSummaryCards({ cards = [] }) {
             <div className={`rounded-lg p-2 ${style.icon}`}>
               <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-          </div>
+          </Tag>
         )
       })}
     </div>

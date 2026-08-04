@@ -57,6 +57,7 @@ export default function ERPListPage({
   searchValue: externalSearch,
   printable = true,
   printSubtitle,
+  addPosition = 'start',
 }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState(filterOptions[0])
@@ -221,6 +222,7 @@ export default function ERPListPage({
           onPrint={printable ? handlePrintList : undefined}
           recordCount={recordCount}
           extra={filterRow}
+          addPosition={addPosition}
         />
         </div>
 

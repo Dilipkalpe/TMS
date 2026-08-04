@@ -25,15 +25,18 @@ export default function LrDetailPage() {
   const { toast } = useToast()
   const [lr, setLr] = useState(null)
   const [process, setProcess] = useState(null)
+  const [statusHistory, setStatusHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
   const reload = useCallback(async () => {
-    const [lrData, proc] = await Promise.all([
+    const [lrData, proc, history] = await Promise.all([
       lrApi.get(lrNumber),
       lrProcessApi.get(lrNumber),
+      lrApi.statusHistory(lrNumber).catch(() => ({ items: [] })),
     ])
     setLr(lrData)
     setProcess(proc)
+    setStatusHistory(history.items ?? [])
   }, [lrNumber])
 
   useEffect(() => {
@@ -240,7 +243,13 @@ export default function LrDetailPage() {
       )}
     >
       <Card className="mb-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div><p className="text-xs text-slate-500">LR Number</p><p className="font-semibold">{lrNumber}</p></div>
+          <div><p className="text-xs text-slate-500">Customer</p><p className="font-medium">{lr.customerName || '—'}</p></div>
+          <div><p className="text-xs text-slate-500">Vehicle</p><p className="font-medium">{lr.vehicle || process?.loadingSheet?.vehicleNumber || '—'}</p></div>
+          <div><p className="text-xs text-slate-500">Transporter / Driver</p><p className="font-medium">{lr.driver || '—'}</p></div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
           <div>
             <p className="text-sm text-slate-500">{lr.from} → {lr.to}</p>
             <p className="font-semibold">{lr.consignor} → {lr.consignee}</p>
@@ -250,6 +259,23 @@ export default function LrDetailPage() {
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div className="h-full rounded-full bg-violet-600" style={{ width: `${lrStatusProgress(status)}%` }} />
         </div>
+      </Card>
+
+      <Card className="mb-4 p-4">
+        <CardHeader title="LR Timeline" />
+        <ol className="mt-3 space-y-3 border-l-2 border-violet-200 pl-4 dark:border-violet-900">
+          {statusHistory.map((item, idx) => (
+            <li key={`${item.newStatus}-${idx}`} className="relative">
+              <span className="absolute -left-[1.35rem] top-1 h-2.5 w-2.5 rounded-full bg-violet-500" />
+              <p className="font-medium text-slate-800 dark:text-slate-100">{item.newStatus}</p>
+              <p className="text-xs text-slate-500">
+                {item.changedAt ? new Date(item.changedAt).toLocaleString() : '—'}
+                {item.changedBy ? ` · ${item.changedBy}` : ''}
+              </p>
+              {item.remarks && <p className="text-sm text-slate-600 dark:text-slate-300">{item.remarks}</p>}
+            </li>
+          ))}
+        </ol>
       </Card>
 
       <div className="mb-4 flex flex-wrap gap-2">

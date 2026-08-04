@@ -6,11 +6,17 @@ import Button from '../../components/ui/Button'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { lrOperationsApi } from '../../services/api'
 import { lrDetailPath, lrEditPath, lrProcessPath } from '../../utils/docPath'
-import { defaultDetailSectionForStatus, gridActionForStage } from '../../constants/lrStatusNavigation'
+import {
+  defaultDetailSectionForStatus,
+  gridActionForStage,
+  lrRowActions,
+} from '../../constants/lrStatusNavigation'
+import { useAuth } from '../../context/AuthContext'
 import { ArrowRight } from 'lucide-react'
 
 export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const stageAction = gridActionForStage(stage)
 
   const paged = usePagedApiResource(
@@ -24,7 +30,7 @@ export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
     navigate(`${lrDetailPath(row.lrNumber)}?section=${section}`)
   }
 
-  const runAction = (e, row) => {
+  const runPrimaryAction = (e, row) => {
     e.stopPropagation()
     if (row.status === 'Draft') {
       navigate(lrEditPath(row.lrNumber))
@@ -34,12 +40,38 @@ export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
     navigate(lrProcessPath(row.lrNumber, step))
   }
 
+  const runRowAction = (e, row, action) => {
+    e.stopPropagation()
+    if (action.id === 'view') {
+      openRow(row)
+      return
+    }
+    if (action.id === 'edit') {
+      navigate(lrEditPath(row.lrNumber))
+      return
+    }
+    if (action.id === 'approve-expense') {
+      navigate('/lr/expense-approval')
+      return
+    }
+    const stepMap = {
+      'assign-vehicle': 'loading',
+      'transit-pass': 'transit',
+      dispatch: 'delivery',
+      pod: 'delivery',
+      invoice: 'invoice',
+      expense: 'expense',
+      close: 'close',
+    }
+    navigate(lrProcessPath(row.lrNumber, stepMap[action.id] || row.processStep || 'loading'))
+  }
+
   const columns = useMemo(() => [
     {
       key: 'action',
       label: 'Next Action',
       render: (r) => (
-        <Button size="sm" icon={ArrowRight} onClick={(e) => runAction(e, r)}>
+        <Button size="sm" icon={ArrowRight} onClick={(e) => runPrimaryAction(e, r)}>
           {stageAction || r.nextAction || 'Continue'}
         </Button>
       ),
@@ -60,7 +92,29 @@ export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
         )
       },
     },
-  ], [stageAction, navigate])
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (r) => {
+        const actions = lrRowActions(r.status || 'LR Created', user?.role).filter((a) => a.id !== 'view')
+        return (
+          <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="outline" onClick={(e) => runRowAction(e, r, { id: 'view' })}>View</Button>
+            {actions.slice(0, 2).map((action) => (
+              <Button
+                key={action.id}
+                size="sm"
+                variant={action.primary ? 'primary' : 'outline'}
+                onClick={(e) => runRowAction(e, r, action)}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        )
+      },
+    },
+  ], [stageAction, user?.role, navigate])
 
   const extraRow = stage === 'expense-pending' ? (
     <Link to="/lr/expense-approval">
@@ -73,11 +127,14 @@ export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
       module="LR Management"
       title={undefined}
       searchPlaceholder="Search LR no., customer, party, vehicle…"
+      showAdd
+      addLabel="Create LR"
+      addPosition="end"
+      onAdd={() => navigate('/lr/generate')}
       columns={columns}
       data={paged.items}
       loading={paged.loading}
       error={paged.error}
-      showAdd={false}
       filterRow={extraRow}
       serverMode
       serverTotal={paged.total}

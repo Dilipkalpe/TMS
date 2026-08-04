@@ -558,25 +558,125 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     }
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<LrDto>>> GetAll(
+    public Task<ActionResult<PagedResult<LrDto>>> GetAll(
         [FromQuery] string? search,
         [FromQuery] string? paymentType,
         [FromQuery] string? status,
+        [FromQuery] string? stage,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
-        [FromQuery] bool includeTotal = true)
+        [FromQuery] bool includeTotal = true,
+        [FromQuery] string? sortColumn = null,
+        [FromQuery] string? sortDirection = null,
+        CancellationToken ct = default)
+        => QueryLrs(search, paymentType, status, stage, page, pageSize, includeTotal, sortColumn, sortDirection, ct);
+
+    [HttpGet("list")]
+    public Task<ActionResult<PagedResult<LrDto>>> List(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] string? stage,
+        [FromQuery] int pageNo = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        [FromQuery] string? sortColumn = null,
+        [FromQuery] string? sortDirection = null,
+        CancellationToken ct = default)
+        => QueryLrs(search, null, status, stage, pageNo, pageSize, includeTotal, sortColumn, sortDirection, ct);
+
+    [HttpGet("status-summary")]
+    public async Task<ActionResult<object>> StatusSummary(CancellationToken ct)
+    {
+        var all = tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking()));
+        return Ok(await LrOperationsService.BuildStatusSummaryAsync(all, db, ct));
+    }
+
+    async Task<ActionResult<PagedResult<LrDto>>> QueryLrs(
+        string? search,
+        string? paymentType,
+        string? status,
+        string? stage,
+        int page,
+        int pageSize,
+        bool includeTotal,
+        string? sortColumn,
+        string? sortDirection,
+        CancellationToken ct)
     {
         var q = tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking().Include(l => l.Branch)));
         if (!string.IsNullOrWhiteSpace(paymentType) && paymentType != "(All)")
             q = q.Where(l => l.PaymentType == paymentType);
         if (!string.IsNullOrWhiteSpace(status) && status != "(All)")
             q = q.Where(l => l.Status == status);
+        if (!string.IsNullOrWhiteSpace(stage) && stage != "lr-list" && stage != "(All)")
+        {
+            var normalized = LrOperationStages.Normalize(stage);
+            if (LrOperationStages.WorkflowFlow.Contains(normalized))
+                q = LrOperationsService.ApplyStageFilter(q, db, normalized);
+        }
         q = SearchHelper.Filter(q, search);
-        q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
+        q = ApplyLrSort(q, sortColumn, sortDirection);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
-        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal, ct);
         return Ok(new PagedResult<LrDto>(
             items.Select(l => EntityMappers.ToDto(l)).ToList(), total, p, size, hasMore, approx));
+    }
+
+    static IQueryable<LorryReceipt> ApplyLrSort(IQueryable<LorryReceipt> q, string? sortColumn, string? sortDirection)
+    {
+        var desc = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(sortDirection);
+        return (sortColumn?.ToLowerInvariant()) switch
+        {
+            "lrnumber" or "lr_no" => desc ? q.OrderByDescending(l => l.LrNumber) : q.OrderBy(l => l.LrNumber),
+            "customer" => desc ? q.OrderByDescending(l => l.CustomerName) : q.OrderBy(l => l.CustomerName),
+            "consignor" => desc ? q.OrderByDescending(l => l.Consignor) : q.OrderBy(l => l.Consignor),
+            "consignee" => desc ? q.OrderByDescending(l => l.Consignee) : q.OrderBy(l => l.Consignee),
+            "vehicle" => desc ? q.OrderByDescending(l => l.VehicleNumber) : q.OrderBy(l => l.VehicleNumber),
+            "status" => desc ? q.OrderByDescending(l => l.Status) : q.OrderBy(l => l.Status),
+            "from" => desc ? q.OrderByDescending(l => l.FromCity) : q.OrderBy(l => l.FromCity),
+            "to" => desc ? q.OrderByDescending(l => l.ToCity) : q.OrderBy(l => l.ToCity),
+            _ => desc
+                ? q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber)
+                : q.OrderBy(l => l.LrDate).ThenBy(l => l.LrNumber),
+        };
+    }
+
+    [HttpGet("{lrNumber}/status-history")]
+    public async Task<ActionResult<object>> StatusHistory(string lrNumber, CancellationToken ct)
+    {
+        lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
+        var lr = await db.LorryReceipts.AsNoTracking().FirstOrDefaultAsync(x => x.LrNumber == lrNumber, ct);
+        if (lr == null || !TenantScope.CanAccessBranchEntity(tenants, branches, lr)) return NotFound();
+
+        var rows = await db.LrStatusHistories.AsNoTracking()
+            .Where(h => h.LrNumber == lrNumber && h.CompanyId == lr.CompanyId)
+            .OrderBy(h => h.ChangedAt)
+            .Select(h => new
+            {
+                h.OldStatus,
+                h.NewStatus,
+                changedBy = h.ChangedBy,
+                changedAt = h.ChangedAt,
+                h.Remarks,
+            })
+            .ToListAsync(ct);
+
+        if (rows.Count == 0)
+        {
+            rows =
+            [
+                new
+                {
+                    OldStatus = (string?)null,
+                    NewStatus = lr.Status,
+                    changedBy = lr.CreatedBy,
+                    changedAt = lr.CreatedAt,
+                    Remarks = (string?)null,
+                },
+            ];
+        }
+
+        return Ok(new { lrNumber, items = rows });
     }
 
     [HttpGet("{lrNumber}")]

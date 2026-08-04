@@ -15,10 +15,32 @@ public static class LrProcessService
         return lr;
     }
 
-    public static async Task SetStatusAsync(TmsDbContext db, LorryReceipt lr, string status, CancellationToken ct = default)
+    public static async Task SetStatusAsync(
+        TmsDbContext db,
+        LorryReceipt lr,
+        string status,
+        string? changedBy = null,
+        string? remarks = null,
+        CancellationToken ct = default)
     {
+        var oldStatus = lr.Status;
+        if (oldStatus == status) return;
+
         lr.Status = status;
         lr.UpdatedAt = DateTime.UtcNow;
+
+        db.LrStatusHistories.Add(new LrStatusHistory
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lr.CompanyId,
+            LrNumber = lr.LrNumber,
+            OldStatus = oldStatus,
+            NewStatus = status,
+            ChangedBy = changedBy,
+            ChangedAt = DateTime.UtcNow,
+            Remarks = remarks,
+        });
+
         await db.SaveChangesAsync(ct);
     }
 
@@ -32,12 +54,12 @@ public static class LrProcessService
         if (expenses.Any(e => e.Status == "Pending"))
         {
             if (lr.Status != LrStatuses.ExpenseAdded && lr.Status != LrStatuses.ExpenseApproved)
-                await SetStatusAsync(db, lr, LrStatuses.ExpenseAdded, ct);
+                await SetStatusAsync(db, lr, LrStatuses.ExpenseAdded, ct: ct);
             return;
         }
 
         if (expenses.All(e => e.Status == "Approved"))
-            await SetStatusAsync(db, lr, LrStatuses.ExpenseApproved, ct);
+            await SetStatusAsync(db, lr, LrStatuses.ExpenseApproved, ct: ct);
     }
 
     public static void EnsureStatusAtLeast(LorryReceipt lr, params string[] allowedPriorStatuses)
