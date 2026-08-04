@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -13,6 +13,8 @@ import { Save, Printer, Download, Copy, Loader2 } from 'lucide-react'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
+import LrStatusFlow from '../../components/lr/LrStatusFlow'
+import { lrProcessPath } from '../../utils/docPath'
 import { useDocumentFlow } from '../../hooks/useDocumentFlow'
 
 const PAYMENT_TYPES = ['To Pay', 'Paid', 'TBB', 'To Be Billed']
@@ -56,6 +58,7 @@ const emptyForm = () => ({
 })
 
 export default function GenerateLR() {
+  const navigate = useNavigate()
   const { toast } = useToast()
   const { company, print } = usePrint()
   const [searchParams] = useSearchParams()
@@ -145,9 +148,7 @@ export default function GenerateLR() {
     try {
       const created = await lrApi.create(form)
       toast({ title: 'LR saved', message: `${created.lrNumber} created successfully.`, type: 'success' })
-      setForm(emptyForm())
-      const lrs = await lrApi.list({ page: 1, pageSize: 15 })
-      setLrList(mapLrRows(lrs))
+      navigate(lrProcessPath(created.lrNumber))
     } catch (err) {
       toast({ title: 'Save failed', message: err.message, type: 'error' })
     } finally {
@@ -210,6 +211,12 @@ export default function GenerateLR() {
         </div>
       )}
       <div className="space-y-4">
+        <Card className="p-4">
+          <LrStatusFlow currentStatus="LR Created" layout="horizontal" />
+          <p className="mt-2 text-xs text-slate-500">
+            After saving, you will continue through Loading → Transit Pass → Delivery → Invoice → Expenses → Closed.
+          </p>
+        </Card>
         <Card>
           <CardHeader title="Generate New LR" subtitle="Fill in the LR details below" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

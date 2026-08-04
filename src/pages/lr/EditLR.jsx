@@ -12,6 +12,7 @@ import { useToast } from '../../context/ToastContext'
 import { Save, ArrowLeft, Printer, Loader2, Workflow } from 'lucide-react'
 import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
+import LrStatusFlow from '../../components/lr/LrStatusFlow'
 import { lrProcessPath } from '../../utils/docPath'
 
 const PAYMENT_TYPES = ['To Pay', 'Paid', 'TBB', 'To Be Billed']
@@ -54,6 +55,7 @@ export default function EditLR() {
   const { toast } = useToast()
   const { company, print } = usePrint()
   const [form, setForm] = useState(null)
+  const [lrStatus, setLrStatus] = useState('LR Created')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -63,6 +65,7 @@ export default function EditLR() {
       .then((lr) => {
         if (cancelled) return
         setForm(mapLrToForm(lr))
+        setLrStatus(lr.status || 'LR Created')
       })
       .catch((err) => {
         if (!cancelled) toast({ title: 'Load failed', message: err.message, type: 'error' })
@@ -110,6 +113,14 @@ export default function EditLR() {
 
   return (
     <ERPContentPage module="LR Management" title={`Edit LR ${lrNumber}`}>
+      <Card className="mb-4 p-4">
+        <LrStatusFlow currentStatus={lrStatus} layout="horizontal" />
+        <div className="mt-3 flex justify-end">
+          <Button variant="outline" icon={Workflow} onClick={() => navigate(lrProcessPath(lrNumber))}>
+            Open full process flow
+          </Button>
+        </div>
+      </Card>
       <Card>
         <CardHeader title="LR Details" subtitle="Update lorry receipt information" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

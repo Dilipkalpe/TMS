@@ -11,22 +11,14 @@ import { fromDocPath, lrEditPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
 import TransitPassPrintFormat from '../../components/print/TransitPassPrintFormat'
+import LrStatusFlow from '../../components/lr/LrStatusFlow'
+import { lrStatusProgress } from '../../constants/lrStatusFlow'
 import {
   ArrowLeft, CheckCircle2, FileText, Loader2, Printer, Receipt, Truck, Upload,
 } from 'lucide-react'
 
 const DOC_TYPES = ['POD', 'Signed LR', 'Delivery Confirmation', 'Supporting Document']
 const SHIPMENT_STATUSES = ['In Transit', 'Delivered', 'POD Received', 'Closed']
-
-const STEPS = [
-  'LR Created', 'Loading Completed', 'Transit Pass Generated', 'In Transit',
-  'Delivery Completed', 'POD Uploaded', 'Invoice Generated', 'Expense Added', 'Expense Approved', 'Closed',
-]
-
-function stepIndex(status) {
-  const idx = STEPS.indexOf(status)
-  return idx >= 0 ? idx : 0
-}
 
 const inputClass = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800'
 
@@ -165,7 +157,7 @@ export default function LRProcessPage() {
     )
   }
 
-  const currentStep = stepIndex(process.status)
+  const progress = lrStatusProgress(process.status)
 
   return (
     <ERPContentPage
@@ -181,25 +173,28 @@ export default function LRProcessPage() {
       )}
     >
       <Card className="mb-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm text-slate-500">{lr.from} → {lr.to} · {lr.vehicle}</p>
             <p className="text-lg font-semibold">{lr.consignor} → {lr.consignee}</p>
           </div>
           <Badge variant={statusVariant(process.status === 'Closed' ? 'Paid' : 'Pending')} className="text-sm">
-            {process.status}
+            {process.status || 'LR Created'}
           </Badge>
         </div>
-        <div className="mt-4 flex flex-wrap gap-1">
-          {STEPS.map((step, i) => (
+        <div className="mb-3">
+          <div className="mb-1 flex justify-between text-xs text-slate-500">
+            <span>Progress</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
             <div
-              key={step}
-              className={`rounded-lg px-2 py-1 text-xs ${i <= currentStep ? 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}
-            >
-              {step}
-            </div>
-          ))}
+              className="h-full rounded-full bg-violet-600 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
+        <LrStatusFlow currentStatus={process.status} layout="horizontal" />
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
