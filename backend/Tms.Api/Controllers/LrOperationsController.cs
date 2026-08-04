@@ -25,7 +25,7 @@ public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBr
             .ApplyStageFilter(BaseLrs(true), db, LrOperationStages.Closed)
             .CountAsync(ct);
 
-        var stages = LrOperationStages.WorkflowTabs.Select(stage => new
+        var stages = LrOperationStages.WorkflowFlow.Select(stage => new
         {
             stage,
             count = counts.GetValueOrDefault(stage),
@@ -45,8 +45,8 @@ public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBr
         CancellationToken ct = default)
     {
         var normalized = LrOperationStages.Normalize(stage ?? "");
-        if (string.IsNullOrWhiteSpace(stage) || !LrOperationStages.WorkflowTabs.Contains(normalized))
-            return BadRequest(new ApiError($"Unknown stage. Use one of: {string.Join(", ", LrOperationStages.WorkflowTabs)}"));
+        if (string.IsNullOrWhiteSpace(stage) || !LrOperationStages.WorkflowFlow.Contains(normalized))
+            return BadRequest(new ApiError($"Unknown stage. Use one of: {string.Join(", ", LrOperationStages.WorkflowFlow)}"));
 
         var includeClosed = normalized == LrOperationStages.Closed;
         var q = LrOperationsService.ApplyStageFilter(BaseLrs(includeClosed), db, normalized);
@@ -58,7 +58,8 @@ public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBr
 
         var dtos = items.Select(l =>
         {
-            var (action, step) = LrOperationsService.ResolveNextAction(l.Status);
+            var stageAction = LrOperationsService.NextActionLabel(normalized);
+            var (_, step) = LrOperationsService.ResolveNextAction(l.Status);
             return new LrQueueItemDto(
                 l.LrNumber,
                 l.LrDate,
@@ -72,8 +73,8 @@ public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBr
                 l.BusinessType,
                 l.Status,
                 l.Freight,
-                action,
-                step ?? LrOperationsService.ResolveProcessStep(normalized));
+                stageAction,
+                LrOperationsService.ResolveProcessStep(normalized) ?? step);
         }).ToList();
 
         return Ok(new PagedResult<LrQueueItemDto>(dtos, total, p, size, hasMore, approx));

@@ -8,9 +8,7 @@ import PageFallback from './components/ui/PageFallback'
 import {
   Dashboard, NewBooking, BookingDetails, EditBooking,
   GenerateLR, EditLR, LRProcessPage, LrExpenseApprovalPage,
-  LrManagementLayout, LrDetailPage,
-  LrListTab, LrLoadingPendingTab, LrLoadingSheetTab, LrTransitPassTab, LrDispatchTab,
-  LrDeliveryTab, LrPodPendingTab, LrInvoicePendingTab, LrExpensePendingTab, LrClosedTab,
+  LrManagementPage, LrDetailPage,
   BookingManagementLayout, BookingQuotationsTab, BookingPendingTab, BookingConfirmedTab, BookingCancelledTab,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
@@ -80,18 +78,16 @@ export default function App() {
         <Route path="bookings/new" element={<NewBooking />} />
         <Route path="bookings/:id/edit" element={<EditBooking />} />
         <Route path="bookings/:id" element={<BookingDetails />} />
-        <Route path="lr" element={<LrManagementLayout />}>
-          <Route index element={<LrListTab />} />
-          <Route path="loading-pending" element={<LrLoadingPendingTab />} />
-          <Route path="loading-sheet" element={<LrLoadingSheetTab />} />
-          <Route path="transit-pass" element={<LrTransitPassTab />} />
-          <Route path="dispatch" element={<LrDispatchTab />} />
-          <Route path="delivery" element={<LrDeliveryTab />} />
-          <Route path="pod-pending" element={<LrPodPendingTab />} />
-          <Route path="invoice-pending" element={<LrInvoicePendingTab />} />
-          <Route path="expense-pending" element={<LrExpensePendingTab />} />
-          <Route path="closed" element={<LrClosedTab />} />
-        </Route>
+        <Route path="lr" element={<LrManagementPage />} />
+        <Route path="lr/loading-pending" element={<Navigate to="/lr?status=loading-pending" replace />} />
+        <Route path="lr/loading-sheet" element={<Navigate to="/lr?status=loading-pending" replace />} />
+        <Route path="lr/transit-pass" element={<Navigate to="/lr?status=transit-pass-generated" replace />} />
+        <Route path="lr/dispatch" element={<Navigate to="/lr?status=dispatched" replace />} />
+        <Route path="lr/delivery" element={<Navigate to="/lr?status=delivered" replace />} />
+        <Route path="lr/pod-pending" element={<Navigate to="/lr?status=delivered" replace />} />
+        <Route path="lr/invoice-pending" element={<Navigate to="/lr?status=pod-uploaded" replace />} />
+        <Route path="lr/expense-pending" element={<Navigate to="/lr?status=expense-pending" replace />} />
+        <Route path="lr/closed" element={<Navigate to="/lr?status=closed" replace />} />
         <Route path="lr/expense-approval" element={<LrExpenseApprovalPage />} />
         <Route path="lr/generate" element={<GenerateLR />} />
         <Route path="lr/expenses/approval" element={<Navigate to="/lr/expense-approval" replace />} />
@@ -105,13 +101,13 @@ export default function App() {
         <Route path="maintenance" element={<MaintenancePage />} />
         <Route path="operations" element={<OperationsHub />} />
         <Route path="operations/lr-management" element={<Navigate to="/lr" replace />} />
-        <Route path="operations/loading" element={<Navigate to="/lr/loading-pending" replace />} />
-        <Route path="operations/transit-pass" element={<Navigate to="/lr/transit-pass" replace />} />
-        <Route path="operations/delivery" element={<Navigate to="/lr/delivery" replace />} />
-        <Route path="operations/invoice" element={<Navigate to="/lr/invoice-pending" replace />} />
-        <Route path="operations/lr-expenses" element={<Navigate to="/lr/expense-pending" replace />} />
+        <Route path="operations/loading" element={<Navigate to="/lr?status=loading-pending" replace />} />
+        <Route path="operations/transit-pass" element={<Navigate to="/lr?status=transit-pass-generated" replace />} />
+        <Route path="operations/delivery" element={<Navigate to="/lr?status=delivered" replace />} />
+        <Route path="operations/invoice" element={<Navigate to="/lr?status=pod-uploaded" replace />} />
+        <Route path="operations/lr-expenses" element={<Navigate to="/lr?status=expense-pending" replace />} />
         <Route path="operations/expense-approval" element={<Navigate to="/lr/expense-approval" replace />} />
-        <Route path="operations/lr-closing" element={<Navigate to="/lr/closed" replace />} />
+        <Route path="operations/lr-closing" element={<Navigate to="/lr?status=expense-approved" replace />} />
         <Route path="operations/fuel" element={<FuelPage />} />
         <Route path="operations/gps" element={<FleetMapPage />} />
         <Route path="operations/gps/geofences" element={<GeofenceManagerPage />} />

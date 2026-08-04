@@ -6,79 +6,67 @@ import Button from '../../components/ui/Button'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { lrOperationsApi } from '../../services/api'
 import { lrDetailPath, lrEditPath, lrProcessPath } from '../../utils/docPath'
-import { lrStatusProgress } from '../../constants/lrStatusFlow'
-import { getWorkflowTab } from '../../constants/lrWorkflowTabs'
+import { defaultDetailSectionForStatus, gridActionForStage } from '../../constants/lrStatusNavigation'
 import { ArrowRight } from 'lucide-react'
 
-export default function LrWorkflowGrid({ stage, filterRow = null }) {
+export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
   const navigate = useNavigate()
-  const tab = getWorkflowTab(stage)
+  const stageAction = gridActionForStage(stage)
 
   const paged = usePagedApiResource(
-    ({ page, pageSize, search }) => {
-      const params = buildListParams({ page, pageSize, search })
-      return lrOperationsApi.queue(stage, params)
-    },
+    ({ page, pageSize, search }) =>
+      lrOperationsApi.queue(stage, buildListParams({ page, pageSize, search })),
     [stage],
   )
 
   const openRow = (row) => {
-    navigate(lrDetailPath(row.lrNumber))
+    const section = defaultDetailSectionForStatus(row.status)
+    navigate(`${lrDetailPath(row.lrNumber)}?section=${section}`)
   }
 
   const runAction = (e, row) => {
     e.stopPropagation()
     if (row.status === 'Draft') {
       navigate(lrEditPath(row.lrNumber))
-    } else if (row.processStep) {
-      navigate(lrProcessPath(row.lrNumber, row.processStep))
-    } else {
-      openRow(row)
+      return
     }
+    const step = row.processStep || 'loading'
+    navigate(lrProcessPath(row.lrNumber, step))
   }
 
-  const columns = useMemo(() => {
-    const cols = [
-      {
-        key: 'action',
-        label: 'Next Action',
-        render: (r) => (
-          <Button size="sm" icon={ArrowRight} onClick={(e) => runAction(e, r)}>
-            {r.nextAction || tab?.label || 'Continue'}
-          </Button>
-        ),
+  const columns = useMemo(() => [
+    {
+      key: 'action',
+      label: 'Next Action',
+      render: (r) => (
+        <Button size="sm" icon={ArrowRight} onClick={(e) => runAction(e, r)}>
+          {stageAction || r.nextAction || 'Continue'}
+        </Button>
+      ),
+    },
+    { key: 'lrNumber', label: 'LR No.' },
+    { key: 'customer', label: 'Customer', render: (r) => r.customer || '—' },
+    { key: 'consignor', label: 'Consignor' },
+    { key: 'consignee', label: 'Consignee' },
+    { key: 'vehicle', label: 'Vehicle', render: (r) => r.vehicle || '—' },
+    { key: 'lrDate', label: 'Date' },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (r) => {
+        const status = r.status || 'LR Created'
+        return (
+          <Badge variant={statusVariant(status === 'Closed' ? 'Paid' : 'Pending')}>{status}</Badge>
+        )
       },
-      { key: 'lrNumber', label: 'LR No.' },
-      { key: 'customer', label: 'Customer', render: (r) => r.customer || '—' },
-      { key: 'consignor', label: 'Consignor' },
-      { key: 'consignee', label: 'Consignee' },
-      { key: 'vehicle', label: 'Vehicle', render: (r) => r.vehicle || '—' },
-      {
-        key: 'status',
-        label: 'Status',
-        render: (r) => {
-          const status = r.status || 'LR Created'
-          return (
-            <div className="min-w-[7rem]">
-              <Badge variant={statusVariant(status === 'Closed' ? 'Paid' : 'Pending')}>{status}</Badge>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                <div className="h-full rounded-full bg-violet-500" style={{ width: `${lrStatusProgress(status)}%` }} />
-              </div>
-            </div>
-          )
-        },
-      },
-      { key: 'lrDate', label: 'Date' },
-      { key: 'from', label: 'Route', render: (r) => `${r.from || '—'} → ${r.to || '—'}` },
-    ]
-    return cols
-  }, [tab, navigate, stage])
+    },
+  ], [stageAction, navigate])
 
-  const extraRow = filterRow ?? (stage === 'expense-pending' ? (
+  const extraRow = stage === 'expense-pending' ? (
     <Link to="/lr/expense-approval">
-      <Button variant="outline">Admin: Expense Approval</Button>
+      <Button variant="outline">Admin: Expense Approval Queue</Button>
     </Link>
-  ) : null)
+  ) : null
 
   return (
     <ERPListPage
@@ -100,22 +88,10 @@ export default function LrWorkflowGrid({ stage, filterRow = null }) {
       serverPageSize={paged.pageSize}
       onServerPageSizeChange={paged.setPageSize}
       onServerSearch={paged.setSearch}
-      onRefreshExternal={paged.refresh}
+      onRefreshExternal={() => { paged.refresh(); onChanged?.() }}
       onRowClick={openRow}
-      printSubtitle={tab?.label}
       exportFilename={`lr-${stage}`}
+      printSubtitle={stageActionLabel}
     />
-  )
-}
-
-export function LrWorkflowToolbar({ children }) {
-  return children ? <div className="mb-4 flex flex-wrap items-center gap-2">{children}</div> : null
-}
-
-export function LrNewButton() {
-  return (
-    <Link to="/lr/generate">
-      <Button>Create LR</Button>
-    </Link>
   )
 }
