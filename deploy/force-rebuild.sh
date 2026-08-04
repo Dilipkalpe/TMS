@@ -15,6 +15,10 @@ if [ -n "$PG" ]; then
     echo "==> Apply company_settings sequence / multi-tenant id fix"
     docker exec -i "$PG" psql -U tms -d tms_pro -v ON_ERROR_STOP=1 < database/settings_extension.sql || true
   fi
+  if [ -f database/lr/schema.sql ]; then
+    echo "==> Apply LR process flow schema"
+    docker exec -i "$PG" psql -U tms -d tms_pro -v ON_ERROR_STOP=0 < database/lr/schema.sql || true
+  fi
 fi
 
 docker compose -f deploy/docker-compose.vps.yml build --no-cache tms-api tms-web

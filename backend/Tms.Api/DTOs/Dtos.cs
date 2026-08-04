@@ -73,7 +73,7 @@ public record LrDto(
     string From, string To, string? Vehicle, string? Driver, string? Material,
     string? Quantity, decimal Freight, decimal Gst, decimal Balance, string PaymentType,
     string? BookingId, decimal? Hamali, decimal? LoadingCharges, decimal? UnloadingCharges,
-    decimal? Insurance, decimal? Advance, string? Remarks,
+    decimal? Insurance, decimal? Advance, string? Remarks, string Status,
     Guid? BranchId = null, string? BranchName = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
 

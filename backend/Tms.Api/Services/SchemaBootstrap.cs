@@ -24,6 +24,7 @@ public static class SchemaBootstrap
             ("Portal", () => PortalSchemaMigrator.EnsureSchemaAsync(db, ct)),
             ("Routing", () => RouteSchemaMigrator.EnsureAsync(db, ct)),
             ("BookingFinance", () => BookingFinanceSchemaMigrator.EnsureAsync(db, ct)),
+            ("LrProcess", () => LrSchemaMigrator.EnsureAsync(db, ct)),
             ("Commercial", () => CommercialSchemaMigrator.EnsureAsync(db, ct)),
             ("DocumentNumbering", () => DocumentNumberingSchemaMigrator.EnsureAsync(db, ct)),
             ("Reports", () => ReportsSchemaMigrator.EnsureAsync(db, ct)),

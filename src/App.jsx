@@ -7,7 +7,7 @@ import LoginRoute from './components/auth/LoginRoute'
 import PageFallback from './components/ui/PageFallback'
 import {
   Dashboard, BookingList, NewBooking, BookingDetails, EditBooking,
-  GenerateLR, LRList, EditLR,
+  GenerateLR, LRList, EditLR, LRProcessPage, LrExpenseApprovalPage,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
   FreightRateList, NewFreightRate, FreightRateDetails,
@@ -70,6 +70,8 @@ export default function App() {
         <Route path="bookings/:id" element={<BookingDetails />} />
         <Route path="lr" element={<LRList />} />
         <Route path="lr/generate" element={<GenerateLR />} />
+        <Route path="lr/expenses/approval" element={<LrExpenseApprovalPage />} />
+        <Route path="lr/:lrNumber/process" element={<LRProcessPage />} />
         <Route path="lr/:lrNumber/edit" element={<EditLR />} />
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="vehicles/new" element={<NewVehicle />} />

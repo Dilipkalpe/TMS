@@ -9,10 +9,14 @@ public static class DocumentNumberTypes
     public const string Invoice = "Invoice";
     public const string Receipt = "Receipt";
     public const string Pod = "Pod";
+    public const string LoadingSheet = "LoadingSheet";
+    public const string TransitPass = "TransitPass";
+    public const string DeliverySheet = "DeliverySheet";
 
     public static readonly IReadOnlyList<string> All =
     [
         Booking, Quotation, LR, Trip, Invoice, Receipt, Pod,
+        LoadingSheet, TransitPass, DeliverySheet,
     ];
 
     public static string DefaultPrefix(string documentType) => documentType switch
@@ -24,6 +28,9 @@ public static class DocumentNumberTypes
         Invoice => "INV",
         Receipt => "RCP",
         Pod => "POD",
+        LoadingSheet => "LS",
+        TransitPass => "TP",
+        DeliverySheet => "DS",
         _ => documentType.ToUpperInvariant()[..Math.Min(3, documentType.Length)],
     };
 }

@@ -69,7 +69,7 @@ public static class EntityMappers
         l.Material, l.Quantity,
         l.Freight, l.Gst, l.Balance, l.PaymentType,
         l.BookingId, l.Hamali, l.LoadingCharges, l.UnloadingCharges,
-        l.Insurance, l.Advance, l.Remarks,
+        l.Insurance, l.Advance, l.Remarks, l.Status,
         branchId ?? l.BranchId, branchName ?? l.Branch?.Name,
         l.CreatedBy, l.CreatedAt, l.UpdatedBy, l.UpdatedAt);
 }

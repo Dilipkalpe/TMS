@@ -405,6 +405,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     public async Task<ActionResult<PagedResult<LrDto>>> GetAll(
         [FromQuery] string? search,
         [FromQuery] string? paymentType,
+        [FromQuery] string? status,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
@@ -412,6 +413,8 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         var q = tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking().Include(l => l.Branch)));
         if (!string.IsNullOrWhiteSpace(paymentType) && paymentType != "(All)")
             q = q.Where(l => l.PaymentType == paymentType);
+        if (!string.IsNullOrWhiteSpace(status) && status != "(All)")
+            q = q.Where(l => l.Status == status);
         q = SearchHelper.Filter(q, search);
         q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
@@ -583,6 +586,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             Advance = advance,
             Balance = freight + gst + hamali + loading + unloading + insurance - advance,
             PaymentType = ApiParseHelper.BodyString(body, "paymentType") ?? "To Pay",
+            Status = ApiParseHelper.BodyBool(body, "isDraft") == true ? LrStatuses.Draft : LrStatuses.LRCreated,
             Remarks = ApiParseHelper.BodyString(body, "remarks"),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

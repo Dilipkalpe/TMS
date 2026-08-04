@@ -224,6 +224,7 @@ public class LorryReceipt : IBranchScoped, IAuditable
     public decimal Gst { get; set; }
     public decimal Balance { get; set; }
     public string PaymentType { get; set; } = "To Pay";
+    public string Status { get; set; } = LrStatuses.LRCreated;
     public decimal? Hamali { get; set; }
     public decimal? LoadingCharges { get; set; }
     public decimal? UnloadingCharges { get; set; }

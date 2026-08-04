@@ -64,6 +64,7 @@
     <None Include="..\..\database\audit\schema.sql" Link="database\audit\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\users\schema.sql" Link="database\users\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\booking_finance\schema.sql" Link="database\booking_finance\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\lr\schema.sql" Link="database\lr\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\commercial\schema.sql" Link="database\commercial\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\document_numbering\schema.sql" Link="database\document_numbering\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\stored_procedures.sql" Link="database\reports\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />

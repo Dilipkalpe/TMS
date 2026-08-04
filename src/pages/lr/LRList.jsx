@@ -4,7 +4,7 @@ import Badge, { statusVariant } from '../../components/ui/Badge'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { lrApi } from '../../services/api'
-import { lrEditPath } from '../../utils/docPath'
+import { lrEditPath, lrProcessPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
@@ -29,6 +29,7 @@ export default function LRList() {
     { key: 'from', label: 'From' },
     { key: 'to', label: 'To' },
     { key: 'vehicle', label: 'Vehicle' },
+    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status === 'Closed' ? 'Paid' : 'Pending')}>{r.status || 'LR Created'}</Badge> },
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
     { key: 'paymentType', label: 'Payment', render: (r) => <Badge variant={statusVariant(r.paymentType === 'Paid' ? 'Paid' : 'Pending')}>{r.paymentType}</Badge> },
   ])
@@ -72,7 +73,7 @@ export default function LRList() {
       error={paged.error}
       onRefreshExternal={paged.refresh}
       sortKey="lrDate"
-      onRowClick={(r) => navigate(lrEditPath(r.lrNumber))}
+      onRowClick={(r) => navigate(lrProcessPath(r.lrNumber))}
       onEdit={(r) => navigate(lrEditPath(r.lrNumber))}
       onDelete={handleDelete}
       onPrint={handlePrintLr}

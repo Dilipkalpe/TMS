@@ -9,9 +9,10 @@ import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import { lrApi } from '../../services/api'
 import { fromDocPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
-import { Save, ArrowLeft, Printer, Loader2 } from 'lucide-react'
+import { Save, ArrowLeft, Printer, Loader2, Workflow } from 'lucide-react'
 import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
+import { lrProcessPath } from '../../utils/docPath'
 
 const PAYMENT_TYPES = ['To Pay', 'Paid', 'TBB', 'To Be Billed']
 
@@ -137,6 +138,7 @@ export default function EditLR() {
         </div>
         <div className="mt-6 flex flex-wrap gap-2">
           <Button icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Update LR'}</Button>
+          <Button variant="outline" icon={Workflow} onClick={() => navigate(lrProcessPath(lrNumber))}>Process Flow</Button>
           <Button variant="outline" icon={Printer} onClick={handlePrint}>Print LR</Button>
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/lr')}>Cancel</Button>
         </div>

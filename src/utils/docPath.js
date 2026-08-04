@@ -22,3 +22,7 @@ export function bookingPath(id, suffix = '') {
 export function lrEditPath(lrNumber) {
   return `/lr/${toDocPath(lrNumber)}/edit`
 }
+
+export function lrProcessPath(lrNumber) {
+  return `/lr/${toDocPath(lrNumber)}/process`
+}

@@ -263,6 +263,54 @@ export const lrApi = {
   remove: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`, { method: 'DELETE' }),
 }
 
+function lrPath(lrNumber, suffix = '') {
+  const base = `/lr/${encodeURIComponent(toDocPath(lrNumber))}`
+  return suffix ? `${base}/${suffix}` : base
+}
+
+async function lrUpload(lrNumber, suffix, formData) {
+  const headers = buildAuthHeaders({ json: false })
+  const res = await fetch(`${API_BASE_URL}${lrPath(lrNumber, suffix)}`, { method: 'POST', headers, body: formData })
+  if (!res.ok) {
+    const { message } = await readApiError(res, res.statusText)
+    throw new ApiError(message, res.status)
+  }
+  return res.json()
+}
+
+export const lrProcessApi = {
+  get: (lrNumber) => apiRequest(lrPath(lrNumber, 'process')),
+  saveLoadingSheet: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'loading-sheet'), { method: 'POST', body: data }),
+  getLoadingSheet: (lrNumber) => apiRequest(lrPath(lrNumber, 'loading-sheet')),
+  createTransitPass: (lrNumber, data = {}) => apiRequest(lrPath(lrNumber, 'transit-pass'), { method: 'POST', body: data }),
+  getTransitPass: (lrNumber) => apiRequest(lrPath(lrNumber, 'transit-pass')),
+  listDeliveryDocuments: (lrNumber) => apiRequest(lrPath(lrNumber, 'delivery-documents')),
+  saveDeliveryDocument: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'delivery-documents'), { method: 'POST', body: data }),
+  uploadDeliveryDocument: (lrNumber, file, docType, title) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('docType', docType)
+    form.append('title', title)
+    return lrUpload(lrNumber, 'delivery-documents/upload', form)
+  },
+  saveDeliverySheet: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'delivery-sheet'), { method: 'POST', body: data }),
+  getDeliverySheet: (lrNumber) => apiRequest(lrPath(lrNumber, 'delivery-sheet')),
+  listExpenses: (lrNumber) => apiRequest(lrPath(lrNumber, 'expenses')),
+  addExpense: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'expenses'), { method: 'POST', body: data }),
+  uploadExpenseAttachment: (lrNumber, expenseId, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return lrUpload(lrNumber, `expenses/${expenseId}/upload`, form)
+  },
+  approveExpense: (lrNumber, expenseId) =>
+    apiRequest(lrPath(lrNumber, `expenses/${expenseId}/approve`), { method: 'PATCH' }),
+  rejectExpense: (lrNumber, expenseId, remarks) =>
+    apiRequest(lrPath(lrNumber, `expenses/${expenseId}/reject`), { method: 'PATCH', body: { remarks } }),
+  pendingExpenses: () => apiRequest('/lr/expenses/pending'),
+  createInvoice: (lrNumber, data = {}) => apiRequest(lrPath(lrNumber, 'invoice'), { method: 'POST', body: data }),
+  close: (lrNumber) => apiRequest(lrPath(lrNumber, 'close'), { method: 'POST' }),
+}
+
 export const dashboardApi = {
   overview: () => apiRequest('/dashboard/overview'),
   stats: () => apiRequest('/dashboard/stats'),
