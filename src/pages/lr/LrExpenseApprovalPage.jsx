@@ -61,11 +61,11 @@ export default function LrExpenseApprovalPage() {
 
   return (
     <ERPContentPage
-      module="Operations"
+      module="LR Management"
       title="Expense Approval"
       toolbar={(
-        <Link to="/operations">
-          <Button variant="outline" icon={ArrowLeft}>Operations desks</Button>
+        <Link to="/lr/expense-pending">
+          <Button variant="outline" icon={ArrowLeft}>Expense Pending</Button>
         </Link>
       )}
     >

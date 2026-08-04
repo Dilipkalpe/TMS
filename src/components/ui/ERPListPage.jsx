@@ -190,7 +190,7 @@ export default function ERPListPage({
 
   return (
     <div className="erp-list-page min-h-0 h-auto lg:h-full">
-      <ERPPageTitle module={module} title={title} />
+      {title ? <ERPPageTitle module={module} title={title} /> : null}
 
       <div className="erp-list-card flex min-h-0 flex-1 flex-col overflow-visible rounded-lg border border-primary/20 bg-white shadow-sm lg:overflow-hidden dark:bg-slate-900">
         {headerBanner ? (

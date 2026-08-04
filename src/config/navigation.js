@@ -1,7 +1,6 @@
 export const navigation = [
   { title: 'Dashboard', path: '/', icon: 'LayoutDashboard', feature: 'dashboard' },
-  { title: 'Quotations', path: '/quotations', icon: 'FileSpreadsheet' },
-  { title: 'Booking', path: '/bookings', icon: 'CalendarPlus', feature: 'booking' },
+  { title: 'Booking Management', path: '/bookings', icon: 'CalendarPlus', feature: 'booking' },
   { title: 'LR Management', path: '/lr', icon: 'FileText', feature: 'lr' },
   { title: 'Operations', path: '/operations', icon: 'Layers' },
   { title: 'Maintenance', path: '/maintenance', icon: 'Wrench' },

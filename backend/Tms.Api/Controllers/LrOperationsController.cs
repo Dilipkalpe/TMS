@@ -13,15 +13,19 @@ namespace Tms.Api.Controllers;
 [Route("api/lr/operations")]
 public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
-    IQueryable<LorryReceipt> BaseLrs() =>
+    IQueryable<LorryReceipt> BaseLrs(bool includeClosed = false) =>
         tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking().Include(l => l.Branch)))
-            .Where(l => l.Status != LrStatuses.Closed);
+            .Where(l => includeClosed || l.Status != LrStatuses.Closed);
 
     [HttpGet("summary")]
     public async Task<ActionResult<object>> Summary(CancellationToken ct)
     {
-        var counts = await LrOperationsService.CountByStageAsync(BaseLrs(), db, tenants, ct);
-        var stages = LrOperationStages.All.Select(stage => new
+        var counts = await LrOperationsService.CountByStageAsync(BaseLrs(), db, ct);
+        counts[LrOperationStages.Closed] = await LrOperationsService
+            .ApplyStageFilter(BaseLrs(true), db, LrOperationStages.Closed)
+            .CountAsync(ct);
+
+        var stages = LrOperationStages.WorkflowTabs.Select(stage => new
         {
             stage,
             count = counts.GetValueOrDefault(stage),
@@ -40,35 +44,37 @@ public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBr
         [FromQuery] bool includeTotal = true,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(stage) || !LrOperationStages.All.Contains(stage))
-            return BadRequest(new ApiError($"Unknown stage. Use one of: {string.Join(", ", LrOperationStages.All)}"));
+        var normalized = LrOperationStages.Normalize(stage ?? "");
+        if (string.IsNullOrWhiteSpace(stage) || !LrOperationStages.WorkflowTabs.Contains(normalized))
+            return BadRequest(new ApiError($"Unknown stage. Use one of: {string.Join(", ", LrOperationStages.WorkflowTabs)}"));
 
-        if (stage == LrOperationStages.ExpenseApproval)
-            return BadRequest(new ApiError("Use GET /api/lr/process/expenses/pending for expense approval queue."));
-
-        var q = LrOperationsService.ApplyStageFilter(BaseLrs(), db, stage);
+        var includeClosed = normalized == LrOperationStages.Closed;
+        var q = LrOperationsService.ApplyStageFilter(BaseLrs(includeClosed), db, normalized);
         q = SearchHelper.Filter(q, search);
         q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
 
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal, ct);
 
-        var processStep = LrOperationsService.ResolveProcessStep(stage);
-        var nextAction = LrOperationsService.NextActionLabel(stage);
-        var dtos = items.Select(l => new LrQueueItemDto(
-            l.LrNumber,
-            l.LrDate,
-            l.Branch?.Name,
-            l.Consignor,
-            l.Consignee,
-            l.FromCity,
-            l.ToCity,
-            l.VehicleNumber,
-            l.BusinessType,
-            l.Status,
-            l.Freight,
-            nextAction,
-            processStep)).ToList();
+        var dtos = items.Select(l =>
+        {
+            var (action, step) = LrOperationsService.ResolveNextAction(l.Status);
+            return new LrQueueItemDto(
+                l.LrNumber,
+                l.LrDate,
+                l.Branch?.Name,
+                l.Consignor,
+                l.Consignee,
+                l.FromCity,
+                l.ToCity,
+                l.VehicleNumber,
+                l.CustomerName,
+                l.BusinessType,
+                l.Status,
+                l.Freight,
+                action,
+                step ?? LrOperationsService.ResolveProcessStep(normalized));
+        }).ToList();
 
         return Ok(new PagedResult<LrQueueItemDto>(dtos, total, p, size, hasMore, approx));
     }
@@ -83,6 +89,7 @@ public record LrQueueItemDto(
     string? From,
     string? To,
     string? Vehicle,
+    string? Customer,
     string? BusinessType,
     string Status,
     decimal Freight,

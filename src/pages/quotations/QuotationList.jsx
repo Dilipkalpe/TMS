@@ -15,7 +15,7 @@ function statusVariant(status) {
   return 'default'
 }
 
-export default function QuotationList() {
+export default function QuotationList({ embedded = false }) {
   const navigate = useNavigate()
   const { toast } = useToast()
   const paged = usePagedApiResource(
@@ -24,6 +24,19 @@ export default function QuotationList() {
   )
 
   const columns = withAuditColumns([
+    {
+      key: 'action',
+      label: 'Next Action',
+      render: (r) => (
+        <button
+          type="button"
+          className="rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700"
+          onClick={(e) => { e.stopPropagation(); navigate(`/quotations/${r.id}`) }}
+        >
+          Open
+        </button>
+      ),
+    },
     { key: 'quoteNo', label: 'Quote No' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
     { key: 'customerName', label: 'Customer' },
@@ -36,10 +49,11 @@ export default function QuotationList() {
 
   return (
     <ERPListPage
-      onAdd={() => navigate(addRecordRoutes.quotations)}
-      module="Quotations"
-      title="Quotation List"
-      statusCards={[{ label: 'Total Quotations', color: 'blue', icon: 'FileText', count: paged.total }]}
+      onAdd={embedded ? undefined : () => navigate(addRecordRoutes.quotations)}
+      showAdd={!embedded}
+      module={embedded ? 'Booking Management' : 'Quotations'}
+      title={embedded ? undefined : 'Quotation List'}
+      statusCards={embedded ? [] : [{ label: 'Total Quotations', color: 'blue', icon: 'FileText', count: paged.total }]}
       searchPlaceholder="Quote no, customer, route..."
       columns={columns}
       data={paged.items}

@@ -6,10 +6,12 @@ import TenantGuard from './components/auth/TenantGuard'
 import LoginRoute from './components/auth/LoginRoute'
 import PageFallback from './components/ui/PageFallback'
 import {
-  Dashboard, BookingList, NewBooking, BookingDetails, EditBooking,
-  GenerateLR, LRList, EditLR, LRProcessPage, LrExpenseApprovalPage,
-  LrManagementQueue, LoadingManagementQueue, TransitPassQueue, DeliveryManagementQueue,
-  InvoiceManagementQueue, LrExpenseManagementQueue, LrClosingQueue,
+  Dashboard, NewBooking, BookingDetails, EditBooking,
+  GenerateLR, EditLR, LRProcessPage, LrExpenseApprovalPage,
+  LrManagementLayout, LrDetailPage,
+  LrListTab, LrLoadingPendingTab, LrLoadingSheetTab, LrTransitPassTab, LrDispatchTab,
+  LrDeliveryTab, LrPodPendingTab, LrInvoicePendingTab, LrExpensePendingTab, LrClosedTab,
+  BookingManagementLayout, BookingQuotationsTab, BookingPendingTab, BookingConfirmedTab, BookingCancelledTab,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
   FreightRateList, NewFreightRate, FreightRateDetails,
@@ -68,29 +70,48 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="bookings" element={<BookingList />} />
+        <Route path="bookings" element={<BookingManagementLayout />}>
+          <Route index element={<Navigate to="/bookings/pending" replace />} />
+          <Route path="quotations" element={<BookingQuotationsTab />} />
+          <Route path="pending" element={<BookingPendingTab />} />
+          <Route path="confirmed" element={<BookingConfirmedTab />} />
+          <Route path="cancelled" element={<BookingCancelledTab />} />
+        </Route>
         <Route path="bookings/new" element={<NewBooking />} />
         <Route path="bookings/:id/edit" element={<EditBooking />} />
         <Route path="bookings/:id" element={<BookingDetails />} />
-        <Route path="lr" element={<LRList />} />
+        <Route path="lr" element={<LrManagementLayout />}>
+          <Route index element={<LrListTab />} />
+          <Route path="loading-pending" element={<LrLoadingPendingTab />} />
+          <Route path="loading-sheet" element={<LrLoadingSheetTab />} />
+          <Route path="transit-pass" element={<LrTransitPassTab />} />
+          <Route path="dispatch" element={<LrDispatchTab />} />
+          <Route path="delivery" element={<LrDeliveryTab />} />
+          <Route path="pod-pending" element={<LrPodPendingTab />} />
+          <Route path="invoice-pending" element={<LrInvoicePendingTab />} />
+          <Route path="expense-pending" element={<LrExpensePendingTab />} />
+          <Route path="closed" element={<LrClosedTab />} />
+        </Route>
+        <Route path="lr/expense-approval" element={<LrExpenseApprovalPage />} />
         <Route path="lr/generate" element={<GenerateLR />} />
-        <Route path="lr/expenses/approval" element={<Navigate to="/operations/expense-approval" replace />} />
+        <Route path="lr/expenses/approval" element={<Navigate to="/lr/expense-approval" replace />} />
         <Route path="lr/:lrNumber/process" element={<LRProcessPage />} />
         <Route path="lr/:lrNumber/edit" element={<EditLR />} />
+        <Route path="lr/:lrNumber" element={<LrDetailPage />} />
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="vehicles/new" element={<NewVehicle />} />
         <Route path="vehicles/:id/edit" element={<EditVehicle />} />
         <Route path="vehicles/:id" element={<VehicleDetails />} />
         <Route path="maintenance" element={<MaintenancePage />} />
         <Route path="operations" element={<OperationsHub />} />
-        <Route path="operations/lr-management" element={<LrManagementQueue />} />
-        <Route path="operations/loading" element={<LoadingManagementQueue />} />
-        <Route path="operations/transit-pass" element={<TransitPassQueue />} />
-        <Route path="operations/delivery" element={<DeliveryManagementQueue />} />
-        <Route path="operations/invoice" element={<InvoiceManagementQueue />} />
-        <Route path="operations/lr-expenses" element={<LrExpenseManagementQueue />} />
-        <Route path="operations/expense-approval" element={<LrExpenseApprovalPage />} />
-        <Route path="operations/lr-closing" element={<LrClosingQueue />} />
+        <Route path="operations/lr-management" element={<Navigate to="/lr" replace />} />
+        <Route path="operations/loading" element={<Navigate to="/lr/loading-pending" replace />} />
+        <Route path="operations/transit-pass" element={<Navigate to="/lr/transit-pass" replace />} />
+        <Route path="operations/delivery" element={<Navigate to="/lr/delivery" replace />} />
+        <Route path="operations/invoice" element={<Navigate to="/lr/invoice-pending" replace />} />
+        <Route path="operations/lr-expenses" element={<Navigate to="/lr/expense-pending" replace />} />
+        <Route path="operations/expense-approval" element={<Navigate to="/lr/expense-approval" replace />} />
+        <Route path="operations/lr-closing" element={<Navigate to="/lr/closed" replace />} />
         <Route path="operations/fuel" element={<FuelPage />} />
         <Route path="operations/gps" element={<FleetMapPage />} />
         <Route path="operations/gps/geofences" element={<GeofenceManagerPage />} />
@@ -119,7 +140,7 @@ export default function App() {
         <Route path="freight-rates" element={<FreightRateList />} />
         <Route path="freight-rates/new" element={<NewFreightRate />} />
         <Route path="freight-rates/:id" element={<FreightRateDetails />} />
-        <Route path="quotations" element={<QuotationList />} />
+        <Route path="quotations" element={<Navigate to="/bookings/quotations" replace />} />
         <Route path="quotations/new" element={<NewQuotation />} />
         <Route path="quotations/:id" element={<QuotationDetails />} />
         <Route path="vendors" element={<VendorList />} />
