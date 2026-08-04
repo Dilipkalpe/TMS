@@ -244,6 +244,22 @@ export const vendorsApi = {
   remove: (id) => apiRequest(`/vendors/${id}`, { method: 'DELETE' }),
 }
 
+export const consignorsApi = {
+  list: (params = {}) => apiRequest(`/consignors?${new URLSearchParams(params)}`),
+  get: (id) => apiRequest(`/consignors/${id}`),
+  create: (data) => apiRequest('/consignors', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/consignors/${id}`, { method: 'PUT', body: data }),
+  remove: (id) => apiRequest(`/consignors/${id}`, { method: 'DELETE' }),
+}
+
+export const consigneesApi = {
+  list: (params = {}) => apiRequest(`/consignees?${new URLSearchParams(params)}`),
+  get: (id) => apiRequest(`/consignees/${id}`),
+  create: (data) => apiRequest('/consignees', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/consignees/${id}`, { method: 'PUT', body: data }),
+  remove: (id) => apiRequest(`/consignees/${id}`, { method: 'DELETE' }),
+}
+
 export const expensesApi = {
   list: (params = {}) => apiRequest(`/expenses?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/expenses/${id}`),

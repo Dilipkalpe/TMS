@@ -5,6 +5,8 @@ export const addRecordRoutes = {
   vehicles: '/vehicles/new',
   employees: '/hr/employees/new',
   customers: '/customers/new',
+  consignors: '/consignors/new',
+  consignees: '/consignees/new',
   freightRates: '/freight-rates/new',
   quotations: '/quotations/new',
   vendors: '/vendors/new',

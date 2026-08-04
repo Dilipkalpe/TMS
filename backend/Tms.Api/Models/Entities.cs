@@ -74,6 +74,56 @@ public class Vendor : IBranchScoped, IAuditable
     public string? UpdatedBy { get; set; }
 }
 
+public class Consignor : IBranchScoped, IAuditable
+{
+    public string Id { get; set; } = "";
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
+    public string Name { get; set; } = "";
+    public string? CompanyName { get; set; }
+    public string? Contact { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public string? Gst { get; set; }
+    public string? Pan { get; set; }
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Pincode { get; set; }
+    public string? DefaultFromLocation { get; set; }
+    public string Status { get; set; } = "Active";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
+public class Consignee : IBranchScoped, IAuditable
+{
+    public string Id { get; set; } = "";
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
+    public string Name { get; set; } = "";
+    public string? CompanyName { get; set; }
+    public string? Contact { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public string? Gst { get; set; }
+    public string? Pan { get; set; }
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Pincode { get; set; }
+    public string? DefaultToLocation { get; set; }
+    public string Status { get; set; } = "Active";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
 public class Driver : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
@@ -215,6 +265,8 @@ public class LorryReceipt : IBranchScoped, IAuditable
     public string? CustomerName { get; set; }
     public string? Consignor { get; set; }
     public string? Consignee { get; set; }
+    public string? ConsignorId { get; set; }
+    public string? ConsigneeId { get; set; }
     public string FromCity { get; set; } = "";
     public string ToCity { get; set; } = "";
     public string? VehicleId { get; set; }

@@ -7,7 +7,10 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import ERPDataTable from '../../components/ui/ERPDataTable'
-import { lrApi, bookingsApi, unwrapList } from '../../services/api'
+import { lrApi, bookingsApi, consignorsApi, consigneesApi, unwrapList } from '../../services/api'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
+import { applyConsignorToLrForm, applyConsigneeToLrForm } from '../../utils/partyMasterLr'
+import { useDocumentFlow } from '../../hooks/useDocumentFlow'
 import { useToast } from '../../context/ToastContext'
 import { Save, Printer, Download, Copy, Loader2 } from 'lucide-react'
 import { formatCurrency } from '../../components/ui/ReportFilters'
@@ -37,8 +40,18 @@ const emptyForm = () => ({
   bookingId: '',
   lrNumber: '',
   lrDate: new Date().toISOString().slice(0, 10),
+  consignorId: '',
+  consigneeId: '',
   consignor: '',
   consignee: '',
+  consignorContact: '',
+  consignorPhone: '',
+  consignorGst: '',
+  consignorAddress: '',
+  consigneeContact: '',
+  consigneePhone: '',
+  consigneeGst: '',
+  consigneeAddress: '',
   from: '',
   to: '',
   vehicle: '',
@@ -141,8 +154,16 @@ export default function GenerateLR() {
       })
       return
     }
+    if (!form.consignorId && !form.consignor?.trim()) {
+      toast({ title: 'Validation', message: 'Consignor is required.', type: 'warning' })
+      return
+    }
+    if (!form.consigneeId && !form.consignee?.trim()) {
+      toast({ title: 'Validation', message: 'Consignee is required.', type: 'warning' })
+      return
+    }
     if (!form.from?.trim() || !form.to?.trim()) {
-      toast({ title: 'Validation', message: 'From and To cities are required.', type: 'warning' })
+      toast({ title: 'Validation', message: 'From and To locations are required.', type: 'warning' })
       return
     }
     setSaving(true)
@@ -264,10 +285,52 @@ export default function GenerateLR() {
               <Input label="Booking No." value={form.bookingId} placeholder="Optional link" onChange={(e) => update('bookingId', e.target.value)} />
             )}
             <Input label="LR Date" type="date" value={form.lrDate} onChange={(e) => update('lrDate', e.target.value)} />
-            <Input label="Consignor" value={form.consignor} onChange={(e) => update('consignor', e.target.value)} />
-            <Input label="Consignee" value={form.consignee} onChange={(e) => update('consignee', e.target.value)} />
-            <Input label="From" value={form.from} onChange={(e) => update('from', e.target.value)} />
-            <Input label="To" value={form.to} onChange={(e) => update('to', e.target.value)} />
+          </div>
+        </Card>
+
+        <Card className="mb-4">
+          <CardHeader title="Consignor (From)" subtitle="Select from master — address and From location auto-fill" />
+          <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
+            <PartyMasterSelect
+              label="Consignor"
+              api={consignorsApi}
+              valueId={form.consignorId}
+              displayValue={form.consignor}
+              onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row) }))}
+            />
+            <Input label="Contact Person" value={form.consignorContact} onChange={(e) => update('consignorContact', e.target.value)} />
+            <Input label="Mobile Number" value={form.consignorPhone} onChange={(e) => update('consignorPhone', e.target.value)} />
+            <Input label="GST No." value={form.consignorGst} onChange={(e) => update('consignorGst', e.target.value)} />
+            <Input label="From Location" value={form.from} onChange={(e) => update('from', e.target.value)} />
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Input label="Address" value={form.consignorAddress} onChange={(e) => update('consignorAddress', e.target.value)} />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="mb-4">
+          <CardHeader title="Consignee (To)" subtitle="Select from master — address and To location auto-fill" />
+          <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
+            <PartyMasterSelect
+              label="Consignee"
+              api={consigneesApi}
+              valueId={form.consigneeId}
+              displayValue={form.consignee}
+              onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row) }))}
+            />
+            <Input label="Contact Person" value={form.consigneeContact} onChange={(e) => update('consigneeContact', e.target.value)} />
+            <Input label="Mobile Number" value={form.consigneePhone} onChange={(e) => update('consigneePhone', e.target.value)} />
+            <Input label="GST No." value={form.consigneeGst} onChange={(e) => update('consigneeGst', e.target.value)} />
+            <Input label="To Location" value={form.to} onChange={(e) => update('to', e.target.value)} />
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Input label="Address" value={form.consigneeAddress} onChange={(e) => update('consigneeAddress', e.target.value)} />
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Shipment & Charges" />
+          <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
             <LookupSelect label="Vehicle" type="vehicles" value={form.vehicle} onChange={(v) => update('vehicle', v)} placeholder="Search vehicle…" />
             <DriverLookupSelect label="Driver" value={form.driver} onChange={(v) => update('driver', v)} />
             <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />

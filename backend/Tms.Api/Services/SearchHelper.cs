@@ -41,6 +41,28 @@ public static class SearchHelper
             || (v.Contact != null && EF.Functions.ILike(v.Contact, p)));
     }
 
+    public static IQueryable<Consignor> Filter(IQueryable<Consignor> q, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search)) return q;
+        var p = Pattern(search);
+        return q.Where(c => EF.Functions.ILike(c.Name, p)
+            || (c.CompanyName != null && EF.Functions.ILike(c.CompanyName, p))
+            || (c.City != null && EF.Functions.ILike(c.City, p))
+            || (c.Gst != null && EF.Functions.ILike(c.Gst, p))
+            || (c.Phone != null && EF.Functions.ILike(c.Phone, p)));
+    }
+
+    public static IQueryable<Consignee> Filter(IQueryable<Consignee> q, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search)) return q;
+        var p = Pattern(search);
+        return q.Where(c => EF.Functions.ILike(c.Name, p)
+            || (c.CompanyName != null && EF.Functions.ILike(c.CompanyName, p))
+            || (c.City != null && EF.Functions.ILike(c.City, p))
+            || (c.Gst != null && EF.Functions.ILike(c.Gst, p))
+            || (c.Phone != null && EF.Functions.ILike(c.Phone, p)));
+    }
+
     public static IQueryable<Booking> Filter(IQueryable<Booking> q, string? search)
     {
         if (string.IsNullOrWhiteSpace(search)) return q;

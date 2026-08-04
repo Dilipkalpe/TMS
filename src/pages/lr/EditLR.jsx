@@ -6,7 +6,9 @@ import Button from '../../components/ui/Button'
 import Input, { Select, Textarea } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
-import { lrApi } from '../../services/api'
+import { lrApi, consignorsApi, consigneesApi } from '../../services/api'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
+import { applyConsignorToLrForm, applyConsigneeToLrForm } from '../../utils/partyMasterLr'
 import { LR_BUSINESS_TYPES, LR_BUSINESS_TYPE_LABELS } from '../../constants/lrBusinessTypes'
 import { fromDocPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
@@ -22,8 +24,18 @@ function mapLrToForm(lr) {
   return {
     lrNumber: lr.lrNumber,
     lrDate: lr.lrDate,
+    consignorId: lr.consignorId ?? '',
+    consigneeId: lr.consigneeId ?? '',
     consignor: lr.consignor ?? '',
     consignee: lr.consignee ?? '',
+    consignorContact: '',
+    consignorPhone: '',
+    consignorGst: '',
+    consignorAddress: '',
+    consigneeContact: '',
+    consigneePhone: '',
+    consigneeGst: '',
+    consigneeAddress: '',
     from: lr.from ?? '',
     to: lr.to ?? '',
     vehicle: lr.vehicle ?? '',
@@ -64,9 +76,32 @@ export default function EditLR() {
   useEffect(() => {
     let cancelled = false
     lrApi.get(lrNumber)
-      .then((lr) => {
+      .then(async (lr) => {
         if (cancelled) return
-        setForm(mapLrToForm(lr))
+        const base = mapLrToForm(lr)
+        if (lr.consignorId) {
+          try {
+            const c = await consignorsApi.get(lr.consignorId)
+            Object.assign(base, {
+              consignorContact: c.contact ?? '',
+              consignorPhone: c.phone ?? '',
+              consignorGst: c.gst ?? '',
+              consignorAddress: c.address ?? '',
+            })
+          } catch { /* legacy LR without master row */ }
+        }
+        if (lr.consigneeId) {
+          try {
+            const c = await consigneesApi.get(lr.consigneeId)
+            Object.assign(base, {
+              consigneeContact: c.contact ?? '',
+              consigneePhone: c.phone ?? '',
+              consigneeGst: c.gst ?? '',
+              consigneeAddress: c.address ?? '',
+            })
+          } catch { /* legacy */ }
+        }
+        setForm(base)
         setLrStatus(lr.status || 'LR Created')
       })
       .catch((err) => {
@@ -85,8 +120,16 @@ export default function EditLR() {
   }
 
   const handleSave = async () => {
+    if (!form.consignorId && !form.consignor?.trim()) {
+      toast({ title: 'Validation', message: 'Consignor is required.', type: 'warning' })
+      return
+    }
+    if (!form.consigneeId && !form.consignee?.trim()) {
+      toast({ title: 'Validation', message: 'Consignee is required.', type: 'warning' })
+      return
+    }
     if (!form.from?.trim() || !form.to?.trim()) {
-      toast({ title: 'Validation', message: 'From and To cities are required.', type: 'warning' })
+      toast({ title: 'Validation', message: 'From and To locations are required.', type: 'warning' })
       return
     }
     setSaving(true)
@@ -123,15 +166,49 @@ export default function EditLR() {
           </Button>
         </div>
       </Card>
+      <Card className="mb-4">
+        <CardHeader title="Consignor (From)" />
+        <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
+          <PartyMasterSelect
+            label="Consignor"
+            api={consignorsApi}
+            valueId={form.consignorId}
+            displayValue={form.consignor}
+            onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row), balance: calcBalance({ ...prev, ...applyConsignorToLrForm(row) }) }))}
+          />
+          <Input label="Contact Person" value={form.consignorContact} onChange={(e) => update('consignorContact', e.target.value)} />
+          <Input label="Mobile" value={form.consignorPhone} onChange={(e) => update('consignorPhone', e.target.value)} />
+          <Input label="GST No." value={form.consignorGst} onChange={(e) => update('consignorGst', e.target.value)} />
+          <Input label="From Location" value={form.from} onChange={(e) => update('from', e.target.value)} />
+          <div className="sm:col-span-2 lg:col-span-3">
+            <Input label="Address" value={form.consignorAddress} onChange={(e) => update('consignorAddress', e.target.value)} />
+          </div>
+        </div>
+      </Card>
+      <Card className="mb-4">
+        <CardHeader title="Consignee (To)" />
+        <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
+          <PartyMasterSelect
+            label="Consignee"
+            api={consigneesApi}
+            valueId={form.consigneeId}
+            displayValue={form.consignee}
+            onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row), balance: calcBalance({ ...prev, ...applyConsigneeToLrForm(row) }) }))}
+          />
+          <Input label="Contact Person" value={form.consigneeContact} onChange={(e) => update('consigneeContact', e.target.value)} />
+          <Input label="Mobile" value={form.consigneePhone} onChange={(e) => update('consigneePhone', e.target.value)} />
+          <Input label="GST No." value={form.consigneeGst} onChange={(e) => update('consigneeGst', e.target.value)} />
+          <Input label="To Location" value={form.to} onChange={(e) => update('to', e.target.value)} />
+          <div className="sm:col-span-2 lg:col-span-3">
+            <Input label="Address" value={form.consigneeAddress} onChange={(e) => update('consigneeAddress', e.target.value)} />
+          </div>
+        </div>
+      </Card>
       <Card>
-        <CardHeader title="LR Details" subtitle="Update lorry receipt information" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <CardHeader title="LR Details" subtitle="Shipment, charges, and payment" />
+        <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
           <Input label="LR Number" value={form.lrNumber} readOnly />
           <Input label="LR Date" type="date" value={form.lrDate} onChange={(e) => update('lrDate', e.target.value)} />
-          <Input label="Consignor" value={form.consignor} onChange={(e) => update('consignor', e.target.value)} />
-          <Input label="Consignee" value={form.consignee} onChange={(e) => update('consignee', e.target.value)} />
-          <Input label="From" value={form.from} onChange={(e) => update('from', e.target.value)} />
-          <Input label="To" value={form.to} onChange={(e) => update('to', e.target.value)} />
           <LookupSelect label="Vehicle" type="vehicles" value={form.vehicle} onChange={(v) => update('vehicle', v)} placeholder="Search vehicle…" />
           <DriverLookupSelect label="Driver" value={form.driver} onChange={(v) => update('driver', v)} />
           <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />

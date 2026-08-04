@@ -51,6 +51,18 @@ public static class EntityMappers
         v.BranchId, v.Branch?.Name,
         v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt);
 
+    public static ConsignorDto ToDto(Consignor c) => new(
+        c.Id, c.Name, c.CompanyName, c.Contact, c.Phone, c.Email, c.Gst, c.Pan,
+        c.Address, c.City, c.State, c.Pincode, c.DefaultFromLocation, c.Status,
+        c.BranchId, c.Branch?.Name,
+        c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt);
+
+    public static ConsigneeDto ToDto(Consignee c) => new(
+        c.Id, c.Name, c.CompanyName, c.Contact, c.Phone, c.Email, c.Gst, c.Pan,
+        c.Address, c.City, c.State, c.Pincode, c.DefaultToLocation, c.Status,
+        c.BranchId, c.Branch?.Name,
+        c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt);
+
     public static ExpenseDto ToDto(Expense e) => new(
         e.Id,
         e.ExpenseDate.ToString("yyyy-MM-dd"),
@@ -71,6 +83,7 @@ public static class EntityMappers
         l.BookingId, l.Hamali, l.LoadingCharges, l.UnloadingCharges,
         l.Insurance, l.Advance, l.Remarks, l.Status,
         l.BusinessType, l.CustomerId, l.CustomerName,
+        l.ConsignorId, l.ConsigneeId,
         branchId ?? l.BranchId, branchName ?? l.Branch?.Name,
         l.CreatedBy, l.CreatedAt, l.UpdatedBy, l.UpdatedAt);
 }
@@ -174,6 +187,18 @@ public static class IdGenerator
     {
         var count = await db.Vehicles.CountAsync();
         return $"V-{(count + 1):D3}";
+    }
+
+    public static async Task<string> NextConsignorId(Data.TmsDbContext db)
+    {
+        var count = await db.Consignors.CountAsync();
+        return $"CR-{(count + 1):D3}";
+    }
+
+    public static async Task<string> NextConsigneeId(Data.TmsDbContext db)
+    {
+        var count = await db.Consignees.CountAsync();
+        return $"CE-{(count + 1):D3}";
     }
 
     public static async Task<string> NextQuoteNo(Data.TmsDbContext db)

@@ -129,6 +129,7 @@ if [[ "$SKIP_DB" -eq 0 ]]; then
   apply_sql database/settings_document_flow.sql "document_flow"
   apply_sql database/lr/schema.sql "LR process flow (loading sheet, transit pass, delivery, expenses)"
   apply_sql database/lr/business_type.sql "FTL/PTL business type and multi-LR loading"
+  apply_sql database/lr/consignor_consignee.sql "Consignor and Consignee masters"
 fi
 
 ENV_ARGS=()

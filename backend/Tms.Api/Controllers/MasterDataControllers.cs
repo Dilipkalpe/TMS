@@ -303,6 +303,162 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants, IBranchC
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+public class ConsignorsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
+{
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<ConsignorDto>>> GetAll(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
+    {
+        var q = tenants.Filter(branches.Filter(db.Consignors.AsNoTracking().Include(c => c.Branch)));
+        if (!string.IsNullOrWhiteSpace(status) && !string.Equals(status, "(All)", StringComparison.OrdinalIgnoreCase))
+            q = q.Where(c => c.Status == status);
+        q = SearchHelper.Filter(q, search);
+        q = q.OrderBy(c => c.Name);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        return Ok(new PagedResult<ConsignorDto>(
+            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+    }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<ConsignorDto>> Get(string id)
+    {
+        var c = await db.Consignors.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
+        if (c == null || !TenantScope.CanAccessBranchEntity(tenants, branches, c)) return NotFound();
+        return Ok(EntityMappers.ToDto(c));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<ConsignorDto>> Create([FromBody] Dictionary<string, object?> body)
+    {
+        var name = ApiParseHelper.BodyString(body, "name");
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest(new ApiError("Consignor name is required."));
+
+        var id = await IdGenerator.NextConsignorId(db);
+        var c = new Consignor
+        {
+            Id = id,
+            Name = name,
+            Status = ApiParseHelper.BodyString(body, "status") ?? "Active",
+            CompanyId = TenantScope.ResolveCompanyId(tenants),
+            BranchId = branches.AssignBranchId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        PartyMasterHelper.ApplyConsignorBody(c, body);
+        db.Consignors.Add(c);
+        await db.SaveChangesAsync();
+        return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(c));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<ActionResult<ConsignorDto>> Update(string id, [FromBody] Dictionary<string, object?> body)
+    {
+        var c = await db.Consignors.FindAsync(id);
+        if (c == null || !TenantScope.CanAccessBranchEntity(tenants, branches, c)) return NotFound();
+        PartyMasterHelper.ApplyConsignorBody(c, body);
+        c.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(EntityMappers.ToDto(c));
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var c = await db.Consignors.FindAsync(id);
+        if (c == null || !TenantScope.CanAccessBranchEntity(tenants, branches, c)) return NotFound();
+        db.Consignors.Remove(c);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+}
+
+[Authorize]
+[ApiController]
+[Route("api/[controller]")]
+public class ConsigneesController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
+{
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<ConsigneeDto>>> GetAll(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
+    {
+        var q = tenants.Filter(branches.Filter(db.Consignees.AsNoTracking().Include(c => c.Branch)));
+        if (!string.IsNullOrWhiteSpace(status) && !string.Equals(status, "(All)", StringComparison.OrdinalIgnoreCase))
+            q = q.Where(c => c.Status == status);
+        q = SearchHelper.Filter(q, search);
+        q = q.OrderBy(c => c.Name);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        return Ok(new PagedResult<ConsigneeDto>(
+            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+    }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<ConsigneeDto>> Get(string id)
+    {
+        var c = await db.Consignees.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
+        if (c == null || !TenantScope.CanAccessBranchEntity(tenants, branches, c)) return NotFound();
+        return Ok(EntityMappers.ToDto(c));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<ConsigneeDto>> Create([FromBody] Dictionary<string, object?> body)
+    {
+        var name = ApiParseHelper.BodyString(body, "name");
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest(new ApiError("Consignee name is required."));
+
+        var id = await IdGenerator.NextConsigneeId(db);
+        var c = new Consignee
+        {
+            Id = id,
+            Name = name,
+            Status = ApiParseHelper.BodyString(body, "status") ?? "Active",
+            CompanyId = TenantScope.ResolveCompanyId(tenants),
+            BranchId = branches.AssignBranchId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        PartyMasterHelper.ApplyConsigneeBody(c, body);
+        db.Consignees.Add(c);
+        await db.SaveChangesAsync();
+        return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(c));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<ActionResult<ConsigneeDto>> Update(string id, [FromBody] Dictionary<string, object?> body)
+    {
+        var c = await db.Consignees.FindAsync(id);
+        if (c == null || !TenantScope.CanAccessBranchEntity(tenants, branches, c)) return NotFound();
+        PartyMasterHelper.ApplyConsigneeBody(c, body);
+        c.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(EntityMappers.ToDto(c));
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var c = await db.Consignees.FindAsync(id);
+        if (c == null || !TenantScope.CanAccessBranchEntity(tenants, branches, c)) return NotFound();
+        db.Consignees.Remove(c);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+}
+
+[Authorize]
+[ApiController]
+[Route("api/[controller]")]
 public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
 {
     [HttpGet]
@@ -565,7 +721,31 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         var from = ApiParseHelper.BodyString(body, "from");
         var to = ApiParseHelper.BodyString(body, "to");
         if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
-            return BadRequest(new ApiError("From and To cities are required."));
+            return BadRequest(new ApiError("From and To locations are required."));
+
+        var consignorId = ApiParseHelper.BodyString(body, "consignorId");
+        var consigneeId = ApiParseHelper.BodyString(body, "consigneeId");
+        var consignorText = ApiParseHelper.BodyString(body, "consignor");
+        var consigneeText = ApiParseHelper.BodyString(body, "consignee");
+
+        var (consignorRow, consignorErr) = await PartyMasterHelper.ResolveActiveConsignorAsync(
+            db, tenants, branches, consignorId, consignorText);
+        if (consignorErr != null) return BadRequest(new ApiError(consignorErr));
+        var (consigneeRow, consigneeErr) = await PartyMasterHelper.ResolveActiveConsigneeAsync(
+            db, tenants, branches, consigneeId, consigneeText);
+        if (consigneeErr != null) return BadRequest(new ApiError(consigneeErr));
+
+        if (consignorRow == null && string.IsNullOrWhiteSpace(consignorText))
+            return BadRequest(new ApiError("Consignor is required."));
+        if (consigneeRow == null && string.IsNullOrWhiteSpace(consigneeText))
+            return BadRequest(new ApiError("Consignee is required."));
+
+        var consignorName = consignorRow != null
+            ? PartyMasterHelper.DisplayName(consignorRow.Name, consignorRow.CompanyName)
+            : consignorText!.Trim();
+        var consigneeName = consigneeRow != null
+            ? PartyMasterHelper.DisplayName(consigneeRow.Name, consigneeRow.CompanyName)
+            : consigneeText!.Trim();
 
         var bookingId = ApiParseHelper.BodyString(body, "bookingId");
         try
@@ -632,8 +812,10 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             BusinessType = LrBusinessTypes.Normalize(ApiParseHelper.BodyString(body, "businessType")),
             CustomerId = booking?.CustomerId,
             CustomerName = booking?.CustomerName,
-            Consignor = ApiParseHelper.BodyString(body, "consignor"),
-            Consignee = ApiParseHelper.BodyString(body, "consignee"),
+            ConsignorId = consignorRow?.Id ?? consignorId,
+            ConsigneeId = consigneeRow?.Id ?? consigneeId,
+            Consignor = consignorName,
+            Consignee = consigneeName,
             FromCity = from,
             ToCity = to,
             VehicleId = vehicle?.Id,
@@ -692,10 +874,40 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
                 lr.BookingId = linked.Id;
             }
         }
+        if (body.ContainsKey("consignorId"))
+            lr.ConsignorId = ApiParseHelper.BodyString(body, "consignorId");
         if (body.ContainsKey("consignor"))
             lr.Consignor = ApiParseHelper.BodyString(body, "consignor");
+        if (body.ContainsKey("consigneeId"))
+            lr.ConsigneeId = ApiParseHelper.BodyString(body, "consigneeId");
         if (body.ContainsKey("consignee"))
             lr.Consignee = ApiParseHelper.BodyString(body, "consignee");
+        if (body.ContainsKey("consignorId") || body.ContainsKey("consignor"))
+        {
+            var (row, err) = await PartyMasterHelper.ResolveActiveConsignorAsync(
+                db, tenants, branches, lr.ConsignorId, lr.Consignor);
+            if (err != null) return BadRequest(new ApiError(err));
+            if (row != null)
+            {
+                lr.ConsignorId = row.Id;
+                lr.Consignor = PartyMasterHelper.DisplayName(row.Name, row.CompanyName);
+            }
+            else if (string.IsNullOrWhiteSpace(lr.Consignor))
+                return BadRequest(new ApiError("Consignor is required."));
+        }
+        if (body.ContainsKey("consigneeId") || body.ContainsKey("consignee"))
+        {
+            var (row, err) = await PartyMasterHelper.ResolveActiveConsigneeAsync(
+                db, tenants, branches, lr.ConsigneeId, lr.Consignee);
+            if (err != null) return BadRequest(new ApiError(err));
+            if (row != null)
+            {
+                lr.ConsigneeId = row.Id;
+                lr.Consignee = PartyMasterHelper.DisplayName(row.Name, row.CompanyName);
+            }
+            else if (string.IsNullOrWhiteSpace(lr.Consignee))
+                return BadRequest(new ApiError("Consignee is required."));
+        }
         if (body.ContainsKey("from") && !string.IsNullOrWhiteSpace(ApiParseHelper.BodyString(body, "from")))
             lr.FromCity = ApiParseHelper.BodyString(body, "from")!;
         if (body.ContainsKey("to") && !string.IsNullOrWhiteSpace(ApiParseHelper.BodyString(body, "to")))

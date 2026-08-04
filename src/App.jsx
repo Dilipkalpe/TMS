@@ -13,6 +13,8 @@ import {
   FreightRateList, NewFreightRate, FreightRateDetails,
   QuotationList, NewQuotation, QuotationDetails,
   VendorList, VendorDetails, NewVendor,
+  ConsignorList, ConsignorDetails, NewConsignor,
+  ConsigneeList, ConsigneeDetails, NewConsignee,
   ExpenseList, NewExpense,
   Settings, BranchesPage, PortalUsersPage, UsersPage, DocumentNumberingPage, NotificationSettings,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
@@ -113,6 +115,12 @@ export default function App() {
         <Route path="vendors" element={<VendorList />} />
         <Route path="vendors/new" element={<NewVendor />} />
         <Route path="vendors/:id" element={<VendorDetails />} />
+        <Route path="consignors" element={<ConsignorList />} />
+        <Route path="consignors/new" element={<NewConsignor />} />
+        <Route path="consignors/:id" element={<ConsignorDetails />} />
+        <Route path="consignees" element={<ConsigneeList />} />
+        <Route path="consignees/new" element={<NewConsignee />} />
+        <Route path="consignees/:id" element={<ConsigneeDetails />} />
         <Route path="expenses" element={<ExpenseList />} />
         <Route path="expenses/new" element={<NewExpense />} />
         <Route path="payroll" element={<PayrollHub />} />

@@ -11,6 +11,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<UserBranch> UserBranches => Set<UserBranch>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Consignor> Consignors => Set<Consignor>();
+    public DbSet<Consignee> Consignees => Set<Consignee>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<Driver> Drivers => Set<Driver>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
@@ -153,6 +155,56 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Outstanding).HasColumnName("outstanding");
             e.Property(x => x.Category).HasColumnName("category");
             e.Property(x => x.TotalBills).HasColumnName("total_bills");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+        });
+
+        modelBuilder.Entity<Consignor>(e =>
+        {
+            e.ToTable("consignors");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.CompanyName).HasColumnName("company_name");
+            e.Property(x => x.Contact).HasColumnName("contact");
+            e.Property(x => x.Phone).HasColumnName("phone");
+            e.Property(x => x.Email).HasColumnName("email");
+            e.Property(x => x.Gst).HasColumnName("gst");
+            e.Property(x => x.Pan).HasColumnName("pan");
+            e.Property(x => x.Address).HasColumnName("address");
+            e.Property(x => x.City).HasColumnName("city");
+            e.Property(x => x.State).HasColumnName("state");
+            e.Property(x => x.Pincode).HasColumnName("pincode");
+            e.Property(x => x.DefaultFromLocation).HasColumnName("default_from_location");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+        });
+
+        modelBuilder.Entity<Consignee>(e =>
+        {
+            e.ToTable("consignees");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.CompanyName).HasColumnName("company_name");
+            e.Property(x => x.Contact).HasColumnName("contact");
+            e.Property(x => x.Phone).HasColumnName("phone");
+            e.Property(x => x.Email).HasColumnName("email");
+            e.Property(x => x.Gst).HasColumnName("gst");
+            e.Property(x => x.Pan).HasColumnName("pan");
+            e.Property(x => x.Address).HasColumnName("address");
+            e.Property(x => x.City).HasColumnName("city");
+            e.Property(x => x.State).HasColumnName("state");
+            e.Property(x => x.Pincode).HasColumnName("pincode");
+            e.Property(x => x.DefaultToLocation).HasColumnName("default_to_location");
+            e.Property(x => x.Status).HasColumnName("status");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
@@ -310,6 +362,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.CustomerName).HasColumnName("customer_name");
             e.Property(x => x.Consignor).HasColumnName("consignor");
             e.Property(x => x.Consignee).HasColumnName("consignee");
+            e.Property(x => x.ConsignorId).HasColumnName("consignor_id");
+            e.Property(x => x.ConsigneeId).HasColumnName("consignee_id");
             e.Property(x => x.FromCity).HasColumnName("from_city");
             e.Property(x => x.ToCity).HasColumnName("to_city");
             e.Property(x => x.VehicleId).HasColumnName("vehicle_id");

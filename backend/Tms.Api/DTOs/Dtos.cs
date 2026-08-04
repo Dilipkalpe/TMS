@@ -62,6 +62,20 @@ public record VendorDto(
     Guid? BranchId = null, string? BranchName = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
 
+public record ConsignorDto(
+    string Id, string Name, string? CompanyName, string? Contact, string? Phone, string? Email,
+    string? Gst, string? Pan, string? Address, string? City, string? State, string? Pincode,
+    string? DefaultFromLocation, string Status,
+    Guid? BranchId = null, string? BranchName = null,
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+
+public record ConsigneeDto(
+    string Id, string Name, string? CompanyName, string? Contact, string? Phone, string? Email,
+    string? Gst, string? Pan, string? Address, string? City, string? State, string? Pincode,
+    string? DefaultToLocation, string Status,
+    Guid? BranchId = null, string? BranchName = null,
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+
 public record ExpenseDto(
     string Id, string Date, string Category, string? Description, string? Vehicle,
     string? Vendor, decimal Amount, string? PaymentMode, string Status,
@@ -75,6 +89,7 @@ public record LrDto(
     string? BookingId, decimal? Hamali, decimal? LoadingCharges, decimal? UnloadingCharges,
     decimal? Insurance, decimal? Advance, string? Remarks, string Status,
     string BusinessType, string? CustomerId, string? CustomerName,
+    string? ConsignorId = null, string? ConsigneeId = null,
     Guid? BranchId = null, string? BranchName = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
 

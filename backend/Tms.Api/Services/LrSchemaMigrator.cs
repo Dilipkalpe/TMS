@@ -12,7 +12,7 @@ public static class LrSchemaMigrator
         if (conn.State != System.Data.ConnectionState.Open)
             await conn.OpenAsync(ct);
 
-        foreach (var file in new[] { "schema.sql", "business_type.sql" })
+        foreach (var file in new[] { "schema.sql", "business_type.sql", "consignor_consignee.sql" })
         {
             var text = await LoadSchemaSqlAsync(file, ct);
             foreach (var stmt in ParseSql(text))
