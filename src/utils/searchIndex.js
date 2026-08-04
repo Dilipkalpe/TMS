@@ -1,4 +1,4 @@
-import { bookingsApi, vehiclesApi, hrApi, customersApi, vendorsApi, lrApi } from '../services/api'
+import { bookingsApi, vehiclesApi, hrApi, customersApi, vendorsApi, consignorsApi, consigneesApi, lrApi } from '../services/api'
 
 let cachedIndex = null
 let cachePromise = null
@@ -9,12 +9,14 @@ async function firstPage(api, pageSize = 25) {
 }
 
 async function buildIndex() {
-  const [bookings, vehicles, employees, customers, vendors, lrs] = await Promise.all([
+  const [bookings, vehicles, employees, customers, vendors, consignors, consignees, lrs] = await Promise.all([
     firstPage(bookingsApi),
     firstPage(vehiclesApi),
     firstPage(hrApi.employees),
     firstPage(customersApi),
     firstPage(vendorsApi),
+    firstPage(consignorsApi),
+    firstPage(consigneesApi),
     firstPage(lrApi),
   ])
 
@@ -25,6 +27,8 @@ async function buildIndex() {
   employees.forEach((e) => items.push({ id: e.id, label: e.name, sub: e.employeeType, path: `/hr/employees/${e.id}`, keywords: `${e.name} ${e.employeeCode} ${e.employeeType}`.toLowerCase() }))
   customers.forEach((c) => items.push({ id: c.id, label: c.name, sub: c.contact, path: `/customers/${c.id}`, keywords: `${c.name} ${c.contact}`.toLowerCase() }))
   vendors.forEach((v) => items.push({ id: v.id, label: v.name, sub: v.category, path: `/vendors/${v.id}`, keywords: `${v.name} ${v.category}`.toLowerCase() }))
+  consignors.forEach((c) => items.push({ id: c.id, label: c.name, sub: c.city || c.defaultFromLocation, path: `/consignors/${c.id}`, keywords: `${c.name} ${c.companyName} ${c.city} ${c.gst} ${c.phone}`.toLowerCase() }))
+  consignees.forEach((c) => items.push({ id: c.id, label: c.name, sub: c.city || c.defaultToLocation, path: `/consignees/${c.id}`, keywords: `${c.name} ${c.companyName} ${c.city} ${c.gst} ${c.phone}`.toLowerCase() }))
   return items
 }
 

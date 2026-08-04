@@ -3,6 +3,8 @@ export const navigation = [
   { title: 'Quotations', path: '/quotations', icon: 'FileSpreadsheet' },
   { title: 'Booking', path: '/bookings', icon: 'CalendarPlus', feature: 'booking' },
   { title: 'LR Management', path: '/lr', icon: 'FileText', feature: 'lr' },
+  { title: 'Consignors', path: '/consignors', icon: 'Package', feature: 'lr' },
+  { title: 'Consignees', path: '/consignees', icon: 'MapPin', feature: 'lr' },
   { title: 'Operations', path: '/operations', icon: 'Layers' },
   { title: 'Maintenance', path: '/maintenance', icon: 'Wrench' },
   { title: 'Accounting', path: '/accounting', icon: 'Calculator', feature: 'accounting' },

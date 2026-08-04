@@ -128,6 +128,12 @@ export default function LRList() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               />
             </div>
+            <Button variant="outline" onClick={() => navigate('/consignors')}>
+              Consignor master
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/consignees')}>
+              Consignee master
+            </Button>
             <Button variant="outline" onClick={() => navigate('/lr/expenses/approval')}>
               Pending expense approvals
             </Button>
