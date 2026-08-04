@@ -37,7 +37,11 @@ public class LrProcessController(
         if (lr == null) return NotFound();
 
         var loading = await db.LrLoadingSheets.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+            .Include(s => s.Items)
+            .Where(s => s.CompanyId == lr.CompanyId &&
+                (s.LrNumber == lr.LrNumber || s.Items.Any(i => i.LrNumber == lr.LrNumber)))
+            .OrderByDescending(s => s.UpdatedAt)
+            .FirstOrDefaultAsync();
         var transit = await db.LrTransitPasses.AsNoTracking()
             .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
         var delivery = await db.LrDeliverySheets.AsNoTracking()
@@ -69,11 +73,15 @@ public class LrProcessController(
         {
             lrNumber = lr.LrNumber,
             status = lr.Status,
+            businessType = lr.BusinessType,
+            customerId = lr.CustomerId,
+            customerName = lr.CustomerName,
+            businessTypes = LrBusinessTypes.All,
             bookingId = lr.BookingId,
             statuses = LrStatuses.All,
             expenseCategories = LrExpenseCategories.All,
             loadingSheet = loading == null ? null : MapLoading(loading),
-            transitPass = transit == null ? null : MapTransit(transit),
+            transitPass = transit == null ? null : MapTransit(transit, loading?.Items),
             deliverySheet = delivery == null ? null : MapDelivery(delivery),
             deliveryDocuments = docs,
             expenses,
@@ -92,24 +100,53 @@ public class LrProcessController(
     [HttpPost("{lrNumber}/loading-sheet")]
     public async Task<ActionResult<object>> SaveLoadingSheet(string lrNumber, [FromBody] Dictionary<string, object?> body)
     {
-        var lr = await LoadLr(lrNumber);
-        if (lr == null) return NotFound();
-        LrProcessService.EnsureStatusAtLeast(lr, LrStatuses.LRCreated, LrStatuses.Draft);
+        var anchor = await LoadLr(lrNumber);
+        if (anchor == null) return NotFound();
+        LrProcessService.EnsureStatusAtLeast(anchor, LrStatuses.LRCreated, LrStatuses.Draft);
 
         var location = ApiParseHelper.BodyString(body, "loadingLocation");
         if (string.IsNullOrWhiteSpace(location))
             return BadRequest(new ApiError("Loading location is required."));
 
+        var lrNumbers = ApiParseHelper.BodyStringList(body, "lrNumbers");
+        if (lrNumbers.Count == 0)
+            lrNumbers = [anchor.LrNumber];
+        if (!lrNumbers.Contains(anchor.LrNumber))
+            lrNumbers.Insert(0, anchor.LrNumber);
+
+        var lrs = new List<LorryReceipt>();
+        foreach (var num in lrNumbers.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var row = await LrProcessService.FindLrAsync(db, tenants, branches, num);
+            if (row == null) return BadRequest(new ApiError($"LR not found: {num}"));
+            lrs.Add(row);
+        }
+
+        var businessType = LrBusinessTypes.Normalize(
+            ApiParseHelper.BodyString(body, "businessType") ?? anchor.BusinessType);
+        var vehicleNum = ApiParseHelper.BodyString(body, "vehicleNumber") ?? anchor.VehicleNumber;
+        var vehicleId = ApiParseHelper.BodyString(body, "vehicleId") ?? anchor.VehicleId;
+        var vehicle = !string.IsNullOrEmpty(vehicleNum) || !string.IsNullOrEmpty(vehicleId)
+            ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleId ?? vehicleNum!)
+            : null;
+
+        var validation = await LrBusinessTypeService.ValidateLoadingSheetAsync(
+            db, tenants, branches, businessType, lrs, vehicle?.Id ?? vehicleId, vehicle?.Number ?? vehicleNum);
+        if (!validation.Ok)
+            return BadRequest(new ApiError(validation.Error ?? "Loading sheet validation failed."));
+
         var existing = await db.LrLoadingSheets
-            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+            .Include(s => s.Items)
+            .FirstOrDefaultAsync(s => s.CompanyId == anchor.CompanyId &&
+                (s.LrNumber == anchor.LrNumber || s.Items.Any(i => i.LrNumber == anchor.LrNumber)));
 
         Guid branchId;
         string sheetNumber;
         try
         {
-            branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, lr.BranchId);
+            branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, anchor.BranchId);
             sheetNumber = existing?.SheetNumber ?? await documentNumbers.NextAsync(
-                DocumentNumberTypes.LoadingSheet, lr.CompanyId, branchId,
+                DocumentNumberTypes.LoadingSheet, anchor.CompanyId, branchId,
                 DateOnly.FromDateTime(DateTime.UtcNow));
         }
         catch (InvalidOperationException ex)
@@ -126,29 +163,101 @@ public class LrProcessController(
             existing = new LrLoadingSheet
             {
                 Id = Guid.NewGuid(),
-                CompanyId = lr.CompanyId,
-                LrNumber = lr.LrNumber,
+                CompanyId = anchor.CompanyId,
+                LrNumber = anchor.LrNumber,
                 SheetNumber = sheetNumber,
+                BusinessType = businessType,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = CurrentUser(),
             };
             db.LrLoadingSheets.Add(existing);
         }
 
-        existing.VehicleNumber = ApiParseHelper.BodyString(body, "vehicleNumber") ?? lr.VehicleNumber;
+        existing.BusinessType = businessType;
+        existing.VehicleId = vehicle?.Id ?? vehicleId;
+        existing.VehicleNumber = vehicle?.Number ?? vehicleNum;
         existing.LoadingLocation = location;
-        existing.MaterialQuantity = ApiParseHelper.BodyString(body, "materialQuantity") ?? lr.Quantity;
         existing.LoadingAt = loadingAt;
         existing.LoadingStatus = ApiParseHelper.BodyString(body, "loadingStatus") ?? "Completed";
         existing.Remarks = ApiParseHelper.BodyString(body, "remarks");
+        existing.TotalQuantity = validation.TotalQuantityTons;
+        existing.CapacityLimit = validation.CapacityLimitTons;
+        existing.CapacityUsed = validation.TotalQuantityTons;
+        existing.MaterialQuantity = validation.TotalQuantityTons > 0
+            ? $"{validation.TotalQuantityTons:N2} MT"
+            : ApiParseHelper.BodyString(body, "materialQuantity") ?? anchor.Quantity;
         existing.UpdatedAt = DateTime.UtcNow;
 
+        var oldItems = await db.LrLoadingSheetItems.Where(i => i.LoadingSheetId == existing.Id).ToListAsync();
+        if (oldItems.Count > 0)
+            db.LrLoadingSheetItems.RemoveRange(oldItems);
+
+        var sort = 0;
+        foreach (var row in lrs)
+        {
+            var (cid, cname) = await LrBusinessTypeService.ResolveLrCustomerAsync(db, row);
+            db.LrLoadingSheetItems.Add(new LrLoadingSheetItem
+            {
+                Id = Guid.NewGuid(),
+                LoadingSheetId = existing.Id,
+                LrNumber = row.LrNumber,
+                CustomerId = cid,
+                CustomerName = cname,
+                QuantityText = row.Quantity,
+                QuantityTons = LrBusinessTypeService.ParseQuantityToTons(row.Quantity),
+                SortOrder = sort++,
+                CreatedAt = DateTime.UtcNow,
+            });
+        }
+
         if (existing.LoadingStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase))
-            lr.Status = LrStatuses.LoadingCompleted;
-        lr.UpdatedAt = DateTime.UtcNow;
+        {
+            foreach (var row in lrs)
+            {
+                row.Status = LrStatuses.LoadingCompleted;
+                row.UpdatedAt = DateTime.UtcNow;
+            }
+        }
 
         await db.SaveChangesAsync();
+        await db.Entry(existing).Collection(s => s.Items).LoadAsync();
         return Ok(MapLoading(existing));
+    }
+
+    [HttpPost("{lrNumber}/loading-sheet/validate")]
+    public async Task<ActionResult<object>> ValidateLoadingSheet(string lrNumber, [FromBody] Dictionary<string, object?> body)
+    {
+        var anchor = await LoadLr(lrNumber);
+        if (anchor == null) return NotFound();
+
+        var lrNumbers = ApiParseHelper.BodyStringList(body, "lrNumbers");
+        if (lrNumbers.Count == 0) lrNumbers = [anchor.LrNumber];
+
+        var lrs = new List<LorryReceipt>();
+        foreach (var num in lrNumbers.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var row = await LrProcessService.FindLrAsync(db, tenants, branches, num);
+            if (row == null) return BadRequest(new ApiError($"LR not found: {num}"));
+            lrs.Add(row);
+        }
+
+        var businessType = LrBusinessTypes.Normalize(
+            ApiParseHelper.BodyString(body, "businessType") ?? anchor.BusinessType);
+        var vehicleId = ApiParseHelper.BodyString(body, "vehicleId") ?? anchor.VehicleId;
+        var vehicleNum = ApiParseHelper.BodyString(body, "vehicleNumber") ?? anchor.VehicleNumber;
+
+        var validation = await LrBusinessTypeService.ValidateLoadingSheetAsync(
+            db, tenants, branches, businessType, lrs, vehicleId, vehicleNum);
+
+        return Ok(new
+        {
+            ok = validation.Ok,
+            error = validation.Error,
+            totalQuantityTons = validation.TotalQuantityTons,
+            capacityLimitTons = validation.CapacityLimitTons,
+            lrNumbers = validation.LrNumbers,
+            businessType,
+        });
     }
 
     [HttpGet("{lrNumber}/loading-sheet")]
@@ -157,7 +266,11 @@ public class LrProcessController(
         var lr = await LoadLr(lrNumber);
         if (lr == null) return NotFound();
         var sheet = await db.LrLoadingSheets.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+            .Include(s => s.Items)
+            .Where(s => s.CompanyId == lr.CompanyId &&
+                (s.LrNumber == lr.LrNumber || s.Items.Any(i => i.LrNumber == lr.LrNumber)))
+            .OrderByDescending(s => s.UpdatedAt)
+            .FirstOrDefaultAsync();
         return sheet == null ? NotFound() : Ok(MapLoading(sheet));
     }
 
@@ -168,10 +281,22 @@ public class LrProcessController(
         if (lr == null) return NotFound();
         LrProcessService.EnsureStatusAtLeast(lr, LrStatuses.LoadingCompleted);
 
-        var hasLoading = await db.LrLoadingSheets.AnyAsync(x =>
-            x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId && x.LoadingStatus == "Completed");
+        var hasLoading = await db.LrLoadingSheetItems.AsNoTracking()
+            .Where(i => i.LrNumber == lr.LrNumber)
+            .Join(db.LrLoadingSheets.AsNoTracking(),
+                i => i.LoadingSheetId,
+                s => s.Id,
+                (i, s) => s)
+            .AnyAsync(s => s.LoadingStatus == "Completed");
         if (!hasLoading)
             return BadRequest(new ApiError("Complete loading sheet before generating transit pass."));
+
+        var loadingSheet = await db.LrLoadingSheets.AsNoTracking()
+            .Include(s => s.Items)
+            .Where(s => s.CompanyId == lr.CompanyId &&
+                (s.LrNumber == lr.LrNumber || s.Items.Any(i => i.LrNumber == lr.LrNumber)))
+            .OrderByDescending(s => s.UpdatedAt)
+            .FirstOrDefaultAsync();
 
         var existing = await db.LrTransitPasses
             .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
@@ -196,6 +321,7 @@ public class LrProcessController(
             Id = Guid.NewGuid(),
             CompanyId = lr.CompanyId,
             LrNumber = lr.LrNumber,
+            LoadingSheetId = loadingSheet?.Id,
             PassNumber = passNumber,
             VehicleNumber = ApiParseHelper.BodyString(body, "vehicleNumber") ?? lr.VehicleNumber,
             DriverName = ApiParseHelper.BodyString(body, "driverName") ?? lr.DriverName,
@@ -208,10 +334,18 @@ public class LrProcessController(
             CreatedAt = DateTime.UtcNow,
         };
         db.LrTransitPasses.Add(pass);
-        lr.Status = LrStatuses.TransitPassGenerated;
-        lr.UpdatedAt = DateTime.UtcNow;
+
+        var linkedLrs = loadingSheet?.Items.Select(i => i.LrNumber).ToList() ?? [lr.LrNumber];
+        foreach (var num in linkedLrs.Distinct())
+        {
+            var row = await db.LorryReceipts.FirstOrDefaultAsync(l => l.LrNumber == num && l.CompanyId == lr.CompanyId);
+            if (row == null) continue;
+            row.Status = LrStatuses.TransitPassGenerated;
+            row.UpdatedAt = DateTime.UtcNow;
+        }
+
         await db.SaveChangesAsync();
-        return Ok(MapTransit(pass));
+        return Ok(MapTransit(pass, loadingSheet?.Items));
     }
 
     [HttpGet("{lrNumber}/transit-pass")]
@@ -221,7 +355,18 @@ public class LrProcessController(
         if (lr == null) return NotFound();
         var pass = await db.LrTransitPasses.AsNoTracking()
             .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
-        return pass == null ? NotFound() : Ok(MapTransit(pass));
+        if (pass == null) return NotFound();
+
+        IEnumerable<LrLoadingSheetItem>? items = null;
+        if (pass.LoadingSheetId.HasValue)
+        {
+            items = await db.LrLoadingSheetItems.AsNoTracking()
+                .Where(i => i.LoadingSheetId == pass.LoadingSheetId.Value)
+                .OrderBy(i => i.SortOrder)
+                .ToListAsync();
+        }
+
+        return Ok(MapTransit(pass, items));
     }
 
     [HttpGet("{lrNumber}/delivery-documents")]
@@ -687,16 +832,29 @@ public class LrProcessController(
     {
         s.Id,
         s.SheetNumber,
+        s.BusinessType,
+        s.VehicleId,
         s.VehicleNumber,
         s.LoadingLocation,
         s.MaterialQuantity,
+        totalQuantityTons = s.TotalQuantity,
+        capacityLimitTons = s.CapacityLimit,
+        capacityUsedTons = s.CapacityUsed,
         loadingAt = s.LoadingAt.ToString("O"),
         s.LoadingStatus,
         s.Remarks,
         s.CreatedBy,
+        items = s.Items.OrderBy(i => i.SortOrder).Select(i => new
+        {
+            i.LrNumber,
+            i.CustomerId,
+            i.CustomerName,
+            i.QuantityText,
+            i.QuantityTons,
+        }).ToList(),
     };
 
-    static object MapTransit(LrTransitPass p) => new
+    static object MapTransit(LrTransitPass p, IEnumerable<LrLoadingSheetItem>? items = null) => new
     {
         p.Id,
         p.PassNumber,
@@ -708,6 +866,8 @@ public class LrProcessController(
         issueDate = p.IssueDate.ToString("yyyy-MM-dd"),
         p.Remarks,
         p.CreatedBy,
+        p.LoadingSheetId,
+        lrNumbers = items?.Select(i => i.LrNumber).ToList() ?? [p.LrNumber],
     };
 
     static object MapDelivery(LrDeliverySheet s) => new

@@ -308,7 +308,14 @@ export const lrProcessApi = {
     apiRequest(lrPath(lrNumber, `expenses/${expenseId}/reject`), { method: 'PATCH', body: { remarks } }),
   pendingExpenses: () => apiRequest('/lr/expenses/pending'),
   createInvoice: (lrNumber, data = {}) => apiRequest(lrPath(lrNumber, 'invoice'), { method: 'POST', body: data }),
+  validateLoadingSheet: (lrNumber, data) =>
+    apiRequest(lrPath(lrNumber, 'loading-sheet/validate'), { method: 'POST', body: data }),
   close: (lrNumber) => apiRequest(lrPath(lrNumber, 'close'), { method: 'POST' }),
+}
+
+export const lrBusinessApi = {
+  eligibleForLoading: (params = {}) =>
+    apiRequest(`/lr/eligible-for-loading?${new URLSearchParams(params)}`),
 }
 
 export const dashboardApi = {

@@ -15,7 +15,7 @@ import { usePrint } from '../../context/PrintContext'
 import LRPrintFormat from '../../components/print/LRPrintFormat'
 import LrStatusFlow from '../../components/lr/LrStatusFlow'
 import { lrProcessPath } from '../../utils/docPath'
-import { useDocumentFlow } from '../../hooks/useDocumentFlow'
+import { LR_BUSINESS_TYPES, LR_BUSINESS_TYPE_LABELS } from '../../constants/lrBusinessTypes'
 
 const PAYMENT_TYPES = ['To Pay', 'Paid', 'TBB', 'To Be Billed']
 
@@ -54,6 +54,7 @@ const emptyForm = () => ({
   advance: 0,
   balance: 0,
   paymentType: 'To Pay',
+  businessType: 'FTL',
   remarks: '',
 })
 
@@ -279,6 +280,12 @@ export default function GenerateLR() {
             <Input label="Insurance (₹)" type="number" value={form.insurance} onChange={(e) => update('insurance', e.target.value)} />
             <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => update('advance', e.target.value)} />
             <Input label="Balance (₹)" type="number" value={form.balance} readOnly />
+            <Select
+              label="Business Type"
+              options={LR_BUSINESS_TYPES.map((t) => ({ value: t, label: LR_BUSINESS_TYPE_LABELS[t] }))}
+              value={form.businessType}
+              onChange={(e) => update('businessType', e.target.value)}
+            />
             <Select label="Payment Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
             <div className="sm:col-span-2 lg:col-span-3">
               <Textarea label="Remarks" value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />

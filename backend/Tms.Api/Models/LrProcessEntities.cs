@@ -40,15 +40,35 @@ public class LrLoadingSheet : ITenantScoped
     public Guid CompanyId { get; set; }
     public string LrNumber { get; set; } = "";
     public string SheetNumber { get; set; } = "";
+    public string BusinessType { get; set; } = LrBusinessTypes.FTL;
+    public string? VehicleId { get; set; }
     public string? VehicleNumber { get; set; }
     public string LoadingLocation { get; set; } = "";
     public string? MaterialQuantity { get; set; }
+    public decimal? TotalQuantity { get; set; }
+    public decimal? CapacityLimit { get; set; }
+    public decimal? CapacityUsed { get; set; }
     public DateTime LoadingAt { get; set; }
     public string LoadingStatus { get; set; } = "Completed";
     public string? Remarks { get; set; }
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public ICollection<LrLoadingSheetItem> Items { get; set; } = [];
+}
+
+public class LrLoadingSheetItem
+{
+    public Guid Id { get; set; }
+    public Guid LoadingSheetId { get; set; }
+    public LrLoadingSheet? LoadingSheet { get; set; }
+    public string LrNumber { get; set; } = "";
+    public string? CustomerId { get; set; }
+    public string? CustomerName { get; set; }
+    public string? QuantityText { get; set; }
+    public decimal? QuantityTons { get; set; }
+    public int SortOrder { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class LrTransitPass : ITenantScoped
@@ -56,6 +76,7 @@ public class LrTransitPass : ITenantScoped
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
     public string LrNumber { get; set; } = "";
+    public Guid? LoadingSheetId { get; set; }
     public string PassNumber { get; set; } = "";
     public string? VehicleNumber { get; set; }
     public string? DriverName { get; set; }
@@ -73,6 +94,7 @@ public class LrDeliverySheet : ITenantScoped
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
     public string LrNumber { get; set; } = "";
+    public Guid? LoadingSheetId { get; set; }
     public string SheetNumber { get; set; } = "";
     public string ShipmentStatus { get; set; } = "In Transit";
     public DateOnly? DeliveryDate { get; set; }

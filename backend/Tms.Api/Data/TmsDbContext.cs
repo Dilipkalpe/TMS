@@ -54,6 +54,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<BookingTrackingToken> BookingTrackingTokens => Set<BookingTrackingToken>();
     public DbSet<LorryReceipt> LorryReceipts => Set<LorryReceipt>();
     public DbSet<LrLoadingSheet> LrLoadingSheets => Set<LrLoadingSheet>();
+    public DbSet<LrLoadingSheetItem> LrLoadingSheetItems => Set<LrLoadingSheetItem>();
     public DbSet<LrTransitPass> LrTransitPasses => Set<LrTransitPass>();
     public DbSet<LrDeliverySheet> LrDeliverySheets => Set<LrDeliverySheet>();
     public DbSet<LrExpense> LrExpenses => Set<LrExpense>();
@@ -304,6 +305,9 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.BranchId).HasColumnName("branch_id");
             e.Property(x => x.LrDate).HasColumnName("lr_date");
             e.Property(x => x.BookingId).HasColumnName("booking_id");
+            e.Property(x => x.BusinessType).HasColumnName("business_type");
+            e.Property(x => x.CustomerId).HasColumnName("customer_id");
+            e.Property(x => x.CustomerName).HasColumnName("customer_name");
             e.Property(x => x.Consignor).HasColumnName("consignor");
             e.Property(x => x.Consignee).HasColumnName("consignee");
             e.Property(x => x.FromCity).HasColumnName("from_city");
@@ -1124,15 +1128,35 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.LrNumber).HasColumnName("lr_number");
             e.Property(x => x.SheetNumber).HasColumnName("sheet_number");
+            e.Property(x => x.BusinessType).HasColumnName("business_type");
+            e.Property(x => x.VehicleId).HasColumnName("vehicle_id");
             e.Property(x => x.VehicleNumber).HasColumnName("vehicle_number");
             e.Property(x => x.LoadingLocation).HasColumnName("loading_location");
             e.Property(x => x.MaterialQuantity).HasColumnName("material_quantity");
+            e.Property(x => x.TotalQuantity).HasColumnName("total_quantity");
+            e.Property(x => x.CapacityLimit).HasColumnName("capacity_limit");
+            e.Property(x => x.CapacityUsed).HasColumnName("capacity_used");
             e.Property(x => x.LoadingAt).HasColumnName("loading_at");
             e.Property(x => x.LoadingStatus).HasColumnName("loading_status");
             e.Property(x => x.Remarks).HasColumnName("remarks");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasMany(x => x.Items).WithOne(i => i.LoadingSheet).HasForeignKey(i => i.LoadingSheetId);
+        });
+
+        modelBuilder.Entity<LrLoadingSheetItem>(e =>
+        {
+            e.ToTable("lr_loading_sheet_items");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.LoadingSheetId).HasColumnName("loading_sheet_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number");
+            e.Property(x => x.CustomerId).HasColumnName("customer_id");
+            e.Property(x => x.CustomerName).HasColumnName("customer_name");
+            e.Property(x => x.QuantityText).HasColumnName("quantity_text");
+            e.Property(x => x.QuantityTons).HasColumnName("quantity_tons");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
         });
 
         modelBuilder.Entity<LrTransitPass>(e =>
@@ -1141,6 +1165,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.LrNumber).HasColumnName("lr_number");
+            e.Property(x => x.LoadingSheetId).HasColumnName("loading_sheet_id");
             e.Property(x => x.PassNumber).HasColumnName("pass_number");
             e.Property(x => x.VehicleNumber).HasColumnName("vehicle_number");
             e.Property(x => x.DriverName).HasColumnName("driver_name");
@@ -1159,6 +1184,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
             e.Property(x => x.LrNumber).HasColumnName("lr_number");
+            e.Property(x => x.LoadingSheetId).HasColumnName("loading_sheet_id");
             e.Property(x => x.SheetNumber).HasColumnName("sheet_number");
             e.Property(x => x.ShipmentStatus).HasColumnName("shipment_status");
             e.Property(x => x.DeliveryDate).HasColumnName("delivery_date");

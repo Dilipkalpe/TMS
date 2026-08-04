@@ -432,6 +432,68 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         return Ok(EntityMappers.ToDto(l));
     }
 
+    [HttpGet("eligible-for-loading")]
+    public async Task<ActionResult<object>> EligibleForLoading(
+        [FromQuery] string businessType,
+        [FromQuery] string? anchorLr,
+        [FromQuery] string? customerId,
+        [FromQuery] string? vehicleId)
+    {
+        var bt = LrBusinessTypes.Normalize(businessType);
+        var q = tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking()))
+            .Where(l => l.BusinessType == bt && l.Status == LrStatuses.LRCreated);
+
+        var loadedLrs = db.LrLoadingSheetItems.AsNoTracking()
+            .Join(db.LrLoadingSheets.AsNoTracking(),
+                i => i.LoadingSheetId,
+                s => s.Id,
+                (i, s) => new { i.LrNumber, s.LoadingStatus })
+            .Where(x => x.LoadingStatus == "Completed")
+            .Select(x => x.LrNumber);
+
+        q = q.Where(l => !loadedLrs.Contains(l.LrNumber));
+
+        if (bt == LrBusinessTypes.FTL && !string.IsNullOrWhiteSpace(anchorLr))
+        {
+            anchorLr = DocumentCodeRules.DecodePathId(anchorLr);
+            var anchor = await db.LorryReceipts.AsNoTracking().FirstOrDefaultAsync(l => l.LrNumber == anchorLr);
+            if (anchor != null)
+            {
+                var (cid, cname) = await LrBusinessTypeService.ResolveLrCustomerAsync(db, anchor);
+                if (!string.IsNullOrWhiteSpace(cid))
+                    q = q.Where(l => l.CustomerId == cid || l.BookingId == anchor.BookingId);
+                else if (!string.IsNullOrWhiteSpace(cname))
+                    q = q.Where(l => l.CustomerName == cname || l.Consignor == cname);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(customerId))
+            q = q.Where(l => l.CustomerId == customerId);
+
+        decimal? capacity = null;
+        if (!string.IsNullOrWhiteSpace(vehicleId))
+            capacity = await LrBusinessTypeService.ResolveVehicleCapacityTonsAsync(db, tenants, branches, vehicleId, null);
+
+        var rows = await q.OrderByDescending(l => l.LrDate).Take(100)
+            .Select(l => new
+            {
+                l.LrNumber,
+                l.LrDate,
+                l.BusinessType,
+                l.CustomerId,
+                l.CustomerName,
+                l.Consignor,
+                l.Consignee,
+                l.FromCity,
+                l.ToCity,
+                l.Quantity,
+                l.VehicleNumber,
+            })
+            .ToListAsync();
+
+        return Ok(new { businessType = bt, vehicleCapacityTons = capacity, items = rows });
+    }
+
     [HttpGet("prefill/{bookingId}")]
     public async Task<ActionResult<object>> PrefillFromBooking(string bookingId)
     {
@@ -567,6 +629,9 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             BranchId = branchId,
             LrDate = lrDate,
             BookingId = booking?.Id,
+            BusinessType = LrBusinessTypes.Normalize(ApiParseHelper.BodyString(body, "businessType")),
+            CustomerId = booking?.CustomerId,
+            CustomerName = booking?.CustomerName,
             Consignor = ApiParseHelper.BodyString(body, "consignor"),
             Consignee = ApiParseHelper.BodyString(body, "consignee"),
             FromCity = from,
@@ -672,6 +737,8 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             lr.Advance = ApiParseHelper.BodyDecimal(body, "advance");
         if (body.ContainsKey("paymentType"))
             lr.PaymentType = ApiParseHelper.BodyString(body, "paymentType") ?? lr.PaymentType;
+        if (body.ContainsKey("businessType"))
+            lr.BusinessType = LrBusinessTypes.Normalize(ApiParseHelper.BodyString(body, "businessType"));
         if (body.ContainsKey("remarks"))
             lr.Remarks = ApiParseHelper.BodyString(body, "remarks");
 

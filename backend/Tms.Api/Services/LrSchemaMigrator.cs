@@ -12,29 +12,32 @@ public static class LrSchemaMigrator
         if (conn.State != System.Data.ConnectionState.Open)
             await conn.OpenAsync(ct);
 
-        var text = await LoadSchemaSqlAsync(ct);
-        foreach (var stmt in ParseSql(text))
+        foreach (var file in new[] { "schema.sql", "business_type.sql" })
         {
-            await using var cmd = new NpgsqlCommand(stmt, conn);
-            await cmd.ExecuteNonQueryAsync(ct);
+            var text = await LoadSchemaSqlAsync(file, ct);
+            foreach (var stmt in ParseSql(text))
+            {
+                await using var cmd = new NpgsqlCommand(stmt, conn);
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
         }
     }
 
-    static async Task<string> LoadSchemaSqlAsync(CancellationToken ct)
+    static async Task<string> LoadSchemaSqlAsync(string fileName, CancellationToken ct)
     {
-        foreach (var p in SchemaPathCandidates())
+        foreach (var p in SchemaPathCandidates(fileName))
         {
             if (File.Exists(p))
                 return await File.ReadAllTextAsync(p, ct);
         }
-        throw new FileNotFoundException("database/lr/schema.sql not found");
+        throw new FileNotFoundException($"database/lr/{fileName} not found");
     }
 
-    static IEnumerable<string> SchemaPathCandidates()
+    static IEnumerable<string> SchemaPathCandidates(string fileName)
     {
-        yield return Path.Combine(AppContext.BaseDirectory, "database", "lr", "schema.sql");
-        yield return Path.Combine(Directory.GetCurrentDirectory(), "database", "lr", "schema.sql");
-        yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "database", "lr", "schema.sql"));
+        yield return Path.Combine(AppContext.BaseDirectory, "database", "lr", fileName);
+        yield return Path.Combine(Directory.GetCurrentDirectory(), "database", "lr", fileName);
+        yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "database", "lr", fileName));
     }
 
     static IEnumerable<string> ParseSql(string text)

@@ -210,6 +210,9 @@ public class LorryReceipt : IBranchScoped, IAuditable
     public Branch? Branch { get; set; }
     public DateOnly LrDate { get; set; }
     public string? BookingId { get; set; }
+    public string BusinessType { get; set; } = LrBusinessTypes.FTL;
+    public string? CustomerId { get; set; }
+    public string? CustomerName { get; set; }
     public string? Consignor { get; set; }
     public string? Consignee { get; set; }
     public string FromCity { get; set; } = "";

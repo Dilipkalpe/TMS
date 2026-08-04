@@ -6,7 +6,8 @@ import Button from '../../components/ui/Button'
 import Badge, { statusVariant } from '../../components/ui/Badge'
 import Input, { Select, Textarea } from '../../components/ui/Input'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { lrApi, lrProcessApi } from '../../services/api'
+import { lrApi, lrProcessApi, lrBusinessApi } from '../../services/api'
+import { LR_BUSINESS_TYPE_LABELS } from '../../constants/lrBusinessTypes'
 import { fromDocPath, lrEditPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
@@ -35,6 +36,9 @@ export default function LRProcessPage() {
   const [saving, setSaving] = useState(false)
 
   const [loadingForm, setLoadingForm] = useState({ loadingLocation: '', materialQuantity: '', loadingStatus: 'Completed', remarks: '' })
+  const [selectedLrNumbers, setSelectedLrNumbers] = useState([])
+  const [eligibleLrs, setEligibleLrs] = useState([])
+  const [capacityInfo, setCapacityInfo] = useState(null)
   const [transitForm, setTransitForm] = useState({ viaPoints: '', remarks: '' })
   const [docForm, setDocForm] = useState({ docType: 'POD', title: '', file: null })
   const [deliveryForm, setDeliveryForm] = useState({ shipmentStatus: 'In Transit', deliveryDate: '', deliveryLocation: '', receiverName: '', remarks: '' })
@@ -55,8 +59,10 @@ export default function LRProcessPage() {
         loadingStatus: proc.loadingSheet.loadingStatus ?? 'Completed',
         remarks: proc.loadingSheet.remarks ?? '',
       })
+      setSelectedLrNumbers(proc.loadingSheet.items?.map((i) => i.lrNumber) ?? [lrNumber])
     } else {
       setLoadingForm((f) => ({ ...f, materialQuantity: lrData.quantity ?? '', loadingLocation: lrData.from ?? '' }))
+      setSelectedLrNumbers([lrNumber])
     }
     if (proc.deliverySheet) {
       setDeliveryForm({
@@ -84,6 +90,49 @@ export default function LRProcessPage() {
     return () => { cancelled = true }
   }, [reload, toast])
 
+  useEffect(() => {
+    if (!process?.businessType || !lrNumber) return
+    lrBusinessApi.eligibleForLoading({
+      businessType: process.businessType,
+      anchorLr: lrNumber,
+      vehicleId: lr?.vehicle,
+    })
+      .then((res) => {
+        setEligibleLrs(res.items ?? [])
+        setCapacityInfo(res.vehicleCapacityTons != null ? { limit: res.vehicleCapacityTons } : null)
+      })
+      .catch(() => {})
+  }, [process?.businessType, lrNumber, lr?.vehicle])
+
+  const toggleLrSelection = (num) => {
+    setSelectedLrNumbers((prev) => {
+      if (prev.includes(num)) {
+        if (num === lrNumber) return prev
+        return prev.filter((x) => x !== num)
+      }
+      return [...prev, num]
+    })
+  }
+
+  const runValidateLoading = async () => {
+    try {
+      const v = await lrProcessApi.validateLoadingSheet(lrNumber, {
+        businessType: process.businessType,
+        lrNumbers: selectedLrNumbers,
+        vehicleNumber: lr?.vehicle,
+      })
+      setCapacityInfo({
+        limit: v.capacityLimitTons,
+        used: v.totalQuantityTons,
+        ok: v.ok,
+        error: v.error,
+      })
+      if (!v.ok && v.error) toast({ title: 'Validation', message: v.error, type: 'warning' })
+    } catch (err) {
+      toast({ title: 'Validation failed', message: err.message, type: 'error' })
+    }
+  }
+
   const run = async (label, fn) => {
     setSaving(true)
     try {
@@ -100,6 +149,8 @@ export default function LRProcessPage() {
   const saveLoadingSheet = () => run('Loading sheet saved', () =>
     lrProcessApi.saveLoadingSheet(lrNumber, {
       ...loadingForm,
+      businessType: process.businessType,
+      lrNumbers: selectedLrNumbers,
       vehicleNumber: lr?.vehicle,
       loadingAt: new Date().toISOString(),
     }))
@@ -109,7 +160,14 @@ export default function LRProcessPage() {
 
   const printTransitPass = () => {
     if (!process?.transitPass) return
-    print(<TransitPassPrintFormat pass={process.transitPass} lr={lr} company={company} />)
+    print(
+      <TransitPassPrintFormat
+        pass={process.transitPass}
+        lr={lr}
+        company={company}
+        loadingItems={process.loadingSheet?.items}
+      />,
+    )
   }
 
   const uploadDocument = () => run('Document uploaded', async () => {
@@ -181,6 +239,7 @@ export default function LRProcessPage() {
           <Badge variant={statusVariant(process.status === 'Closed' ? 'Paid' : 'Pending')} className="text-sm">
             {process.status || 'LR Created'}
           </Badge>
+          <Badge variant="outline" className="text-sm">{process.businessType || 'FTL'}</Badge>
         </div>
         <div className="mb-3">
           <div className="mb-1 flex justify-between text-xs text-slate-500">
@@ -199,8 +258,55 @@ export default function LRProcessPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="2. Loading Sheet" subtitle={process.loadingSheet ? `Sheet ${process.loadingSheet.sheetNumber}` : 'Create after LR'} />
+          <CardHeader
+            title="2. Loading Sheet"
+            subtitle={
+              process.businessType === 'PTL'
+                ? 'Select multiple LRs · capacity check required'
+                : 'Same-customer LRs can share one sheet (FTL)'
+            }
+          />
           <div className="space-y-3 p-4 pt-0">
+            <p className="text-xs text-slate-500">
+              {LR_BUSINESS_TYPE_LABELS[process.businessType] || LR_BUSINESS_TYPE_LABELS.FTL}
+            </p>
+            {(process.businessType === 'PTL' || eligibleLrs.length > 1) && (
+              <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <p className="mb-2 text-sm font-medium">LRs on this loading sheet</p>
+                <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
+                  {[lrNumber, ...eligibleLrs.map((e) => e.lrNumber).filter((n) => n !== lrNumber)]
+                    .filter((n, i, a) => a.indexOf(n) === i)
+                    .map((num) => (
+                      <li key={num} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedLrNumbers.includes(num)}
+                          disabled={num === lrNumber}
+                          onChange={() => toggleLrSelection(num)}
+                        />
+                        <span>{num}{num === lrNumber ? ' (current)' : ''}</span>
+                      </li>
+                    ))}
+                </ul>
+                <Button size="sm" variant="outline" className="mt-2" onClick={runValidateLoading}>
+                  Validate capacity
+                </Button>
+                {capacityInfo && (
+                  <p className={`mt-2 text-xs ${capacityInfo.ok === false ? 'text-red-600' : 'text-slate-600'}`}>
+                    Load: {capacityInfo.used ?? '—'} MT
+                    {capacityInfo.limit != null ? ` / ${capacityInfo.limit} MT capacity` : ''}
+                    {capacityInfo.error ? ` — ${capacityInfo.error}` : ''}
+                  </p>
+                )}
+              </div>
+            )}
+            {process.loadingSheet?.items?.length > 0 && (
+              <ul className="text-sm text-slate-600">
+                {process.loadingSheet.items.map((i) => (
+                  <li key={i.lrNumber}>{i.lrNumber} · {i.customerName || '—'} · {i.quantityText || '—'}</li>
+                ))}
+              </ul>
+            )}
             <Input label="Loading Location" value={loadingForm.loadingLocation} onChange={(e) => setLoadingForm({ ...loadingForm, loadingLocation: e.target.value })} />
             <Input label="Material Quantity" value={loadingForm.materialQuantity} onChange={(e) => setLoadingForm({ ...loadingForm, materialQuantity: e.target.value })} />
             <Select label="Loading Status" options={['Pending', 'In Progress', 'Completed']} value={loadingForm.loadingStatus} onChange={(e) => setLoadingForm({ ...loadingForm, loadingStatus: e.target.value })} />

@@ -1,7 +1,17 @@
 import PrintCompanyHeader, { PrintFooter } from './PrintCompanyHeader'
 import { formatPrintDate } from '../../utils/printUtils'
 
-export default function TransitPassPrintFormat({ pass, lr, company }) {
+export default function TransitPassPrintFormat({ pass, lr, company, loadingItems }) {
+  const lrList = pass?.lrNumbers?.length > 1
+    ? pass.lrNumbers
+    : loadingItems?.length > 1
+      ? loadingItems.map((i) => i.lrNumber)
+      : null
+
+  const items = loadingItems?.length
+    ? loadingItems
+    : lrList?.map((num) => ({ lrNumber: num, customerName: null, quantityText: null }))
+
   return (
     <div className="print-document">
       <PrintCompanyHeader
@@ -9,7 +19,7 @@ export default function TransitPassPrintFormat({ pass, lr, company }) {
         documentTitle="Transit Pass / Memo"
         meta={[
           { label: 'Pass No.', value: pass.passNumber },
-          { label: 'LR No.', value: lr?.lrNumber ?? pass.lrNumber },
+          { label: 'LR No.', value: lrList ? lrList.join(', ') : (lr?.lrNumber ?? pass.lrNumber) },
           { label: 'Issue Date', value: formatPrintDate(pass.issueDate) },
         ]}
       />
@@ -38,19 +48,44 @@ export default function TransitPassPrintFormat({ pass, lr, company }) {
           <p className="text-[8pt] font-semibold uppercase text-gray-600">Via</p>
           <p className="mt-0.5 text-[10pt] font-medium">{pass.viaPoints || '—'}</p>
         </div>
-        <div>
-          <p className="text-[8pt] font-semibold uppercase text-gray-600">Material</p>
-          <p className="mt-0.5 text-[10pt] font-medium">{lr?.material || '—'}</p>
-        </div>
-        <div>
-          <p className="text-[8pt] font-semibold uppercase text-gray-600">Quantity</p>
-          <p className="mt-0.5 text-[10pt] font-medium">{lr?.quantity || '—'}</p>
-        </div>
-        <div>
-          <p className="text-[8pt] font-semibold uppercase text-gray-600">Consignee</p>
-          <p className="mt-0.5 text-[10pt] font-medium">{lr?.consignee || '—'}</p>
-        </div>
+        {!items?.length && (
+          <>
+            <div>
+              <p className="text-[8pt] font-semibold uppercase text-gray-600">Material</p>
+              <p className="mt-0.5 text-[10pt] font-medium">{lr?.material || '—'}</p>
+            </div>
+            <div>
+              <p className="text-[8pt] font-semibold uppercase text-gray-600">Quantity</p>
+              <p className="mt-0.5 text-[10pt] font-medium">{lr?.quantity || '—'}</p>
+            </div>
+            <div>
+              <p className="text-[8pt] font-semibold uppercase text-gray-600">Consignee</p>
+              <p className="mt-0.5 text-[10pt] font-medium">{lr?.consignee || '—'}</p>
+            </div>
+          </>
+        )}
       </div>
+
+      {items?.length > 1 && (
+        <table className="print-table mb-3 w-full text-[9pt]">
+          <thead>
+            <tr>
+              <th className="text-left">LR No.</th>
+              <th className="text-left">Customer</th>
+              <th className="text-left">Quantity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((row) => (
+              <tr key={row.lrNumber}>
+                <td>{row.lrNumber}</td>
+                <td>{row.customerName || '—'}</td>
+                <td>{row.quantityText || (row.quantityTons != null ? `${row.quantityTons} MT` : '—')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {pass.remarks && (
         <div className="print-box mb-3 text-[10pt]">

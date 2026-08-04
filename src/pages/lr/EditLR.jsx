@@ -7,6 +7,7 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import LookupSelect from '../../components/ui/LookupSelect'
 import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
 import { lrApi } from '../../services/api'
+import { LR_BUSINESS_TYPES, LR_BUSINESS_TYPE_LABELS } from '../../constants/lrBusinessTypes'
 import { fromDocPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { Save, ArrowLeft, Printer, Loader2, Workflow } from 'lucide-react'
@@ -38,6 +39,7 @@ function mapLrToForm(lr) {
     advance: lr.advance ?? 0,
     balance: lr.balance ?? 0,
     paymentType: lr.paymentType ?? 'To Pay',
+    businessType: lr.businessType ?? 'FTL',
     remarks: lr.remarks ?? '',
   }
 }
@@ -143,6 +145,12 @@ export default function EditLR() {
           <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => update('advance', e.target.value)} />
           <Input label="Balance (₹)" type="number" value={form.balance} readOnly />
           <Select label="Payment Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
+          <Select
+            label="Business Type"
+            options={LR_BUSINESS_TYPES.map((t) => ({ value: t, label: LR_BUSINESS_TYPE_LABELS[t] }))}
+            value={form.businessType}
+            onChange={(e) => update('businessType', e.target.value)}
+          />
           <div className="sm:col-span-2 lg:col-span-3">
             <Textarea label="Remarks" value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />
           </div>

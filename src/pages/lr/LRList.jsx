@@ -43,6 +43,7 @@ export default function LRList() {
     { key: 'from', label: 'From' },
     { key: 'to', label: 'To' },
     { key: 'vehicle', label: 'Vehicle' },
+    { key: 'businessType', label: 'Type', render: (r) => <Badge variant="outline">{r.businessType || 'FTL'}</Badge> },
     {
       key: 'status',
       label: 'Status',

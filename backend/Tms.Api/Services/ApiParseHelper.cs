@@ -94,4 +94,30 @@ public static class ApiParseHelper
         }
         return bool.TryParse(val.ToString(), out var result) ? result : null;
     }
+
+    public static List<string> BodyStringList(Dictionary<string, object?> body, string key)
+    {
+        if (!body.TryGetValue(key, out var val) || val is null) return [];
+
+        if (val is JsonElement el)
+        {
+            if (el.ValueKind == JsonValueKind.Array)
+                return el.EnumerateArray()
+                    .Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() : x.ToString())
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x!.Trim())
+                    .ToList();
+            if (el.ValueKind == JsonValueKind.String)
+            {
+                var s = el.GetString();
+                return string.IsNullOrWhiteSpace(s) ? [] : [s.Trim()];
+            }
+        }
+
+        if (val is IEnumerable<object?> list && val is not string)
+            return list.Select(x => x?.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim()).ToList();
+
+        var single = val.ToString();
+        return string.IsNullOrWhiteSpace(single) ? [] : [single.Trim()];
+    }
 }
