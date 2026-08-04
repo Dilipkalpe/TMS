@@ -285,6 +285,12 @@ if (!app.Environment.IsEnvironment("Testing"))
                 logger.LogInformation("Ensuring branch isolation columns…");
                 await BranchIsolationMigrator.EnsureAsync(db);
 
+                logger.LogInformation("Ensuring users schema…");
+                await UserSchemaMigrator.EnsureAsync(db);
+
+                logger.LogInformation("Ensuring LR process schema…");
+                await LrSchemaMigrator.EnsureAsync(db);
+
                 logger.LogInformation("Ensuring booking-finance schema…");
                 await BookingFinanceSchemaMigrator.EnsureAsync(db);
 

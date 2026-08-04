@@ -26,6 +26,21 @@ ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT
 ALTER TABLE branches ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
+-- Legacy installs: branches may exist without PRIMARY KEY on id (blocks REFERENCES branches(id))
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid();
+UPDATE branches SET id = gen_random_uuid() WHERE id IS NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND t.relname = 'branches' AND c.contype = 'p'
+  ) THEN
+    ALTER TABLE branches ADD CONSTRAINT branches_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
+
 ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;
 ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;
 ALTER TABLE drivers ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;

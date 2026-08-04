@@ -12,6 +12,8 @@ public static class BranchSchemaMigrator
         if (conn.State != System.Data.ConnectionState.Open)
             await conn.OpenAsync(ct);
 
+        await SchemaMigrationHelper.EnsureBranchesPrimaryKeyAsync(conn, ct);
+
         if (await SchemaMigrationHelper.IsBranchSchemaAppliedAsync(conn, ct))
             return;
 

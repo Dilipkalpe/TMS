@@ -82,10 +82,57 @@ public static class SchemaMigrationHelper
     public static async Task<bool> IsBranchSchemaAppliedAsync(NpgsqlConnection conn, CancellationToken ct = default)
     {
         if (!await TableExistsAsync(conn, "branches", ct)) return false;
+        if (!await BranchesPrimaryKeyExistsAsync(conn, ct)) return false;
         if (!await ColumnExistsAsync(conn, "vehicles", "branch_id", ct)) return false;
         if (!await ColumnExistsAsync(conn, "bookings", "branch_id", ct)) return false;
         return await IndexExistsAsync(conn, "idx_vehicles_branch", ct)
             && await IndexExistsAsync(conn, "idx_bookings_branch", ct);
+    }
+
+    /// <summary>
+    /// Legacy installs may have branches without PRIMARY KEY on id, which blocks REFERENCES branches(id).
+    /// </summary>
+    public static async Task EnsureBranchesPrimaryKeyAsync(NpgsqlConnection conn, CancellationToken ct = default)
+    {
+        if (!await TableExistsAsync(conn, "branches", ct)) return;
+
+        await ExecuteNonQueryAsync(conn, """
+            ALTER TABLE branches ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid()
+            """, ct);
+        await ExecuteNonQueryAsync(conn, """
+            UPDATE branches SET id = gen_random_uuid() WHERE id IS NULL
+            """, ct);
+        await ExecuteNonQueryAsync(conn, """
+            WITH ranked AS (
+                SELECT ctid, ROW_NUMBER() OVER (PARTITION BY id ORDER BY ctid) AS rn
+                FROM branches
+            )
+            UPDATE branches b SET id = gen_random_uuid()
+            FROM ranked r
+            WHERE b.ctid = r.ctid AND r.rn > 1
+            """, ct);
+
+        if (await BranchesPrimaryKeyExistsAsync(conn, ct)) return;
+
+        await ExecuteNonQueryAsync(conn, """
+            ALTER TABLE branches ADD CONSTRAINT branches_pkey PRIMARY KEY (id)
+            """, ct);
+    }
+
+    static async Task<bool> BranchesPrimaryKeyExistsAsync(NpgsqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM pg_constraint c
+                JOIN pg_class t ON c.conrelid = t.oid
+                JOIN pg_namespace n ON t.relnamespace = n.oid
+                WHERE n.nspname = 'public' AND t.relname = 'branches' AND c.contype = 'p'
+            )
+            """,
+            conn);
+        cmd.CommandTimeout = CommandTimeoutSeconds;
+        return (bool)(await cmd.ExecuteScalarAsync(ct) ?? false);
     }
 
     /// <summary>

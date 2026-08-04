@@ -13,6 +13,8 @@ public static class BranchIsolationMigrator
         if (conn.State != System.Data.ConnectionState.Open)
             await conn.OpenAsync(ct);
 
+        await SchemaMigrationHelper.EnsureBranchesPrimaryKeyAsync(conn, ct);
+
         await using (var check = new NpgsqlCommand(
             """
             SELECT COUNT(*) FROM information_schema.columns
