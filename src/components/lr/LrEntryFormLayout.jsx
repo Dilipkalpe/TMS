@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo } from 'react'
 import {
   CloudUpload, Eye, Loader2, Plus, Printer, RotateCcw, Save, Trash2, X,
 } from 'lucide-react'
-import Card, { CardHeader } from '../ui/Card'
 import Button from '../ui/Button'
 import Input, { Select, Textarea } from '../ui/Input'
 import PartyMasterSelect from '../masters/PartyMasterSelect'
@@ -82,48 +81,34 @@ export const emptyLrEntryForm = () => ({
   attachments: [],
 })
 
-function PartyBlock({ title, form, prefix, onSelect, onUpdate, sameAsConsignor }) {
+function PartyBlock({ title, form, prefix, onSelect, onUpdate, sameAsConsignor, compact }) {
   const nameKey = prefix === 'billingParty' ? 'billingParty' : prefix
+  const wrap = compact ? 'lr-entry-section lr-entry-compact min-h-0' : 'h-full p-4'
   return (
-    <Card className="h-full p-4">
-      <CardHeader title={title} />
-      <div className="space-y-3">
+    <div className={wrap}>
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-primary">{title}</p>
+      <div className={compact ? 'space-y-1' : 'space-y-3'}>
         {prefix === 'consignor' && (
-          <PartyMasterSelect
-            label="Name *"
-            api={consignorsApi}
-            valueId={form.consignorId}
-            displayValue={form.consignor}
-            onSelect={onSelect}
-          />
+          <PartyMasterSelect label="Name *" api={consignorsApi} valueId={form.consignorId} displayValue={form.consignor} onSelect={onSelect} />
         )}
         {prefix === 'consignee' && (
-          <PartyMasterSelect
-            label="Name *"
-            api={consigneesApi}
-            valueId={form.consigneeId}
-            displayValue={form.consignee}
-            onSelect={onSelect}
-          />
+          <PartyMasterSelect label="Name *" api={consigneesApi} valueId={form.consigneeId} displayValue={form.consignee} onSelect={onSelect} />
         )}
         {prefix === 'billingParty' && (
-          <>
-            <Input
-              label="Name *"
-              value={form.billingParty}
-              onChange={(e) => onUpdate('billingParty', e.target.value)}
-              placeholder={sameAsConsignor ? 'Same as consignor' : 'Billing party name'}
-            />
-            <Button size="sm" variant="outline" type="button" onClick={sameAsConsignor}>
-              Copy from Consignor
-            </Button>
-          </>
+          <div className="flex gap-1">
+            <div className="min-w-0 flex-1">
+              <Input label="Name *" value={form.billingParty} onChange={(e) => onUpdate('billingParty', e.target.value)} placeholder="Billing party" />
+            </div>
+            <Button size="sm" variant="outline" type="button" className="mt-4 shrink-0" onClick={sameAsConsignor}>Copy</Button>
+          </div>
         )}
-        <Textarea label="Address" rows={2} value={form[`${nameKey}Address`] || ''} onChange={(e) => onUpdate(`${nameKey}Address`, e.target.value)} />
-        <Input label="GSTIN" value={form[`${nameKey}Gst`] || ''} onChange={(e) => onUpdate(`${nameKey}Gst`, e.target.value)} />
-        <Input label="Mobile" value={form[`${nameKey}Phone`] || ''} onChange={(e) => onUpdate(`${nameKey}Phone`, e.target.value)} />
+        <Textarea label="Address" rows={compact ? 1 : 2} value={form[`${nameKey}Address`] || ''} onChange={(e) => onUpdate(`${nameKey}Address`, e.target.value)} />
+        <div className="grid grid-cols-2 gap-1">
+          <Input label="GSTIN" value={form[`${nameKey}Gst`] || ''} onChange={(e) => onUpdate(`${nameKey}Gst`, e.target.value)} />
+          <Input label="Mobile" value={form[`${nameKey}Phone`] || ''} onChange={(e) => onUpdate(`${nameKey}Phone`, e.target.value)} />
+        </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -209,229 +194,177 @@ export default function LrEntryFormLayout({
   }
 
   return (
-    <div className="space-y-4">
-      {flowBanner}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <Input label="LR No." value={form.lrNumber || 'Auto on save'} readOnly />
+    <div className="lr-entry-shell lr-entry-compact">
+      {flowBanner && <div className="shrink-0 [&>div]:rounded [&>div]:px-2 [&>div]:py-1 [&>div]:text-[10px]">{flowBanner}</div>}
+
+      {/* Header row */}
+      <div className="lr-entry-section shrink-0">
+        <div className="flex items-start gap-2">
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-2 gap-y-1 sm:grid-cols-3 lg:grid-cols-6">
+            <Input label="LR No." value={form.lrNumber || 'Auto'} readOnly />
             <Input label="LR Date *" type="date" value={form.lrDate} onChange={(e) => update('lrDate', e.target.value)} />
-            <Input label="Booking Branch" value={form.branchName} placeholder="Current branch" onChange={(e) => update('branchName', e.target.value)} />
+            <Input label="Branch" value={form.branchName} placeholder="Branch" onChange={(e) => update('branchName', e.target.value)} />
             <Select
-              label="Booking Type"
+              label="Type"
               options={LR_BUSINESS_TYPES.map((t) => ({ value: t, label: LR_BUSINESS_TYPE_LABELS[t] || t }))}
               value={form.businessType}
               onChange={(e) => update('businessType', e.target.value)}
             />
             {!ultra && (
-              <Select label="Service Type" options={SERVICE_TYPES} value={form.serviceType} onChange={(e) => update('serviceType', e.target.value)} />
+              <Select label="Service" options={SERVICE_TYPES} value={form.serviceType} onChange={(e) => update('serviceType', e.target.value)} />
             )}
             {bookingSlot}
           </div>
           {!ultra && (
-            <div className="flex flex-col items-center rounded-lg border border-dashed border-slate-300 p-3 text-center dark:border-slate-600">
-              <div className="flex h-20 w-20 items-center justify-center bg-slate-100 text-[10px] text-slate-500 dark:bg-slate-800">
-                QR
-              </div>
-              <p className="mt-1 text-xs text-slate-500">Scan to Track</p>
-              <p className="text-xs font-semibold">{form.lrNumber || 'New LR'}</p>
+            <div className="hidden shrink-0 flex-col items-center rounded border border-dashed border-slate-300 px-2 py-1 text-center sm:flex dark:border-slate-600">
+              <div className="flex h-10 w-10 items-center justify-center bg-slate-100 text-[8px] text-slate-500 dark:bg-slate-800">QR</div>
+              <p className="text-[9px] font-semibold">{form.lrNumber || 'New'}</p>
             </div>
           )}
         </div>
-      </Card>
-
-      {!ultra && (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <PartyBlock
-            title="Consignor (From)"
-            prefix="consignor"
-            form={form}
-            onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row), pickupCity: row.city || prev.from }))}
-            onUpdate={update}
-          />
-          <PartyBlock
-            title="Consignee (To)"
-            prefix="consignee"
-            form={form}
-            onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row), deliveryBranch: row.city || prev.to }))}
-            onUpdate={update}
-          />
-          <PartyBlock
-            title="Billing Party"
-            prefix="billingParty"
-            form={form}
-            onUpdate={update}
-            sameAsConsignor={copyBillingFromConsignor}
-          />
-        </div>
-      )}
+      </div>
 
       {ultra ? (
-        <Card className="p-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PartyMasterSelect label="Consignor *" api={consignorsApi} valueId={form.consignorId} displayValue={form.consignor} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row) }))} />
-            <PartyMasterSelect label="Consignee *" api={consigneesApi} valueId={form.consigneeId} displayValue={form.consignee} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row) }))} />
-            <Input label="From *" value={form.from} onChange={(e) => update('from', e.target.value)} />
-            <Input label="To *" value={form.to} onChange={(e) => update('to', e.target.value)} />
-            <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />
-            <Input label="Qty / Weight" value={form.quantity} onChange={(e) => update('quantity', e.target.value)} placeholder="27 pkgs / 372 kg" />
+        <>
+          <div className="lr-entry-section shrink-0">
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1 lg:grid-cols-4 xl:grid-cols-8">
+              <PartyMasterSelect label="Consignor *" api={consignorsApi} valueId={form.consignorId} displayValue={form.consignor} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row) }))} />
+              <PartyMasterSelect label="Consignee *" api={consigneesApi} valueId={form.consigneeId} displayValue={form.consignee} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row) }))} />
+              <Input label="From *" value={form.from} onChange={(e) => update('from', e.target.value)} />
+              <Input label="To *" value={form.to} onChange={(e) => update('to', e.target.value)} />
+              <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />
+              <Input label="Qty/Wt" value={form.quantity} onChange={(e) => update('quantity', e.target.value)} placeholder="pkgs/kg" />
+              <Select label="Freight Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
+              <Input label="Freight ₹" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
+              <Input label="GST ₹" type="number" value={form.gst} onChange={(e) => update('gst', e.target.value)} />
+              <Input label="Total ₹" readOnly value={formatCurrency(totalAmount)} />
+            </div>
           </div>
-        </Card>
+        </>
       ) : (
         <>
-          <Card className="p-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <Input label="Pickup Address" value={form.pickupAddress} onChange={(e) => update('pickupAddress', e.target.value)} />
+          <div className="lr-entry-party-grid shrink-0">
+            <PartyBlock title="Consignor" prefix="consignor" compact form={form} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row), pickupCity: row.city || prev.from }))} onUpdate={update} />
+            <PartyBlock title="Consignee" prefix="consignee" compact form={form} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row), deliveryBranch: row.city || prev.to }))} onUpdate={update} />
+            <PartyBlock title="Billing" prefix="billingParty" compact form={form} onUpdate={update} sameAsConsignor={copyBillingFromConsignor} />
+          </div>
+
+          <div className="lr-entry-section shrink-0">
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1 lg:grid-cols-5">
+              <Input label="Pickup Addr" value={form.pickupAddress} onChange={(e) => update('pickupAddress', e.target.value)} />
               <Input label="Pickup City" value={form.pickupCity || form.from} onChange={(e) => update('pickupCity', e.target.value)} />
               <Input label="Destination" value={form.to} onChange={(e) => update('to', e.target.value)} />
-              <Input label="Delivery Branch" value={form.deliveryBranch} onChange={(e) => update('deliveryBranch', e.target.value)} />
-              <Input label="Expected Delivery Date" type="date" value={form.expectedDeliveryDate} onChange={(e) => update('expectedDeliveryDate', e.target.value)} />
+              <Input label="Del. Branch" value={form.deliveryBranch} onChange={(e) => update('deliveryBranch', e.target.value)} />
+              <Input label="Exp. Delivery" type="date" value={form.expectedDeliveryDate} onChange={(e) => update('expectedDeliveryDate', e.target.value)} />
             </div>
-          </Card>
+          </div>
 
-          <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
-            <Card padding={false}>
-              <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                <CardHeader title="Item Details" />
+          <div className="lr-entry-main">
+            <div className="lr-entry-section flex min-h-0 flex-col overflow-hidden">
+              <div className="mb-1 flex shrink-0 items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Item Details</p>
+                <Button size="sm" variant="outline" icon={Plus} type="button" onClick={addItem}>Add (F7)</Button>
               </div>
               <div
                 ref={gridRef}
-                className="overflow-x-auto"
+                className="lr-entry-items-scroll"
                 data-kbd-grid="true"
                 onKeyDown={onContainerKeyDown}
-                title="Grid: F7 insert · F6 delete · Ctrl+D duplicate · Ctrl+C/V copy/paste"
               >
-                <table className="w-full min-w-[900px] text-sm">
-                  <thead className="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase text-slate-500 dark:bg-slate-900">
+                <table className="w-full min-w-[720px] text-[11px]">
+                  <thead className="sticky top-0 z-10 bg-slate-100 text-left dark:bg-slate-800">
                     <tr>
-                      <th className="px-2 py-2">#</th>
-                      <th className="px-2 py-2">Item Name / Description</th>
-                      <th className="px-2 py-2">HSN</th>
-                      <th className="px-2 py-2">Package</th>
-                      <th className="px-2 py-2">Qty</th>
-                      <th className="px-2 py-2">Weight (Kg)</th>
-                      <th className="px-2 py-2">Invoice No.</th>
-                      <th className="px-2 py-2">Invoice Date</th>
-                      <th className="px-2 py-2">Invoice Value (₹)</th>
-                      <th className="px-2 py-2" />
+                      <th className="px-1 py-0.5">#</th>
+                      <th className="px-1 py-0.5">Description</th>
+                      <th className="px-1 py-0.5">HSN</th>
+                      <th className="px-1 py-0.5">Pkg</th>
+                      <th className="px-1 py-0.5">Qty</th>
+                      <th className="px-1 py-0.5">Kg</th>
+                      <th className="px-1 py-0.5">Inv#</th>
+                      <th className="px-1 py-0.5">Date</th>
+                      <th className="px-1 py-0.5">Value</th>
+                      <th className="px-1 py-0.5" />
                     </tr>
                   </thead>
                   <tbody>
                     {(form.items || []).map((item, idx) => (
                       <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
-                        <td className="px-2 py-1">{idx + 1}</td>
+                        <td className="px-1 py-0.5">{idx + 1}</td>
                         {ITEM_FIELD_KEYS.map((field, colIdx) => (
-                          <td key={field} className="px-2 py-1" data-grid-row={idx} data-grid-col={colIdx}>
+                          <td key={field} className="px-1 py-0.5" data-grid-row={idx} data-grid-col={colIdx}>
                             {field === 'packageType' ? (
-                              <select className="rounded border px-1 py-1 text-sm dark:border-slate-700 dark:bg-slate-900" value={item.packageType} onChange={(e) => updateItem(idx, 'packageType', e.target.value)}>
+                              <select className="w-full rounded border px-0.5 py-0.5 dark:border-slate-700 dark:bg-slate-900" value={item.packageType} onChange={(e) => updateItem(idx, 'packageType', e.target.value)}>
                                 {PACKAGE_TYPES.map((p) => <option key={p} value={p}>{p}</option>)}
                               </select>
                             ) : (
                               <input
                                 type={field === 'qty' || field === 'weight' || field === 'invoiceValue' ? 'number' : field === 'invoiceDate' ? 'date' : 'text'}
                                 step={field === 'weight' ? '0.001' : undefined}
-                                className={`rounded border px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900 ${field === 'description' ? 'w-full' : field === 'hsn' ? 'w-20' : field === 'qty' ? 'w-16' : field === 'weight' ? 'w-20' : 'w-24'}`}
+                                className="w-full min-w-0 rounded border px-1 py-0.5 dark:border-slate-700 dark:bg-slate-900"
                                 value={item[field] ?? ''}
                                 onChange={(e) => updateItem(idx, field, e.target.value)}
                               />
                             )}
                           </td>
                         ))}
-                        <td className="px-2 py-1">
-                          <button type="button" className="text-red-500 hover:text-red-700" onClick={() => removeItem(idx)} aria-label="Remove item">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        <td className="px-1 py-0.5">
+                          <button type="button" className="text-red-500" onClick={() => removeItem(idx)} aria-label="Remove"><Trash2 className="h-3 w-3" /></button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="border-t bg-slate-50 text-sm font-medium dark:bg-slate-900">
+                  <tfoot className="sticky bottom-0 bg-slate-50 text-[10px] font-medium dark:bg-slate-900">
                     <tr>
-                      <td colSpan={4} className="px-4 py-2">
-                        <Button size="sm" variant="outline" icon={Plus} type="button" onClick={addItem}>Add Item</Button>
-                      </td>
-                      <td className="px-2 py-2 text-green-700">{itemTotals.qty}</td>
-                      <td className="px-2 py-2 text-green-700">{itemTotals.weight.toFixed(3)}</td>
+                      <td colSpan={4} className="px-1 py-0.5">Totals</td>
+                      <td className="px-1 py-0.5 text-green-700">{itemTotals.qty}</td>
+                      <td className="px-1 py-0.5 text-green-700">{itemTotals.weight.toFixed(1)}</td>
                       <td colSpan={2} />
-                      <td className="px-2 py-2 text-green-700">{formatCurrency(itemTotals.invoiceValue)}</td>
+                      <td className="px-1 py-0.5 text-green-700">{formatCurrency(itemTotals.invoiceValue)}</td>
                       <td />
                     </tr>
                   </tfoot>
                 </table>
               </div>
-            </Card>
+            </div>
 
-            <Card className="p-4">
-              <CardHeader title="Freight & Charges" />
-              <div className="space-y-3">
-                <Select label="Freight Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
-                <Input label="Freight Amount (₹)" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
-                <Input label="Loading Charges (₹)" type="number" value={form.loadingCharges} onChange={(e) => update('loadingCharges', e.target.value)} />
-                <Input label="Unloading Charges (₹)" type="number" value={form.unloadingCharges} onChange={(e) => update('unloadingCharges', e.target.value)} />
-                <Input label="Other Charges (₹)" type="number" value={form.otherCharges} onChange={(e) => update('otherCharges', e.target.value)} />
-                <div className="rounded border border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
-                  <span className="text-slate-500">Taxable Amount</span>
-                  <p className="font-semibold">{formatCurrency(taxable)}</p>
-                </div>
+            <div className="lr-entry-section flex min-h-0 flex-col overflow-y-auto">
+              <p className="mb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-primary">Freight</p>
+              <div className="grid grid-cols-2 gap-1 xl:grid-cols-1">
+                <Select label="Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
+                <Input label="Freight" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
+                <Input label="Loading" type="number" value={form.loadingCharges} onChange={(e) => update('loadingCharges', e.target.value)} />
+                <Input label="Unloading" type="number" value={form.unloadingCharges} onChange={(e) => update('unloadingCharges', e.target.value)} />
+                <Input label="Other" type="number" value={form.otherCharges} onChange={(e) => update('otherCharges', e.target.value)} />
                 <Select label="GST %" options={GST_OPTIONS} value={form.gstPercent} onChange={(e) => update('gstPercent', e.target.value)} />
-                <div className="rounded border border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
-                  <span className="text-slate-500">GST Amount</span>
-                  <p className="font-semibold">{formatCurrency(gstAmount)}</p>
-                </div>
-                <div className="rounded-lg bg-green-50 px-3 py-2 dark:bg-green-950/30">
-                  <span className="text-xs text-green-800 dark:text-green-200">Total Amount (₹)</span>
-                  <p className="text-xl font-bold text-green-700 dark:text-green-300">{formatCurrency(totalAmount)}</p>
-                </div>
               </div>
-            </Card>
+              <div className="mt-1 shrink-0 rounded bg-green-50 px-2 py-1 dark:bg-green-950/30">
+                <p className="text-[9px] text-green-800 dark:text-green-200">Taxable {formatCurrency(taxable)} · GST {formatCurrency(gstAmount)}</p>
+                <p className="text-sm font-bold text-green-700 dark:text-green-300">{formatCurrency(totalAmount)}</p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="p-4">
-              <Textarea label={`Remarks (${(form.remarks || '').length} / 500)`} rows={4} maxLength={500} value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />
-            </Card>
-            <Card className="p-4">
-              <CardHeader title="Attachments" />
-              <div className="flex flex-wrap gap-2">
-                {(form.attachments || []).map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs dark:bg-slate-800">
-                    {f.name}
-                    <button type="button" onClick={() => update('attachments', form.attachments.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
-                  </span>
-                ))}
-              </div>
-              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm text-primary">
-                <CloudUpload className="h-4 w-4" />
-                Upload More
-                <input type="file" multiple className="hidden" onChange={(e) => {
-                  const files = [...(form.attachments || []), ...Array.from(e.target.files || [])]
-                  update('attachments', files)
-                }} />
+          <div className="grid shrink-0 grid-cols-1 gap-1 lg:grid-cols-[1fr_auto]">
+            <Textarea label={`Remarks (${(form.remarks || '').length}/500)`} rows={1} maxLength={500} value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />
+            <div className="lr-entry-section flex items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1 text-[10px] text-primary">
+                <CloudUpload className="h-3 w-3" /> Attach
+                <input type="file" multiple className="hidden" onChange={(e) => update('attachments', [...(form.attachments || []), ...Array.from(e.target.files || [])])} />
               </label>
-            </Card>
+              {(form.attachments || []).slice(0, 3).map((f, i) => (
+                <span key={i} className="max-w-[5rem] truncate rounded bg-slate-100 px-1 text-[9px] dark:bg-slate-800">{f.name}</span>
+              ))}
+            </div>
           </div>
         </>
       )}
 
-      {ultra && (
-        <Card className="p-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Select label="Freight Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
-            <Input label="Freight (₹)" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
-            <Input label="GST (₹)" type="number" value={form.gst} onChange={(e) => update('gst', e.target.value)} />
-            <Input label="Total" readOnly value={formatCurrency(totalAmount)} />
-          </div>
-        </Card>
-      )}
-
-      <div className="sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-        <Button variant="outline" icon={RotateCcw} type="button" onClick={onClear}>Clear</Button>
-        <Button icon={saving ? Loader2 : Save} type="button" onClick={onSave} disabled={saving} className="bg-green-600 hover:bg-green-700">
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
-        <Button icon={Printer} type="button" onClick={onSavePrint} disabled={saving}>Save & Print</Button>
-        {!ultra && <Button variant="secondary" icon={Eye} type="button" onClick={onPreview}>Preview</Button>}
-        <Button variant="outline" icon={X} type="button" onClick={onCancel} className="text-red-600">Cancel</Button>
+      <div className="lr-entry-footer">
+        <Button size="sm" variant="outline" icon={RotateCcw} type="button" onClick={onClear}>Clear</Button>
+        <Button size="sm" icon={saving ? Loader2 : Save} type="button" onClick={onSave} disabled={saving} className="bg-green-600 hover:bg-green-700">{saving ? '…' : 'Save'}</Button>
+        <Button size="sm" icon={Printer} type="button" onClick={onSavePrint} disabled={saving}>Save & Print</Button>
+        {!ultra && <Button size="sm" variant="secondary" icon={Eye} type="button" onClick={onPreview}>Preview</Button>}
+        <Button size="sm" variant="outline" icon={X} type="button" onClick={onCancel} className="text-red-600">Cancel</Button>
       </div>
     </div>
   )

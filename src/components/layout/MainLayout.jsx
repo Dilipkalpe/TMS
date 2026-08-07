@@ -24,6 +24,9 @@ function RouteAutoFocus() {
 }
 
 export default function MainLayout() {
+  const location = useLocation()
+  const isFillPage = /^\/lr\/(entry|ultra-entry)\/?$/.test(location.pathname)
+
   return (
     <PageTitleProvider>
       <RouteAutoFocus />
@@ -31,8 +34,8 @@ export default function MainLayout() {
         <Sidebar />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Navbar />
-          <main className="app-shell-bg app-scroll mobile-scroll-y flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-2 sm:p-3 lg:p-4">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <main className={`app-shell-bg flex min-h-0 flex-1 flex-col overflow-x-hidden p-1 sm:p-2 lg:p-3 ${isFillPage ? 'lr-entry-page overflow-hidden' : 'app-scroll mobile-scroll-y overflow-y-auto'}`}>
+            <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${isFillPage ? 'overflow-hidden' : ''}`}>
               <Outlet />
             </div>
           </main>

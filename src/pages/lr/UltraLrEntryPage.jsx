@@ -57,11 +57,8 @@ export default function UltraLrEntryPage() {
   }, [form, saving])
 
   return (
-    <ERPContentPage module="LR" title="Ultra LR Entry (Fast)">
-      <div ref={formRef} data-kbd-form-root>
-      <p className="mb-4 text-sm text-slate-500">
-        Tally Mode: Enter moves field-to-field · F2/Ctrl+S Save · F4 Lookup · Alt+L full LR Entry
-      </p>
+    <ERPContentPage module="LR" title="Ultra LR Entry (Fast)" fillViewport>
+      <div ref={formRef} data-kbd-form-root className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LrEntryFormLayout
         ultra
         form={form}

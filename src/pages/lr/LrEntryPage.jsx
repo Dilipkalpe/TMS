@@ -132,8 +132,8 @@ export default function LrEntryPage() {
   )
 
   return (
-    <ERPContentPage module="LR" title="Lorry Receipt (LR Entry)">
-      <div ref={formRef} data-kbd-form-root>
+    <ERPContentPage module="LR" title="Lorry Receipt (LR Entry)" fillViewport>
+      <div ref={formRef} data-kbd-form-root className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LrEntryFormLayout
         form={form}
         setForm={setForm}
