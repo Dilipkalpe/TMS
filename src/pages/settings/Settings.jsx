@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button'
 import Input, { Select, Textarea } from '../../components/ui/Input'
 import Tabs from '../../components/ui/Tabs'
 import { useTheme } from '../../context/ThemeContext'
+import TallyModeToggle from '../../components/keyboard/TallyModeToggle'
 import { usePrint } from '../../context/PrintContext'
 import { settingsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
@@ -274,6 +275,11 @@ export default function Settings() {
           ))}
         </div>
       ),
+    },
+    {
+      id: 'keyboard',
+      label: 'Keyboard',
+      content: <TallyModeToggle />,
     },
     {
       id: 'theme',

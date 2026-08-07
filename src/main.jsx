@@ -12,6 +12,7 @@ import { SidebarProvider } from './context/SidebarContext'
 import { ToastProvider } from './context/ToastContext'
 import { AlertsProvider } from './context/AlertsContext'
 import { PrintProvider } from './context/PrintContext'
+import { KeyboardShortcutProvider } from './context/KeyboardShortcutContext'
 import './index.css'
 import './components/print/print.css'
 
@@ -27,7 +28,9 @@ createRoot(document.getElementById('root')).render(
             <ToastProvider>
               <AlertsProvider>
                 <PrintProvider>
-                  <App />
+                  <KeyboardShortcutProvider>
+                    <App />
+                  </KeyboardShortcutProvider>
                 </PrintProvider>
               </AlertsProvider>
             </ToastProvider>

@@ -1,7 +1,7 @@
 /** Add New Record routes — used by list/report toolbar buttons */
 export const addRecordRoutes = {
   bookings: '/bookings/new',
-  lr: '/lr/generate',
+  lr: '/lr/entry',
   vehicles: '/vehicles/new',
   employees: '/hr/employees/new',
   customers: '/customers/new',

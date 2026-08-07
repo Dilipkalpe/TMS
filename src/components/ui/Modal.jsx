@@ -1,17 +1,28 @@
-import { useEffect } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
+import { usePopupKeyboard } from '../../hooks/usePopupKeyboard'
+import { focusFirstEditable } from '../../keyboard/keyUtils'
 
-export default function Modal({ open, onClose, title, children, footer, size = 'md'}) {
+export default function Modal({ open, onClose, title, children, footer, size = 'md', confirmOnEnter = false }) {
+  const id = useId()
+  const contentRef = useRef(null)
+
+  usePopupKeyboard({
+    id: `modal-${id}`,
+    open,
+    onClose,
+    onConfirm: confirmOnEnter ? onClose : undefined,
+  })
+
   useEffect(() => {
     if (!open) return
-    const onKey = (e) => e.key === 'Escape' && onClose?.()
-    document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
+    const t = setTimeout(() => focusFirstEditable(contentRef.current ?? document), 80)
     return () => {
-      document.removeEventListener('keydown', onKey)
+      clearTimeout(t)
       document.body.style.overflow = ''
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
@@ -23,11 +34,13 @@ export default function Modal({ open, onClose, title, children, footer, size = '
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-kbd-popup="true">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
+        ref={contentRef}
         role="dialog"
         aria-modal="true"
+        data-kbd-form-root
         className={`relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 ${sizes[size] ?? sizes.md}`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:px-5">

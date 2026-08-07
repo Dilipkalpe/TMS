@@ -7,6 +7,9 @@ export const navigation = [
     feature: 'lr',
     children: [
       { title: 'LR Management', path: '/lr' },
+      { title: 'LR List', path: '/lr/list' },
+      { title: 'LR Entry (Fast)', path: '/lr/entry' },
+      { title: 'Ultra LR Entry', path: '/lr/ultra-entry' },
       { title: 'Create LR', path: '/lr/generate' },
       { title: 'Expense Approval', path: '/lr/expense-approval' },
     ],

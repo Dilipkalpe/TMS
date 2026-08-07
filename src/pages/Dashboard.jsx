@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useState } from 'react'
 import { RefreshCw, Settings2 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
@@ -13,7 +12,6 @@ import { useToast } from '../context/ToastContext'
 export default function Dashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const navigate = useNavigate()
   const [refreshSeed, setRefreshSeed] = useState(0)
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const home = useDashboardHome(refreshSeed)
@@ -23,22 +21,6 @@ export default function Dashboard() {
     setRefreshSeed((s) => s + 1)
     toast({ title: 'Dashboard refreshed', type: 'success' })
   }, [home, toast])
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.key === 'F2') { e.preventDefault(); navigate('/lr/generate') }
-      if (e.key === 'F6') { e.preventDefault(); navigate('/bookings/new') }
-      if (e.key === 'F7') { e.preventDefault(); navigate('/lr?status=loading-pending') }
-      if (e.key === 'F8') { e.preventDefault(); navigate('/lr?status=delivered') }
-      if (e.key === 'F10') { e.preventDefault(); navigate('/lr?status=expense-pending') }
-      if (e.key === 'F11') { e.preventDefault(); navigate('/reports') }
-      if (e.key === 'F12') { e.preventDefault(); navigate('/vehicles') }
-      if (e.key === 'F3') { e.preventDefault(); document.querySelector('[data-global-search]')?.focus() }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [navigate])
 
   return (
     <div className="flex min-h-full flex-col space-y-4">

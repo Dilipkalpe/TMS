@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useCompany } from '../../context/CompanyContext'
 import { useSubscription } from '../../context/SubscriptionContext'
 import { ChevronDown, ChevronLeft, Truck, X } from 'lucide-react'
+import TallyModeToggle from '../keyboard/TallyModeToggle'
 
 function NavIcon({ name }) {
   const Icon = Icons[name] || Icons.Circle
@@ -127,12 +128,17 @@ export default function Sidebar() {
 
         <div className="hidden border-t border-slate-700/50 p-3 lg:block">
           {!collapsed && (
-            <div className="mb-3 rounded-lg bg-slate-800/50 px-2 py-2 text-[10px] leading-relaxed text-slate-400">
-              <p className="mb-1 font-semibold uppercase tracking-wide text-slate-500">Shortcuts</p>
-              <p>F2 New LR · F3 Search</p>
-              <p>F6 Booking · F7 Loading</p>
-              <p>F8 Delivery · F11 Reports</p>
-              <p>Ctrl+S Save · Ctrl+P Print</p>
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Keyboard</p>
+                <TallyModeToggle compact />
+              </div>
+              <div className="rounded-lg bg-slate-800/50 px-2 py-2 text-[10px] leading-relaxed text-slate-400">
+                <p>F1 Help · F2 Save · F3 Search · F4 Lookup</p>
+                <p>F6/F7 Grid row · Ctrl+S Save · Ctrl+P Print</p>
+                <p>Alt+L LR · Alt+B Billing · Alt+H Home</p>
+                <p>Enter next field (Tally Mode)</p>
+              </div>
             </div>
           )}
           <button

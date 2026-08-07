@@ -8,7 +8,7 @@ import PageFallback from './components/ui/PageFallback'
 import {
   Dashboard, NewBooking, BookingDetails, EditBooking,
   GenerateLR, EditLR, LRProcessPage, LrExpenseApprovalPage,
-  LrManagementPage, LrDetailPage,
+  LrManagementPage, LrDetailPage, LrListPage, LrEntryPage, UltraLrEntryPage,
   BookingManagementLayout, BookingQuotationsTab, BookingPendingTab, BookingConfirmedTab, BookingCancelledTab,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
@@ -89,6 +89,9 @@ export default function App() {
         <Route path="lr/expense-pending" element={<Navigate to="/lr?status=expense-pending" replace />} />
         <Route path="lr/closed" element={<Navigate to="/lr?status=closed" replace />} />
         <Route path="lr/expense-approval" element={<LrExpenseApprovalPage />} />
+        <Route path="lr/list" element={<LrListPage />} />
+        <Route path="lr/entry" element={<LrEntryPage />} />
+        <Route path="lr/ultra-entry" element={<UltraLrEntryPage />} />
         <Route path="lr/generate" element={<GenerateLR />} />
         <Route path="lr/expenses/approval" element={<Navigate to="/lr/expense-approval" replace />} />
         <Route path="lr/:lrNumber/process" element={<LRProcessPage />} />

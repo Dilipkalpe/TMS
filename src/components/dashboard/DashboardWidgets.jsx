@@ -72,7 +72,7 @@ export default function DashboardKpiRow({ kpis = [], loading }) {
 
 export function DashboardQuickActions() {
   const actions = [
-    { label: 'New LR', shortcut: 'F2', path: '/lr/generate', icon: 'FilePlus', color: 'bg-blue-600 hover:bg-blue-700' },
+    { label: 'New LR', shortcut: 'F2', path: '/lr/entry', icon: 'FilePlus', color: 'bg-blue-600 hover:bg-blue-700' },
     { label: 'New Booking', shortcut: 'F6', path: '/bookings/new', icon: 'CalendarPlus', color: 'bg-violet-600 hover:bg-violet-700' },
     { label: 'Loading Slip', shortcut: 'F7', path: '/lr?status=loading-pending', icon: 'ClipboardList', color: 'bg-amber-600 hover:bg-amber-700' },
     { label: 'Delivery / POD', shortcut: 'F8', path: '/lr?status=delivered', icon: 'PackageCheck', color: 'bg-emerald-600 hover:bg-emerald-700' },

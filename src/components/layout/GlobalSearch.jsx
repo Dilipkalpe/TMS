@@ -29,17 +29,7 @@ export default function GlobalSearch({ className = '' } = {}) {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault()
-        ref.current?.querySelector('input')?.focus()
-        setOpen(true)
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  // Ctrl+K / F3 handled globally by KeyboardShortcutProvider
 
   const go = (path) => {
     navigate(path)

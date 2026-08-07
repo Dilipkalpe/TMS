@@ -6,6 +6,8 @@ import { LOOKUP_CREATED_EVENT, lookupEventMatches, notifyLookupCreated } from '.
 import Modal from './Modal'
 import Button from './Button'
 import { useToast } from '../../context/ToastContext'
+import { usePopupKeyboard } from '../../hooks/usePopupKeyboard'
+import { useKeyboardShortcutsOptional } from '../../context/KeyboardShortcutContext'
 
 const FETCHERS = {
   vehicles: lookupsApi.vehicles,
@@ -67,10 +69,13 @@ export default function LookupSelect({
   const [pendingName, setPendingName] = useState('')
   const [creating, setCreating] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(0)
   const wrapRef = useRef(null)
   const inputRef = useRef(null)
   const skipBlurRef = useRef(false)
+  const lookupId = useRef(`lookup-${type}-${employeeType ?? 'default'}-${Math.random().toString(36).slice(2)}`).current
   const { toast } = useToast()
+  const kbd = useKeyboardShortcutsOptional()
 
   const loadOptions = useCallback(async (searchText) => {
     if (!fetcher) return []
@@ -138,6 +143,30 @@ export default function LookupSelect({
     setPendingName('')
   }
 
+  usePopupKeyboard({
+    id: lookupId,
+    open: open && !disabled,
+    onClose: () => setOpen(false),
+    onConfirm: () => { if (options[activeIndex]) pick(options[activeIndex]) },
+    onArrow: (dir) => {
+      if (!options.length) return
+      setActiveIndex((i) => (dir === 'down' ? (i + 1) % options.length : (i - 1 + options.length) % options.length))
+    },
+    focusSearch: () => inputRef.current?.focus(),
+  })
+
+  useEffect(() => {
+    if (!kbd) return undefined
+    const trigger = () => {
+      if (document.activeElement === inputRef.current) {
+        setOpen(true)
+        inputRef.current?.focus()
+        loadOptions(query)
+      }
+    }
+    return kbd.registerLookupTrigger(trigger)
+  }, [kbd, query, loadOptions])
+
   const offerCreate = (text) => {
     setPendingName(text.trim())
     setConfirmOpen(true)
@@ -177,8 +206,29 @@ export default function LookupSelect({
   }
 
   const handleKeyDown = async (e) => {
+    if (open && options.length) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setActiveIndex((i) => (i + 1) % options.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setActiveIndex((i) => (i - 1 + options.length) % options.length)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setOpen(false)
+        return
+      }
+    }
     if (e.key === 'Enter') {
       e.preventDefault()
+      if (open && options[activeIndex]) {
+        pick(options[activeIndex])
+        return
+      }
       await commitValue(query)
     } else if (e.key === 'Tab' && !e.shiftKey) {
       const ok = await commitValue(query, { fromTab: true })
@@ -252,6 +302,9 @@ export default function LookupSelect({
           placeholder={placeholder}
           disabled={disabled}
           readOnly={disabled}
+          data-lookup-type={type}
+          role="combobox"
+          aria-expanded={open}
           onChange={(e) => {
             if (disabled) return
             setQuery(e.target.value)
@@ -282,11 +335,15 @@ export default function LookupSelect({
                   : 'No matches'}
               </li>
             )}
-            {!loading && options.map((opt) => (
+            {!loading && options.map((opt, idx) => (
               <li key={opt}>
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-primary/10 dark:text-slate-100 dark:hover:bg-primary/20"
+                  role="option"
+                  aria-selected={idx === activeIndex}
+                  className={`w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-primary/10 dark:text-slate-100 dark:hover:bg-primary/20 ${
+                    idx === activeIndex ? 'bg-primary/10 dark:bg-primary/20' : ''
+                  }`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => pick(opt)}
                 >

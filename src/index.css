@@ -389,3 +389,14 @@ body {
 body.printing #print-root {
   visibility: visible;
 }
+
+/* Keyboard-first navigation — visible focus indicators (WCAG) */
+[data-kbd-form-root] input:focus-visible,
+[data-kbd-form-root] select:focus-visible,
+[data-kbd-form-root] textarea:focus-visible,
+[data-kbd-grid] input:focus-visible,
+[data-kbd-grid] select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
