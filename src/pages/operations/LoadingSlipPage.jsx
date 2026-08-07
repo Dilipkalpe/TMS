@@ -1,59 +1,105 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Input, { Select, Textarea } from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
+import OpsLrQueueGate from '../../components/ops/OpsLrQueueGate'
 import { OpsFooter, OpsGrid, OpsLrTable, OpsPageHeader, OpsSection, OpsStatusPanel } from '../../components/ops/OpsFormParts'
-import { ClipboardList, Truck, MapPin, User } from 'lucide-react'
-import { useToast } from '../../context/ToastContext'
+import { ClipboardList, Truck, MapPin, User, ArrowLeft } from 'lucide-react'
+import { lrProcessApi } from '../../services/api'
+import { formatLrDate, parsePackagesWeight } from '../../utils/lrDisplayHelpers'
 
-const SAMPLE_LRS = [
-  { lrNumber: 'LR250500101', lrDate: '06/05/2025', customer: 'Swift Industrial', consignee: 'Techno Electricals', destination: 'Nagpur', packages: 12, actualWeight: '980.000', chargedWeight: '1200.000' },
-  { lrNumber: 'LR250500102', lrDate: '06/05/2025', customer: 'Mahesh Industries', consignee: 'Global Traders', destination: 'Nagpur', packages: 10, actualWeight: '850.000', chargedWeight: '1050.000' },
-]
+function mapLrRows(process, lr) {
+  const items = process?.loadingSheet?.items?.length
+    ? process.loadingSheet.items
+    : [{ lrNumber: lr.lrNumber, lrDate: formatLrDate(lr.lrDate), customer: lr.customerName || lr.consignor, consignee: lr.consignee, destination: lr.to, ...parsePackagesWeight(lr.quantity) }]
+  return items.map((i) => ({
+    lrNumber: i.lrNumber,
+    lrDate: i.lrDate || formatLrDate(lr.lrDate),
+    customer: i.customerName || lr.customerName || lr.consignor,
+    consignee: i.consignee || lr.consignee,
+    destination: i.destination || lr.to,
+    packages: i.packages ?? parsePackagesWeight(lr.quantity).packages,
+    actualWeight: i.actualWeight ?? parsePackagesWeight(lr.quantity).weight,
+    chargedWeight: i.chargedWeight ?? parsePackagesWeight(lr.quantity).weight,
+  }))
+}
 
-export default function LoadingSlipPage() {
+function LoadingSlipForm({ lrNumber, lr, process, saving, runSave, onBack }) {
   const navigate = useNavigate()
-  const { toast } = useToast()
-  const [rows, setRows] = useState(SAMPLE_LRS)
+  const sheet = process?.loadingSheet
   const [form, setForm] = useState({
-    slipNo: 'LS250500123', date: '2025-05-06', time: '10:30', branch: 'Pune Main Branch',
-    plannedBy: 'Rohit Sharma', vehicle: 'MH12AB1234', vehicleType: '14 FEET',
-    driver: 'Suresh Patil', driverMobile: '9876543210', transporter: 'Shree Ganesh Transport',
-    tripNo: 'TRP25050045', from: 'Pune Main Branch', to: 'Nagpur Branch',
-    route: 'Pune - Ahmednagar - Aurangabad - Nagpur', expectedDelivery: '2025-05-08',
-    loader: 'Ramesh Yadav', loaderMobile: '9012345678', supervisor: 'Mahesh Kale',
-    supervisorMobile: '9898765432', sealNo: 'SGT125698', remarks: 'All LR scanned and verified.',
+    slipNo: sheet?.sheetNumber || '—',
+    loadingLocation: sheet?.loadingLocation || lr.from || '',
+    loadingStatus: sheet?.loadingStatus || 'Completed',
+    sealNo: sheet?.sealNumber || '',
+    remarks: sheet?.remarks || '',
+    loader: sheet?.loaderName || '',
+    supervisor: sheet?.supervisorName || '',
   })
+  const [rows, setRows] = useState(() => mapLrRows(process, lr))
   const u = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
+  useEffect(() => {
+    setRows(mapLrRows(process, lr))
+    if (process?.loadingSheet) {
+      setForm({
+        slipNo: process.loadingSheet.sheetNumber || '—',
+        loadingLocation: process.loadingSheet.loadingLocation || lr.from || '',
+        loadingStatus: process.loadingSheet.loadingStatus || 'Completed',
+        sealNo: process.loadingSheet.sealNumber || '',
+        remarks: process.loadingSheet.remarks || '',
+        loader: process.loadingSheet.loaderName || '',
+        supervisor: process.loadingSheet.supervisorName || '',
+      })
+    }
+  }, [process, lr])
+
   const totals = useMemo(() => ({
-    packages: rows.reduce((s, r) => s + Number(r.packages), 0),
-    actualWeight: rows.reduce((s, r) => s + parseFloat(r.actualWeight), 0).toFixed(3),
-    chargedWeight: rows.reduce((s, r) => s + parseFloat(r.chargedWeight), 0).toFixed(3),
+    packages: rows.reduce((s, r) => s + Number(r.packages || 0), 0),
+    actualWeight: rows.reduce((s, r) => s + parseFloat(r.actualWeight || 0), 0).toFixed(3),
+    chargedWeight: rows.reduce((s, r) => s + parseFloat(r.chargedWeight || 0), 0).toFixed(3),
   }), [rows])
+
+  const handleSave = () => runSave('Loading slip saved', () =>
+    lrProcessApi.saveLoadingSheet(lrNumber, {
+      loadingLocation: form.loadingLocation,
+      materialQuantity: lr.quantity,
+      loadingStatus: form.loadingStatus,
+      remarks: form.remarks,
+      businessType: process.businessType || lr.businessType,
+      lrNumbers: rows.map((r) => r.lrNumber),
+      vehicleNumber: lr.vehicle,
+      loaderName: form.loader,
+      supervisorName: form.supervisor,
+      sealNumber: form.sealNo,
+      loadingAt: new Date().toISOString(),
+    }))
 
   return (
     <ERPContentPage module="Operations" title="Loading Slip" fillViewport>
       <div className="lr-entry-shell lr-entry-compact" data-kbd-form-root>
-        <OpsPageHeader title="Loading Slip" breadcrumb="Home / Loading Slip / Create" status="LOADING COMPLETED" />
+        <OpsPageHeader
+          title="Loading Slip"
+          breadcrumb={`Home / Loading Slip / ${lrNumber}`}
+          status={lr.status}
+          actions={<Button size="sm" variant="outline" icon={ArrowLeft} onClick={onBack}>Back to list</Button>}
+        />
 
-        <OpsGrid cols={5}>
+        <OpsGrid cols={4}>
           <Input label="Loading Slip No." value={form.slipNo} readOnly />
-          <Input label="Date & Time" type="datetime-local" value={`${form.date}T10:30`} onChange={(e) => u('date', e.target.value.slice(0, 10))} />
-          <Select label="Branch / Warehouse" options={['Pune Main Branch', 'Nagpur Branch']} value={form.branch} onChange={(e) => u('branch', e.target.value)} />
-          <Select label="Planned By" options={['Rohit Sharma', 'Admin User']} value={form.plannedBy} onChange={(e) => u('plannedBy', e.target.value)} />
-          <Input label="Loading Completed" value="06/05/2025 12:45 PM" readOnly />
+          <Input label="LR No." value={lrNumber} readOnly />
+          <Input label="Branch" value={lr.branchName || '—'} readOnly />
+          <Input label="Status" value={lr.status} readOnly />
         </OpsGrid>
 
         <div className="grid shrink-0 gap-1 lg:grid-cols-4">
           <OpsSection title="Vehicle Details" icon={Truck}>
             <OpsGrid cols={2}>
-              <Input label="Vehicle No." value={form.vehicle} onChange={(e) => u('vehicle', e.target.value)} />
-              <Input label="Type" value={form.vehicleType} onChange={(e) => u('vehicleType', e.target.value)} />
-              <Input label="Driver" value={form.driver} onChange={(e) => u('driver', e.target.value)} />
-              <Input label="Mobile" value={form.driverMobile} onChange={(e) => u('driverMobile', e.target.value)} />
-              <Input label="Transporter" className="sm:col-span-2" value={form.transporter} onChange={(e) => u('transporter', e.target.value)} />
+              <Input label="Vehicle No." value={lr.vehicle || '—'} readOnly />
+              <Input label="Driver" value={lr.driver || '—'} readOnly />
+              <Input label="From" value={lr.from || '—'} readOnly />
+              <Input label="To" value={lr.to || '—'} readOnly />
             </OpsGrid>
           </OpsSection>
           <OpsSection title="LR Summary" icon={ClipboardList}>
@@ -64,50 +110,55 @@ export default function LoadingSlipPage() {
               <Input label="Chg. Weight" readOnly value={`${totals.chargedWeight} Kg`} />
             </OpsGrid>
           </OpsSection>
-          <OpsSection title="Trip / Route" icon={MapPin}>
+          <OpsSection title="Loading Details" icon={MapPin}>
             <OpsGrid cols={2}>
-              <Input label="Trip No." value={form.tripNo} onChange={(e) => u('tripNo', e.target.value)} />
-              <Input label="Exp. Delivery" type="date" value={form.expectedDelivery} onChange={(e) => u('expectedDelivery', e.target.value)} />
-              <Input label="From" value={form.from} onChange={(e) => u('from', e.target.value)} />
-              <Input label="To" value={form.to} onChange={(e) => u('to', e.target.value)} />
-              <Input label="Via / Route" className="sm:col-span-2" value={form.route} onChange={(e) => u('route', e.target.value)} />
+              <Input label="Loading Location" value={form.loadingLocation} onChange={(e) => u('loadingLocation', e.target.value)} />
+              <Select label="Loading Status" options={['Pending', 'In Progress', 'Completed']} value={form.loadingStatus} onChange={(e) => u('loadingStatus', e.target.value)} />
             </OpsGrid>
           </OpsSection>
           <OpsSection title="Loader / Supervisor" icon={User}>
             <OpsGrid cols={2}>
               <Input label="Loader" value={form.loader} onChange={(e) => u('loader', e.target.value)} />
-              <Input label="Loader Mobile" value={form.loaderMobile} onChange={(e) => u('loaderMobile', e.target.value)} />
               <Input label="Supervisor" value={form.supervisor} onChange={(e) => u('supervisor', e.target.value)} />
-              <Input label="Sup. Mobile" value={form.supervisorMobile} onChange={(e) => u('supervisorMobile', e.target.value)} />
+              <Input label="Seal No." className="sm:col-span-2" value={form.sealNo} onChange={(e) => u('sealNo', e.target.value)} />
             </OpsGrid>
           </OpsSection>
         </div>
 
         <OpsSection title="LR Details to be Loaded" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <OpsLrTable rows={rows} totals={totals} onRemove={(i) => setRows((r) => r.filter((_, j) => j !== i))} onAdd={() => toast({ title: 'Add LR', message: 'Select from loading pending queue.', type: 'info' })} />
+          <OpsLrTable rows={rows} totals={totals} />
         </OpsSection>
 
-        <OpsGrid cols={3}>
-          <OpsSection title="Loading Checklist">
-            {['All LR verified', 'Vehicle cleaned', 'Seal applied', 'Documents checked'].map((c) => (
-              <label key={c} className="flex items-center gap-1 text-[10px]"><input type="checkbox" defaultChecked className="rounded" /> {c}</label>
-            ))}
-            <Input label="Seal Number" value={form.sealNo} onChange={(e) => u('sealNo', e.target.value)} />
-          </OpsSection>
+        <OpsGrid cols={2}>
           <Textarea label="Loading Notes" rows={2} value={form.remarks} onChange={(e) => u('remarks', e.target.value)} />
-          <OpsSection title="Attachments">
-            <p className="text-[10px] text-slate-500">LR_Summary.pdf · Vehicle_Photo.jpg</p>
-            <Button size="sm" variant="outline" className="mt-1">+ Upload</Button>
-          </OpsSection>
+          <OpsStatusPanel status={form.loadingStatus} rows={[
+            { label: 'Customer', value: lr.customerName || lr.consignor || '—' },
+            { label: 'Consignee', value: lr.consignee || '—' },
+          ]} />
         </OpsGrid>
 
         <OpsFooter
+          saving={saving}
           onCancel={() => navigate('/lr?status=loading-pending')}
-          onSave={() => toast({ title: 'Saved', type: 'success' })}
-          onSavePrint={() => toast({ title: 'Saved & Print', type: 'success' })}
-          extra={<Button size="sm" className="bg-green-600" onClick={() => toast({ title: 'Loading Complete', type: 'success' })}>Loading Complete</Button>}
+          onSave={handleSave}
+          onSavePrint={handleSave}
         />
       </div>
     </ERPContentPage>
+  )
+}
+
+export default function LoadingSlipPage() {
+  return (
+    <OpsLrQueueGate
+      module="Operations"
+      title="Loading Slip"
+      stage="loading-pending"
+      processStep="loading"
+      basePath="/operations/loading-slip"
+      queueHint="Select an LR pending loading to create or update a loading slip (CRUD)."
+    >
+      {(ctx) => <LoadingSlipForm {...ctx} />}
+    </OpsLrQueueGate>
   )
 }

@@ -33,8 +33,6 @@ export const navigation = [
     children: [
       { title: 'Create Invoice', path: '/operations/billing/invoice' },
       { title: 'Invoice Queue', path: '/lr?status=pod-uploaded' },
-      { title: 'Freight Invoices', path: '/accounting/freight-invoices' },
-      { title: 'Accounting Hub', path: '/accounting' },
     ],
   },
   {
@@ -43,7 +41,6 @@ export const navigation = [
     children: [
       { title: 'Add Trip Expenses', path: '/operations/trip-expenses' },
       { title: 'Expense Queue', path: '/lr?status=expense-pending' },
-      { title: 'Expense Approval', path: '/lr/expense-approval' },
     ],
   },
   { title: 'Accounts', path: '/accounting', icon: 'Calculator', feature: 'accounting' },
