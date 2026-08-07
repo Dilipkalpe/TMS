@@ -246,11 +246,6 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
         {activeFilterCount > 0 && (
           <Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>
         )}
-        {!embedded && (
-          <Link to="/lr" className="ml-auto text-xs text-primary hover:underline">
-            Open LR Management workflow →
-          </Link>
-        )}
       </div>
 
       {showFilters && (
@@ -275,7 +270,7 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
         <>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
             <span>Home / LR / LR List</span>
-            <span>F2 New LR · F3 Search · F8 Refresh</span>
+            <span>F2 Add LR · F3 Search · F8 Refresh</span>
           </div>
           <div className="mb-2">
             <StatusSummaryCards cards={kpiCards} />
@@ -286,10 +281,11 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
       <ERPListPage
         module="LR"
         title={embedded ? undefined : undefined}
-        showAdd
-        addLabel="New LR (F2)"
-        addPosition="start"
+        showAdd={!embedded}
+        addLabel="Add LR"
         onAdd={() => navigate('/lr/entry')}
+        secondaryAddLabel="Add Bulk LR"
+        onSecondaryAdd={!embedded ? () => navigate('/lr/bulk') : undefined}
         searchPlaceholder="Search LR, customer, consignee, vehicle, route…"
         filterRow={filterRow}
         columns={columns}

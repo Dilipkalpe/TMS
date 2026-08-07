@@ -21,6 +21,8 @@ export default function ERPListPage({
   addLabel,
   onAdd,
   showAdd = true,
+  secondaryAddLabel,
+  onSecondaryAdd,
   searchPlaceholder = 'Search...',
   searchKeys = [],
   filterOptions = ['(All)'],
@@ -209,6 +211,8 @@ export default function ERPListPage({
           addLabel={addLabel}
           onAdd={onAdd}
           showAdd={showAdd}
+          secondaryAddLabel={secondaryAddLabel}
+          onSecondaryAdd={onSecondaryAdd}
           searchValue={serverMode ? (externalSearch ?? '') : search}
           onSearchChange={handleSearch}
           searchPlaceholder={searchPlaceholder}

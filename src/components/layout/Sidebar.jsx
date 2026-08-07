@@ -21,12 +21,16 @@ function NavItem({ item, collapsed, onNavigate }) {
   const [open, setOpen] = useState(isChildActive)
 
   if (!hasChildren) {
+    const lrHub = item.path === '/lr/list'
+    const isActive = lrHub
+      ? location.pathname === '/lr' || location.pathname === '/lr/list' || location.pathname.startsWith('/lr/')
+      : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
     return (
       <NavLink
         to={item.path}
-        end
+        end={!lrHub}
         onClick={onNavigate}
-        className={({ isActive }) =>
+        className={() =>
           `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
             isActive
               ? 'bg-primary text-white shadow-sm shadow-primary/25 ring-1 ring-accent/30'

@@ -14,6 +14,8 @@ export default function ERPListToolbar({
   addLabel = 'Add New Record',
   onAdd,
   showAdd = true,
+  secondaryAddLabel,
+  onSecondaryAdd,
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Search...',
@@ -35,11 +37,18 @@ export default function ERPListToolbar({
     </Button>
   ) : null
 
+  const secondaryAddButton = onSecondaryAdd ? (
+    <Button variant="outline" icon={Plus} onClick={onSecondaryAdd} className="w-full sm:w-auto">
+      {secondaryAddLabel || 'Add Bulk'}
+    </Button>
+  ) : null
+
   return (
     <div className="shrink-0 space-y-2 border-x border-primary/20 bg-white px-2 py-2 sm:px-3 sm:py-3 dark:bg-slate-900">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {addPosition === 'start' && addButton}
+          {addPosition === 'start' && secondaryAddButton}
           <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input

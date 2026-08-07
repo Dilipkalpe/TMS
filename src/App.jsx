@@ -93,7 +93,8 @@ export default function App() {
         <Route path="lr/expense-approval" element={<LrExpenseApprovalPage />} />
         <Route path="lr/list" element={<LrListPage />} />
         <Route path="lr/entry" element={<LrEntryPage />} />
-        <Route path="lr/ultra-entry" element={<UltraLrEntryPage />} />
+        <Route path="lr/bulk" element={<UltraLrEntryPage />} />
+        <Route path="lr/ultra-entry" element={<Navigate to="/lr/bulk" replace />} />
         <Route path="lr/generate" element={<GenerateLR />} />
         <Route path="lr/expenses/approval" element={<Navigate to="/lr/expense-approval" replace />} />
         <Route path="lr/:lrNumber/process" element={<LRProcessPage />} />

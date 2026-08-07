@@ -57,7 +57,7 @@ export default function UltraLrEntryPage() {
   }, [form, saving])
 
   return (
-    <ERPContentPage module="LR" title="Ultra LR Entry (Fast)" fillViewport>
+    <ERPContentPage module="LR" title="Bulk LR Entry" fillViewport>
       <div ref={formRef} data-kbd-form-root className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LrEntryFormLayout
         ultra

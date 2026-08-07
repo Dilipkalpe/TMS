@@ -5,7 +5,7 @@ export const TMS_MODULES = {
     title: 'LR / Consignment',
     listPath: '/lr/list',
     addPath: '/lr/entry',
-    bulkAddPath: '/lr/ultra-entry',
+    bulkAddPath: '/lr/bulk',
     remark: 'Master shipment document for the transport lifecycle.',
   },
   loadingSlip: {

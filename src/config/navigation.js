@@ -1,68 +1,7 @@
 export const navigation = [
   { title: 'Dashboard', path: '/', icon: 'LayoutDashboard', feature: 'dashboard' },
   { title: 'Booking', path: '/bookings', icon: 'CalendarPlus', feature: 'booking' },
-  {
-    title: 'LR / Consignment',
-    icon: 'FileText',
-    feature: 'lr',
-    children: [
-      { title: 'LR List', path: '/lr/list' },
-      { title: 'LR Entry (Fast)', path: '/lr/entry' },
-      { title: 'Ultra LR Entry', path: '/lr/ultra-entry' },
-      { title: 'LR Management', path: '/lr' },
-      { title: 'Expense Approval', path: '/lr/expense-approval' },
-    ],
-  },
-  {
-    title: 'Loading Slip',
-    icon: 'ClipboardList',
-    feature: 'lr',
-    children: [
-      { title: 'Loading Slip List', path: '/operations/loading-slip/list' },
-      { title: 'Create Loading Slip', path: '/operations/loading-slip' },
-    ],
-  },
-  {
-    title: 'Transit Pass',
-    icon: 'FileBadge',
-    feature: 'lr',
-    children: [
-      { title: 'Transit Pass List', path: '/operations/transit-pass/list' },
-      { title: 'Create Transit Pass', path: '/operations/transit-pass' },
-    ],
-  },
-  { title: 'In Transit', path: '/lr?status=dispatched', icon: 'Truck', feature: 'lr' },
-  {
-    title: 'Delivery / POD',
-    icon: 'PackageCheck',
-    feature: 'lr',
-    children: [
-      { title: 'Delivery Complete List', path: '/operations/delivery-complete/list' },
-      { title: 'Delivery Complete', path: '/operations/delivery-complete' },
-      { title: 'POD List', path: '/operations/delivery/pod/list' },
-      { title: 'POD Entry', path: '/operations/delivery/pod' },
-      { title: 'Delivery Queue', path: '/lr?status=delivered' },
-    ],
-  },
-  {
-    title: 'Billing',
-    icon: 'Receipt',
-    feature: 'accounting',
-    children: [
-      { title: 'Billing List', path: '/operations/billing/list' },
-      { title: 'Create Invoice', path: '/operations/billing/invoice' },
-      { title: 'Invoice Queue', path: '/lr?status=pod-uploaded' },
-    ],
-  },
-  {
-    title: 'Trip Expenses',
-    icon: 'Wallet',
-    children: [
-      { title: 'Trip Expenses List', path: '/operations/trip-expenses/list' },
-      { title: 'Add Trip Expenses', path: '/operations/trip-expenses' },
-      { title: 'Expense Queue', path: '/lr?status=expense-pending' },
-    ],
-  },
+  { title: 'LR / Consignment', path: '/lr/list', icon: 'FileText', feature: 'lr' },
   { title: 'Accounts', path: '/accounting', icon: 'Calculator', feature: 'accounting' },
   {
     title: 'Reports',
