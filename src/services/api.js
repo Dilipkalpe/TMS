@@ -289,6 +289,12 @@ export const lrOperationsApi = {
     apiRequest(`/lr/operations/queue?stage=${encodeURIComponent(stage)}&${new URLSearchParams(params)}`),
 }
 
+export const operationsModulesApi = {
+  summary: (moduleKey) => apiRequest(`/operations/modules/${moduleKey}/summary`),
+  list: (moduleKey, params = {}) =>
+    apiRequest(`/operations/modules/${moduleKey}?${new URLSearchParams(params)}`),
+}
+
 function lrPath(lrNumber, suffix = '') {
   const base = `/lr/${encodeURIComponent(toDocPath(lrNumber))}`
   return suffix ? `${base}/${suffix}` : base

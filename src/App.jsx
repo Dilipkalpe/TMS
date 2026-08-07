@@ -40,6 +40,7 @@ import {
   VehicleHistoryPage, GeofenceManagerPage, GeofenceAlertsPage,
   FuelPage, EpodPage, PodPage, CustomerPortalPage, TripsPage, ShipmentsPage,
   LoadingSlipPage, TransitPassCreatePage, PodEntryPage, CreateInvoicePage, TripExpensesEntryPage,
+  DeliveryCompletePage, TmsModuleListRoute,
   FinanceModulePage, DocumentsPage, NotificationsPage, AnalyticsPage,
   MarketplacePage, WarehousePage, IotPage, AiPage, PlatformHub,
 } from './routes/lazyPages'
@@ -104,10 +105,17 @@ export default function App() {
         <Route path="vehicles/:id" element={<VehicleDetails />} />
         <Route path="maintenance" element={<MaintenancePage />} />
         <Route path="operations" element={<OperationsHub />} />
+        <Route path="operations/loading-slip/list" element={<TmsModuleListRoute module="loading-slip" />} />
         <Route path="operations/loading-slip" element={<LoadingSlipPage />} />
+        <Route path="operations/transit-pass/list" element={<TmsModuleListRoute module="transit-pass" />} />
         <Route path="operations/transit-pass" element={<TransitPassCreatePage />} />
+        <Route path="operations/delivery-complete/list" element={<TmsModuleListRoute module="delivery-complete" />} />
+        <Route path="operations/delivery-complete" element={<DeliveryCompletePage />} />
+        <Route path="operations/delivery/pod/list" element={<TmsModuleListRoute module="pod" />} />
         <Route path="operations/delivery/pod" element={<PodEntryPage />} />
+        <Route path="operations/billing/list" element={<TmsModuleListRoute module="billing" />} />
         <Route path="operations/billing/invoice" element={<CreateInvoicePage />} />
+        <Route path="operations/trip-expenses/list" element={<TmsModuleListRoute module="trip-expenses" />} />
         <Route path="operations/trip-expenses" element={<TripExpensesEntryPage />} />
         <Route path="operations/lr-management" element={<Navigate to="/lr" replace />} />
         <Route path="operations/loading" element={<Navigate to="/operations/loading-slip" replace />} />

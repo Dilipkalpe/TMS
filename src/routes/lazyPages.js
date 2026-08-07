@@ -133,6 +133,8 @@ export const TransitPassCreatePage = lazy(() => import('../pages/operations/Tran
 export const PodEntryPage = lazy(() => import('../pages/operations/PodEntryPage'))
 export const CreateInvoicePage = lazy(() => import('../pages/operations/CreateInvoicePage'))
 export const TripExpensesEntryPage = lazy(() => import('../pages/operations/TripExpensesEntryPage'))
+export const DeliveryCompletePage = lazy(() => import('../pages/operations/DeliveryCompletePage'))
+export const TmsModuleListRoute = lazy(() => import('../pages/operations/modules/TmsModuleListRoute'))
 export const EpodPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.EpodPage })))
 export const PodPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.PodPage })))
 export const CustomerPortalPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.CustomerPortalPage })))

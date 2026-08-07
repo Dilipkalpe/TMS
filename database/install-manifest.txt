@@ -50,6 +50,13 @@ database/routing/schema.sql
 # Booking finance
 database/booking_finance/schema.sql
 
+# LR workflow (loading slip, transit pass, delivery, expenses)
+database/lr/schema.sql
+database/lr/business_type.sql
+database/lr/status_history.sql
+database/lr/module_extensions.sql
+database/lr/consignor_consignee.sql
+
 # Reports
 database/reports/report_indexes.sql
 database/reports/sp_dashboard_stats.sql
