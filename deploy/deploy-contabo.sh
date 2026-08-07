@@ -20,6 +20,9 @@
 #   bash /var/www/tms/deploy/deploy-contabo.sh --smtp
 #   bash /var/www/tms/deploy/deploy-contabo.sh --smtp --smtp-password 'your-app-password'
 #
+# From Windows (PowerShell) — one-liner full deploy:
+#   ssh root@144.91.98.218 "cd /var/www/tms && git checkout -- deploy/ && git pull --ff-only && bash deploy/deploy-contabo.sh"
+#
 # From Windows (PowerShell) — SSH then run:
 #   ssh root@144.91.98.218
 #   bash /var/www/tms/deploy/deploy-contabo.sh
@@ -136,6 +139,8 @@ if [[ "$SKIP_DB" -eq 0 ]]; then
   apply_sql database/settings_document_flow.sql "document_flow"
   apply_sql database/lr/schema.sql "LR process flow (loading sheet, transit pass, delivery, expenses)"
   apply_sql database/lr/business_type.sql "FTL/PTL business type and multi-LR loading"
+  apply_sql database/lr/module_extensions.sql "LR module extension columns"
+  apply_sql database/lr/phase2_extended_data.sql "LR Phase 2 extended_data JSONB"
   apply_sql database/lr/consignor_consignee.sql "Consignor and Consignee masters"
   apply_sql database/lr/status_history.sql "LR status history audit"
 fi
@@ -200,7 +205,7 @@ echo "=============================================="
 echo " DEPLOY_OK"
 echo " Web UI : http://${PUBLIC_IP}:${WEB_PORT}"
 echo " Health : http://${PUBLIC_IP}:${WEB_PORT}/api/health"
-echo " LR flow: http://${PUBLIC_IP}:${WEB_PORT}/lr  (click LR → Process Flow)"
+ echo " LR hub : http://${PUBLIC_IP}:${WEB_PORT}/lr/list  (Add LR · workflow via row actions)"
 echo "=============================================="
 echo ""
 echo "If UI shows old behaviour, hard-refresh browser (Ctrl+Shift+R)."
