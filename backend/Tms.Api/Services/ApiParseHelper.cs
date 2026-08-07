@@ -120,4 +120,23 @@ public static class ApiParseHelper
         var single = val.ToString();
         return string.IsNullOrWhiteSpace(single) ? [] : [single.Trim()];
     }
+
+    public static int? BodyInt(Dictionary<string, object?> body, string key)
+    {
+        var s = BodyString(body, key);
+        return int.TryParse(s, out var n) ? n : null;
+    }
+
+    public static TimeOnly? BodyTime(Dictionary<string, object?> body, string key)
+    {
+        var s = BodyString(body, key);
+        return !string.IsNullOrWhiteSpace(s) && TimeOnly.TryParse(s, out var t) ? t : null;
+    }
+
+    public static string? BodyJsonRaw(Dictionary<string, object?> body, string key)
+    {
+        if (!body.TryGetValue(key, out var val) || val is null) return null;
+        if (val is JsonElement el) return el.GetRawText();
+        return JsonSerializer.Serialize(val);
+    }
 }

@@ -4,29 +4,30 @@ import ERPContentPage from '../../components/ui/ERPContentPage'
 import Input, { Select, Textarea } from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import OpsLrQueueGate from '../../components/ops/OpsLrQueueGate'
-import { OpsFooter, OpsGrid, OpsPageHeader, OpsSection, OpsStatusPanel } from '../../components/ops/OpsFormParts'
+import { OpsFooter, OpsGrid, OpsPageHeader, OpsSection } from '../../components/ops/OpsFormParts'
+import { OpsPhotoGrid, OpsTimeline } from '../../components/ops/OpsPhase2Parts'
 import { PackageCheck, User, ArrowLeft } from 'lucide-react'
 import { lrProcessApi } from '../../services/api'
 import { parsePackagesWeight } from '../../utils/lrDisplayHelpers'
 
-function DeliveryCompleteForm({ lrNumber, lr, process, saving, runSave, onBack }) {
+function DeliveryCompleteForm({ lrNumber, lr, process, saving, runSave, reload, onBack }) {
   const navigate = useNavigate()
   const delivery = process?.deliverySheet
   const pkg = parsePackagesWeight(lr.quantity)
   const [form, setForm] = useState({
-    tripNo: lr.vehicle || '',
+    tripNo: delivery?.tripNo || lr.vehicle || '',
     deliveryDate: delivery?.deliveryDate || new Date().toISOString().slice(0, 10),
-    deliveryTime: '16:35',
+    deliveryTime: delivery?.deliveryTime || '16:35',
     deliveryBranch: lr.branchName || '',
-    packagesTotal: pkg.packages,
-    packagesReceived: pkg.packages,
-    packagesDamaged: 0,
-    actualWeight: pkg.weight,
-    chargedWeight: pkg.weight,
+    packagesTotal: delivery?.packagesTotal ?? pkg.packages,
+    packagesReceived: delivery?.packagesReceived ?? pkg.packages,
+    packagesDamaged: delivery?.packagesDamaged ?? 0,
+    actualWeight: delivery?.actualWeight ?? pkg.weight,
+    chargedWeight: delivery?.chargedWeight ?? pkg.weight,
     deliveryStatus: 'Delivered',
     receiverName: delivery?.receiverName || lr.consignee || '',
-    receiverDesignation: '',
-    receiverMobile: '',
+    receiverDesignation: delivery?.receiverDesignation || '',
+    receiverMobile: delivery?.receiverMobile || '',
     remarks: delivery?.remarks || '',
   })
   const u = (k, v) => setForm((f) => ({ ...f, [k]: v }))
@@ -35,8 +36,17 @@ function DeliveryCompleteForm({ lrNumber, lr, process, saving, runSave, onBack }
     if (delivery) {
       setForm((f) => ({
         ...f,
+        tripNo: delivery.tripNo || f.tripNo,
         deliveryDate: delivery.deliveryDate || f.deliveryDate,
+        deliveryTime: delivery.deliveryTime || f.deliveryTime,
+        packagesTotal: delivery.packagesTotal ?? f.packagesTotal,
+        packagesReceived: delivery.packagesReceived ?? f.packagesReceived,
+        packagesDamaged: delivery.packagesDamaged ?? f.packagesDamaged,
+        actualWeight: delivery.actualWeight ?? f.actualWeight,
+        chargedWeight: delivery.chargedWeight ?? f.chargedWeight,
         receiverName: delivery.receiverName || lr.consignee || '',
+        receiverDesignation: delivery.receiverDesignation || '',
+        receiverMobile: delivery.receiverMobile || '',
         remarks: delivery.remarks || '',
         deliveryStatus: delivery.shipmentStatus === 'Delivered' ? 'Delivered' : f.deliveryStatus,
       }))
@@ -47,10 +57,22 @@ function DeliveryCompleteForm({ lrNumber, lr, process, saving, runSave, onBack }
     lrProcessApi.saveDeliverySheet(lrNumber, {
       shipmentStatus: 'Delivered',
       deliveryDate: form.deliveryDate,
+      deliveryTime: form.deliveryTime,
       deliveryLocation: lr.to,
+      tripNo: form.tripNo,
+      packagesTotal: Number(form.packagesTotal),
+      packagesReceived: Number(form.packagesReceived),
+      packagesDamaged: Number(form.packagesDamaged),
+      actualWeight: Number(form.actualWeight),
+      chargedWeight: Number(form.chargedWeight),
       receiverName: form.receiverName,
+      receiverDesignation: form.receiverDesignation,
+      receiverMobile: form.receiverMobile,
       remarks: form.remarks,
     }))
+
+  const photos = process?.deliveryDocuments || []
+  const timeline = process?.statusHistory || []
 
   return (
     <ERPContentPage module="Operations" title="Delivery Complete" fillViewport>
@@ -103,6 +125,15 @@ function DeliveryCompleteForm({ lrNumber, lr, process, saving, runSave, onBack }
               <Input label="Charged Weight (Kg)" value={form.chargedWeight} onChange={(e) => u('chargedWeight', e.target.value)} />
               <Select label="Delivery Status" options={['Delivered', 'Partial', 'Refused']} value={form.deliveryStatus} onChange={(e) => u('deliveryStatus', e.target.value)} />
             </OpsGrid>
+          </OpsSection>
+        </OpsGrid>
+
+        <OpsGrid cols={2}>
+          <OpsSection title="Delivery Photos">
+            <OpsPhotoGrid lrNumber={lrNumber} photos={photos} uploadFn={lrProcessApi.uploadDeliveryDocument} onUploaded={reload} />
+          </OpsSection>
+          <OpsSection title="Status History">
+            <OpsTimeline rows={timeline} />
           </OpsSection>
         </OpsGrid>
 

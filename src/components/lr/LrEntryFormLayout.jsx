@@ -78,6 +78,7 @@ export const emptyLrEntryForm = () => ({
   paymentType: 'Paid',
   customerName: '',
   remarks: '',
+  ewayBillNo: '',
   attachments: [],
 })
 
@@ -234,6 +235,7 @@ export default function LrEntryFormLayout({
               <Input label="To *" value={form.to} onChange={(e) => update('to', e.target.value)} />
               <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />
               <Input label="Qty/Wt" value={form.quantity} onChange={(e) => update('quantity', e.target.value)} placeholder="pkgs/kg" />
+              <Input label="E-Way Bill No." value={form.ewayBillNo} onChange={(e) => update('ewayBillNo', e.target.value)} />
               <Select label="Freight Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
               <Input label="Freight ₹" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
               <Input label="GST ₹" type="number" value={form.gst} onChange={(e) => update('gst', e.target.value)} />
@@ -381,6 +383,7 @@ export function buildLrApiPayload(form) {
     items: form.items,
     gstPercent: form.gstPercent,
     otherCharges: form.otherCharges,
+    ewayBillNo: form.ewayBillNo,
   }
   const baseRemarks = (form.remarks || '').split('\n__lr_meta__:')[0]
   const remarksExtra = `\n__lr_meta__:${JSON.stringify(meta)}`

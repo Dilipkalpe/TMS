@@ -5,6 +5,7 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import OpsLrQueueGate from '../../components/ops/OpsLrQueueGate'
 import { OpsFooter, OpsGrid, OpsLrTable, OpsPageHeader, OpsSection, OpsStatusPanel } from '../../components/ops/OpsFormParts'
+import { OpsSignaturePad, useOpsExtended } from '../../components/ops/OpsPhase2Parts'
 import { FileBadge, Truck, Route, ArrowLeft } from 'lucide-react'
 import { lrProcessApi } from '../../services/api'
 import { formatLrDate, parsePackagesWeight } from '../../utils/lrDisplayHelpers'
@@ -15,14 +16,17 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
   const navigate = useNavigate()
   const { company, print } = usePrint()
   const pass = process?.transitPass
+  const ext = pass?.extendedData || {}
   const [form, setForm] = useState({
     passNo: pass?.passNumber || '—',
     via: pass?.viaPoints || `${lr.from} - ${lr.to}`,
     sealNo: pass?.sealNumber || '',
     sealCondition: pass?.sealCondition || 'Intact',
     transitType: pass?.transitType || 'By Road',
+    expectedDelivery: pass?.expectedDelivery || '',
     remarks: pass?.remarks || '',
   })
+  const [extended, mergeExt] = useOpsExtended({ signatures: ext.signatures || {} })
   const u = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => {
@@ -33,10 +37,12 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
         sealNo: pass.sealNumber || '',
         sealCondition: pass.sealCondition || 'Intact',
         transitType: pass.transitType || 'By Road',
+        expectedDelivery: pass.expectedDelivery || '',
         remarks: pass.remarks || '',
       })
+      mergeExt({ signatures: pass.extendedData?.signatures || {} })
     }
-  }, [pass, lr])
+  }, [pass, lr]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const items = process?.loadingSheet?.items?.length ? process.loadingSheet.items : [{ lrNumber: lr.lrNumber }]
@@ -61,14 +67,18 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
     chargedWeight: rows.reduce((s, r) => s + parseFloat(r.chargedWeight || 0), 0).toFixed(3),
   }), [rows])
 
+  const payload = () => ({
+    viaPoints: form.via,
+    sealNumber: form.sealNo,
+    sealCondition: form.sealCondition,
+    transitType: form.transitType,
+    expectedDelivery: form.expectedDelivery || undefined,
+    remarks: form.remarks,
+    extendedData: { signatures: extended.signatures },
+  })
+
   const handleSave = () => runSave(pass ? 'Transit pass updated' : 'Transit pass generated', () =>
-    lrProcessApi.createTransitPass(lrNumber, {
-      viaPoints: form.via,
-      sealNumber: form.sealNo,
-      sealCondition: form.sealCondition,
-      transitType: form.transitType,
-      remarks: form.remarks,
-    }))
+    lrProcessApi.createTransitPass(lrNumber, payload()))
 
   const handlePrint = () => {
     if (!process?.transitPass) return
@@ -122,11 +132,12 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
         </OpsGrid>
 
         <OpsSection title="Route & Schedule" icon={Route}>
-          <OpsGrid cols={4}>
+          <OpsGrid cols={5}>
             <Input label="Via / Route" value={form.via} onChange={(e) => u('via', e.target.value)} />
             <Input label="Seal No." value={form.sealNo} onChange={(e) => u('sealNo', e.target.value)} />
             <Select label="Seal Condition" options={['Intact', 'Broken', 'Missing']} value={form.sealCondition} onChange={(e) => u('sealCondition', e.target.value)} />
             <Select label="Transit Type" options={['By Road', 'By Rail', 'Multimodal']} value={form.transitType} onChange={(e) => u('transitType', e.target.value)} />
+            <Input label="Expected Delivery" type="date" value={form.expectedDelivery} onChange={(e) => u('expectedDelivery', e.target.value)} />
           </OpsGrid>
         </OpsSection>
 
@@ -134,7 +145,15 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
           <OpsLrTable rows={rows} totals={totals} />
         </OpsSection>
 
-        <Textarea label="Remarks" rows={2} maxLength={200} value={form.remarks} onChange={(e) => u('remarks', e.target.value)} />
+        <OpsGrid cols={2}>
+          <OpsSection title="Authorization Signatures">
+            <div className="grid gap-1 sm:grid-cols-2">
+              <OpsSignaturePad label="Gate Officer" value={extended.signatures?.gateOfficer} onChange={(v) => mergeExt({ signatures: { ...extended.signatures, gateOfficer: v } })} />
+              <OpsSignaturePad label="Security / Authorizer" value={extended.signatures?.authorizer} onChange={(v) => mergeExt({ signatures: { ...extended.signatures, authorizer: v } })} />
+            </div>
+          </OpsSection>
+          <Textarea label="Remarks" rows={3} maxLength={200} value={form.remarks} onChange={(e) => u('remarks', e.target.value)} />
+        </OpsGrid>
 
         <OpsFooter saving={saving} onCancel={() => navigate('/lr?status=vehicle-assigned')} onSave={handleSave} onSavePrint={() => { handleSave(); handlePrint() }} />
       </div>

@@ -55,6 +55,7 @@ database/lr/schema.sql
 database/lr/business_type.sql
 database/lr/status_history.sql
 database/lr/module_extensions.sql
+database/lr/phase2_extended_data.sql
 database/lr/consignor_consignee.sql
 
 # Reports

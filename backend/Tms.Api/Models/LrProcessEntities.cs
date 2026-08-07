@@ -51,6 +51,11 @@ public class LrLoadingSheet : ITenantScoped
     public DateTime LoadingAt { get; set; }
     public string LoadingStatus { get; set; } = "Completed";
     public string? Remarks { get; set; }
+    public string? LoaderName { get; set; }
+    public string? SupervisorName { get; set; }
+    public string? SealNumber { get; set; }
+    public string? TripNo { get; set; }
+    public string ExtendedDataJson { get; set; } = "{}";
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -84,9 +89,16 @@ public class LrTransitPass : ITenantScoped
     public string RouteTo { get; set; } = "";
     public string? ViaPoints { get; set; }
     public DateOnly IssueDate { get; set; }
+    public string? SealNumber { get; set; }
+    public string? SealCondition { get; set; }
+    public string? TransitType { get; set; }
+    public DateOnly? ExpectedDelivery { get; set; }
+    public string? TripNo { get; set; }
     public string? Remarks { get; set; }
+    public string ExtendedDataJson { get; set; } = "{}";
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class LrDeliverySheet : ITenantScoped
@@ -100,7 +112,20 @@ public class LrDeliverySheet : ITenantScoped
     public DateOnly? DeliveryDate { get; set; }
     public string? DeliveryLocation { get; set; }
     public string? ReceiverName { get; set; }
+    public string? TripNo { get; set; }
+    public TimeOnly? DeliveryTime { get; set; }
+    public int? PackagesTotal { get; set; }
+    public int? PackagesReceived { get; set; }
+    public int? PackagesDamaged { get; set; }
+    public decimal? ActualWeight { get; set; }
+    public decimal? ChargedWeight { get; set; }
+    public string? Condition { get; set; }
+    public string? ReceiverDesignation { get; set; }
+    public string? ReceiverMobile { get; set; }
+    public string? PodNo { get; set; }
+    public string? DeliveryNoteNo { get; set; }
     public string? Remarks { get; set; }
+    public string ExtendedDataJson { get; set; } = "{}";
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -116,12 +141,18 @@ public class LrExpense : ITenantScoped
     public string? Description { get; set; }
     public decimal Amount { get; set; }
     public string? AttachmentUrl { get; set; }
+    public string? BillNo { get; set; }
+    public string? PaymentMode { get; set; }
+    public decimal? AdvanceTaken { get; set; }
+    public decimal? Reimbursed { get; set; }
+    public string ExtendedDataJson { get; set; } = "{}";
     public string Status { get; set; } = "Pending";
     public string? AddedBy { get; set; }
     public string? ApprovedBy { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public string? RejectionRemarks { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class LrStatusHistory : ITenantScoped

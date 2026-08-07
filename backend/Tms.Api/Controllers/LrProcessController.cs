@@ -56,6 +56,19 @@ public class LrProcessController(
             .OrderByDescending(e => e.CreatedAt)
             .Select(e => MapExpense(e))
             .ToListAsync();
+        var statusHistory = await db.LrStatusHistories.AsNoTracking()
+            .Where(h => h.LrNumber == lr.LrNumber && h.CompanyId == lr.CompanyId)
+            .OrderByDescending(h => h.ChangedAt)
+            .Select(h => new
+            {
+                at = h.ChangedAt.ToString("yyyy-MM-dd HH:mm"),
+                status = h.NewStatus,
+                location = lr.ToCity,
+                by = h.ChangedBy,
+                remarks = h.Remarks,
+            })
+            .Take(20)
+            .ToListAsync();
 
         FreightInvoice? invoice = null;
         if (!string.IsNullOrEmpty(lr.BookingId))
@@ -84,6 +97,7 @@ public class LrProcessController(
             transitPass = transit == null ? null : MapTransit(transit, loading?.Items),
             deliverySheet = delivery == null ? null : MapDelivery(delivery),
             deliveryDocuments = docs,
+            statusHistory,
             expenses,
             invoice = invoice == null ? null : new
             {
@@ -186,6 +200,11 @@ public class LrProcessController(
         existing.MaterialQuantity = validation.TotalQuantityTons > 0
             ? $"{validation.TotalQuantityTons:N2} MT"
             : ApiParseHelper.BodyString(body, "materialQuantity") ?? anchor.Quantity;
+        existing.LoaderName = ApiParseHelper.BodyString(body, "loaderName") ?? existing.LoaderName;
+        existing.SupervisorName = ApiParseHelper.BodyString(body, "supervisorName") ?? existing.SupervisorName;
+        existing.SealNumber = ApiParseHelper.BodyString(body, "sealNumber") ?? existing.SealNumber;
+        existing.TripNo = ApiParseHelper.BodyString(body, "tripNo") ?? existing.TripNo;
+        existing.ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? existing.ExtendedDataJson;
         existing.UpdatedAt = DateTime.UtcNow;
 
         var oldItems = await db.LrLoadingSheetItems.Where(i => i.LoadingSheetId == existing.Id).ToListAsync();
@@ -291,6 +310,9 @@ public class LrProcessController(
         if (!hasLoading)
             return BadRequest(new ApiError("Complete loading sheet before generating transit pass."));
 
+        var existing = await db.LrTransitPasses
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+
         var loadingSheet = await db.LrLoadingSheets.AsNoTracking()
             .Include(s => s.Items)
             .Where(s => s.CompanyId == lr.CompanyId &&
@@ -298,9 +320,21 @@ public class LrProcessController(
             .OrderByDescending(s => s.UpdatedAt)
             .FirstOrDefaultAsync();
 
-        var existing = await db.LrTransitPasses
-            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
-        if (existing != null) return Ok(MapTransit(existing));
+        if (existing != null)
+        {
+            existing.ViaPoints = ApiParseHelper.BodyString(body, "viaPoints") ?? existing.ViaPoints;
+            existing.SealNumber = ApiParseHelper.BodyString(body, "sealNumber") ?? existing.SealNumber;
+            existing.SealCondition = ApiParseHelper.BodyString(body, "sealCondition") ?? existing.SealCondition;
+            existing.TransitType = ApiParseHelper.BodyString(body, "transitType") ?? existing.TransitType;
+            existing.ExpectedDelivery = body.ContainsKey("expectedDelivery")
+                ? ApiParseHelper.BodyDate(body, "expectedDelivery", existing.ExpectedDelivery ?? DateOnly.FromDateTime(DateTime.UtcNow))
+                : existing.ExpectedDelivery;
+            existing.Remarks = ApiParseHelper.BodyString(body, "remarks") ?? existing.Remarks;
+            existing.ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? existing.ExtendedDataJson;
+            existing.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            return Ok(MapTransit(existing, loadingSheet?.Items));
+        }
 
         Guid branchId;
         string passNumber;
@@ -328,10 +362,18 @@ public class LrProcessController(
             RouteFrom = ApiParseHelper.BodyString(body, "routeFrom") ?? lr.FromCity,
             RouteTo = ApiParseHelper.BodyString(body, "routeTo") ?? lr.ToCity,
             ViaPoints = ApiParseHelper.BodyString(body, "viaPoints"),
+            SealNumber = ApiParseHelper.BodyString(body, "sealNumber"),
+            SealCondition = ApiParseHelper.BodyString(body, "sealCondition") ?? "Intact",
+            TransitType = ApiParseHelper.BodyString(body, "transitType") ?? "By Road",
+            ExpectedDelivery = body.ContainsKey("expectedDelivery")
+                ? ApiParseHelper.BodyDate(body, "expectedDelivery", DateOnly.FromDateTime(DateTime.UtcNow))
+                : null,
             IssueDate = ApiParseHelper.BodyDate(body, "issueDate", DateOnly.FromDateTime(DateTime.UtcNow)),
             Remarks = ApiParseHelper.BodyString(body, "remarks"),
+            ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? "{}",
             CreatedBy = CurrentUser(),
             CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
         };
         db.LrTransitPasses.Add(pass);
 
@@ -499,7 +541,24 @@ public class LrProcessController(
             : existing.DeliveryDate;
         existing.DeliveryLocation = ApiParseHelper.BodyString(body, "deliveryLocation") ?? lr.ToCity;
         existing.ReceiverName = ApiParseHelper.BodyString(body, "receiverName") ?? lr.Consignee;
+        existing.TripNo = ApiParseHelper.BodyString(body, "tripNo") ?? existing.TripNo;
+        existing.DeliveryTime = ApiParseHelper.BodyTime(body, "deliveryTime") ?? existing.DeliveryTime;
+        existing.PackagesTotal = ApiParseHelper.BodyInt(body, "packagesTotal") ?? existing.PackagesTotal;
+        existing.PackagesReceived = ApiParseHelper.BodyInt(body, "packagesReceived") ?? existing.PackagesReceived;
+        existing.PackagesDamaged = ApiParseHelper.BodyInt(body, "packagesDamaged") ?? existing.PackagesDamaged;
+        existing.ActualWeight = body.ContainsKey("actualWeight")
+            ? ApiParseHelper.BodyDecimal(body, "actualWeight")
+            : existing.ActualWeight;
+        existing.ChargedWeight = body.ContainsKey("chargedWeight")
+            ? ApiParseHelper.BodyDecimal(body, "chargedWeight")
+            : existing.ChargedWeight;
+        existing.Condition = ApiParseHelper.BodyString(body, "condition") ?? existing.Condition;
+        existing.ReceiverDesignation = ApiParseHelper.BodyString(body, "receiverDesignation") ?? existing.ReceiverDesignation;
+        existing.ReceiverMobile = ApiParseHelper.BodyString(body, "receiverMobile") ?? existing.ReceiverMobile;
+        existing.PodNo = ApiParseHelper.BodyString(body, "podNo") ?? existing.PodNo;
+        existing.DeliveryNoteNo = ApiParseHelper.BodyString(body, "deliveryNoteNo") ?? existing.DeliveryNoteNo;
         existing.Remarks = ApiParseHelper.BodyString(body, "remarks");
+        existing.ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? existing.ExtendedDataJson;
         existing.UpdatedAt = DateTime.UtcNow;
 
         lr.Status = shipmentStatus switch
@@ -561,10 +620,16 @@ public class LrProcessController(
             Category = category,
             Description = ApiParseHelper.BodyString(body, "description"),
             Amount = amount,
+            BillNo = ApiParseHelper.BodyString(body, "billNo"),
+            PaymentMode = ApiParseHelper.BodyString(body, "paymentMode"),
+            AdvanceTaken = body.ContainsKey("advanceTaken") ? ApiParseHelper.BodyDecimal(body, "advanceTaken") : null,
+            Reimbursed = body.ContainsKey("reimbursed") ? ApiParseHelper.BodyDecimal(body, "reimbursed") : null,
             AttachmentUrl = ApiParseHelper.BodyString(body, "attachmentUrl"),
+            ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? "{}",
             Status = "Pending",
             AddedBy = CurrentUser(),
             CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
         };
         db.LrExpenses.Add(expense);
         lr.Status = LrStatuses.ExpenseAdded;
@@ -724,6 +789,9 @@ public class LrProcessController(
                 freight = built.Freight,
                 taxableAmount = taxable,
                 gstAmount = gst,
+                lineItems = ApiParseHelper.BodyJsonRaw(body, "lineItems"),
+                amountInWords = ApiParseHelper.BodyString(body, "amountInWords"),
+                paymentDetails = ApiParseHelper.BodyJsonRaw(body, "paymentDetails"),
             };
         }
         else
@@ -741,6 +809,9 @@ public class LrProcessController(
                 freight = lr.Freight,
                 taxableAmount = taxable,
                 gstAmount = gst,
+                lineItems = ApiParseHelper.BodyJsonRaw(body, "lineItems"),
+                amountInWords = ApiParseHelper.BodyString(body, "amountInWords"),
+                paymentDetails = ApiParseHelper.BodyJsonRaw(body, "paymentDetails"),
             };
         }
 
@@ -828,10 +899,18 @@ public class LrProcessController(
         return Ok(new { lrNumber = lr.LrNumber, status = lr.Status });
     }
 
+    static object? ParseExtendedJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "{}") return null;
+        try { return JsonSerializer.Deserialize<JsonElement>(json); }
+        catch { return null; }
+    }
+
     static object MapLoading(LrLoadingSheet s) => new
     {
         s.Id,
         s.SheetNumber,
+        sheetNumber = s.SheetNumber,
         s.BusinessType,
         s.VehicleId,
         s.VehicleNumber,
@@ -843,6 +922,11 @@ public class LrProcessController(
         loadingAt = s.LoadingAt.ToString("O"),
         s.LoadingStatus,
         s.Remarks,
+        loaderName = s.LoaderName,
+        supervisorName = s.SupervisorName,
+        sealNumber = s.SealNumber,
+        tripNo = s.TripNo,
+        extendedData = ParseExtendedJson(s.ExtendedDataJson),
         s.CreatedBy,
         items = s.Items.OrderBy(i => i.SortOrder).Select(i => new
         {
@@ -858,15 +942,21 @@ public class LrProcessController(
     {
         p.Id,
         p.PassNumber,
+        passNumber = p.PassNumber,
         p.VehicleNumber,
         p.DriverName,
         routeFrom = p.RouteFrom,
         routeTo = p.RouteTo,
         p.ViaPoints,
+        sealNumber = p.SealNumber,
+        sealCondition = p.SealCondition,
+        transitType = p.TransitType,
+        expectedDelivery = p.ExpectedDelivery?.ToString("yyyy-MM-dd"),
         issueDate = p.IssueDate.ToString("yyyy-MM-dd"),
         p.Remarks,
         p.CreatedBy,
         p.LoadingSheetId,
+        extendedData = ParseExtendedJson(p.ExtendedDataJson),
         lrNumbers = items?.Select(i => i.LrNumber).ToList() ?? [p.LrNumber],
     };
 
@@ -878,7 +968,20 @@ public class LrProcessController(
         deliveryDate = s.DeliveryDate?.ToString("yyyy-MM-dd"),
         s.DeliveryLocation,
         s.ReceiverName,
+        tripNo = s.TripNo,
+        deliveryTime = s.DeliveryTime?.ToString("HH:mm"),
+        packagesTotal = s.PackagesTotal,
+        packagesReceived = s.PackagesReceived,
+        packagesDamaged = s.PackagesDamaged,
+        actualWeight = s.ActualWeight,
+        chargedWeight = s.ChargedWeight,
+        condition = s.Condition,
+        receiverDesignation = s.ReceiverDesignation,
+        receiverMobile = s.ReceiverMobile,
+        podNo = s.PodNo,
+        deliveryNoteNo = s.DeliveryNoteNo,
         s.Remarks,
+        extendedData = ParseExtendedJson(s.ExtendedDataJson),
         s.CreatedBy,
     };
 
@@ -890,7 +993,12 @@ public class LrProcessController(
         e.Category,
         e.Description,
         e.Amount,
+        billNo = e.BillNo,
+        paymentMode = e.PaymentMode,
+        advanceTaken = e.AdvanceTaken,
+        reimbursed = e.Reimbursed,
         e.AttachmentUrl,
+        extendedData = ParseExtendedJson(e.ExtendedDataJson),
         e.Status,
         e.AddedBy,
         e.ApprovedBy,

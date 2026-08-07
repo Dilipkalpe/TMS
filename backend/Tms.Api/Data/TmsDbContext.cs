@@ -1194,6 +1194,11 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.LoadingAt).HasColumnName("loading_at");
             e.Property(x => x.LoadingStatus).HasColumnName("loading_status");
             e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.LoaderName).HasColumnName("loader_name");
+            e.Property(x => x.SupervisorName).HasColumnName("supervisor_name");
+            e.Property(x => x.SealNumber).HasColumnName("seal_number");
+            e.Property(x => x.TripNo).HasColumnName("trip_no");
+            e.Property(x => x.ExtendedDataJson).HasColumnName("extended_data").HasColumnType("jsonb");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -1228,9 +1233,16 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.RouteTo).HasColumnName("route_to");
             e.Property(x => x.ViaPoints).HasColumnName("via_points");
             e.Property(x => x.IssueDate).HasColumnName("issue_date");
+            e.Property(x => x.SealNumber).HasColumnName("seal_number");
+            e.Property(x => x.SealCondition).HasColumnName("seal_condition");
+            e.Property(x => x.TransitType).HasColumnName("transit_type");
+            e.Property(x => x.ExpectedDelivery).HasColumnName("expected_delivery");
+            e.Property(x => x.TripNo).HasColumnName("trip_no");
             e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.ExtendedDataJson).HasColumnName("extended_data").HasColumnType("jsonb");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<LrDeliverySheet>(e =>
@@ -1245,7 +1257,20 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.DeliveryDate).HasColumnName("delivery_date");
             e.Property(x => x.DeliveryLocation).HasColumnName("delivery_location");
             e.Property(x => x.ReceiverName).HasColumnName("receiver_name");
+            e.Property(x => x.TripNo).HasColumnName("trip_no");
+            e.Property(x => x.DeliveryTime).HasColumnName("delivery_time");
+            e.Property(x => x.PackagesTotal).HasColumnName("packages_total");
+            e.Property(x => x.PackagesReceived).HasColumnName("packages_received");
+            e.Property(x => x.PackagesDamaged).HasColumnName("packages_damaged");
+            e.Property(x => x.ActualWeight).HasColumnName("actual_weight");
+            e.Property(x => x.ChargedWeight).HasColumnName("charged_weight");
+            e.Property(x => x.Condition).HasColumnName("condition");
+            e.Property(x => x.ReceiverDesignation).HasColumnName("receiver_designation");
+            e.Property(x => x.ReceiverMobile).HasColumnName("receiver_mobile");
+            e.Property(x => x.PodNo).HasColumnName("pod_no");
+            e.Property(x => x.DeliveryNoteNo).HasColumnName("delivery_note_no");
             e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.ExtendedDataJson).HasColumnName("extended_data").HasColumnType("jsonb");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -1262,12 +1287,18 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Description).HasColumnName("description");
             e.Property(x => x.Amount).HasColumnName("amount");
             e.Property(x => x.AttachmentUrl).HasColumnName("attachment_url");
+            e.Property(x => x.BillNo).HasColumnName("bill_no");
+            e.Property(x => x.PaymentMode).HasColumnName("payment_mode");
+            e.Property(x => x.AdvanceTaken).HasColumnName("advance_taken");
+            e.Property(x => x.Reimbursed).HasColumnName("reimbursed");
+            e.Property(x => x.ExtendedDataJson).HasColumnName("extended_data").HasColumnType("jsonb");
             e.Property(x => x.Status).HasColumnName("status");
             e.Property(x => x.AddedBy).HasColumnName("added_by");
             e.Property(x => x.ApprovedBy).HasColumnName("approved_by");
             e.Property(x => x.ApprovedAt).HasColumnName("approved_at");
             e.Property(x => x.RejectionRemarks).HasColumnName("rejection_remarks");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<LrStatusHistory>(e =>

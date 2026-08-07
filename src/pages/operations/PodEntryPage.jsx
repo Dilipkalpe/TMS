@@ -5,26 +5,35 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import OpsLrQueueGate from '../../components/ops/OpsLrQueueGate'
 import { OpsFooter, OpsGrid, OpsPageHeader, OpsSection, OpsStatusPanel } from '../../components/ops/OpsFormParts'
+import { OpsAttachments, OpsPhotoGrid, OpsSignaturePad, useOpsExtended } from '../../components/ops/OpsPhase2Parts'
 import { PackageCheck, MapPin, User, ArrowLeft } from 'lucide-react'
 import { lrProcessApi } from '../../services/api'
 import { parsePackagesWeight } from '../../utils/lrDisplayHelpers'
 
 const SHIPMENT_STATUSES = ['In Transit', 'Delivered', 'POD Received', 'Closed']
 
-function PodEntryForm({ lrNumber, lr, process, saving, runSave, onBack }) {
+function PodEntryForm({ lrNumber, lr, process, saving, runSave, reload, onBack }) {
   const navigate = useNavigate()
   const delivery = process?.deliverySheet
+  const ext = delivery?.extendedData || {}
   const pkg = parsePackagesWeight(lr.quantity)
   const [form, setForm] = useState({
     deliveryDate: delivery?.deliveryDate || new Date().toISOString().slice(0, 10),
     deliveryLocation: delivery?.deliveryLocation || lr.to || '',
     receiverName: delivery?.receiverName || lr.consignee || '',
-    shipmentStatus: delivery?.shipmentStatus || 'Delivered',
+    podNo: delivery?.podNo || '',
+    deliveryNoteNo: delivery?.deliveryNoteNo || '',
+    shipmentStatus: delivery?.shipmentStatus || 'POD Received',
     remarks: delivery?.remarks || '',
-    packages: pkg.packages,
-    actualWeight: pkg.weight,
-    chargedWeight: pkg.weight,
-    condition: 'Good',
+    packages: delivery?.packagesTotal ?? pkg.packages,
+    actualWeight: delivery?.actualWeight ?? pkg.weight,
+    chargedWeight: delivery?.chargedWeight ?? pkg.weight,
+    condition: delivery?.condition || 'Good',
+    receiverStamp: ext.receiverStamp || '',
+  })
+  const [extended, mergeExt] = useOpsExtended({
+    signatures: ext.signatures || {},
+    receiverStamp: ext.receiverStamp || '',
   })
   const u = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -35,11 +44,21 @@ function PodEntryForm({ lrNumber, lr, process, saving, runSave, onBack }) {
         deliveryDate: delivery.deliveryDate || f.deliveryDate,
         deliveryLocation: delivery.deliveryLocation || lr.to || '',
         receiverName: delivery.receiverName || lr.consignee || '',
-        shipmentStatus: delivery.shipmentStatus || 'Delivered',
+        podNo: delivery.podNo || '',
+        deliveryNoteNo: delivery.deliveryNoteNo || '',
+        shipmentStatus: delivery.shipmentStatus || 'POD Received',
         remarks: delivery.remarks || '',
+        packages: delivery.packagesTotal ?? f.packages,
+        actualWeight: delivery.actualWeight ?? f.actualWeight,
+        chargedWeight: delivery.chargedWeight ?? f.chargedWeight,
+        condition: delivery.condition || f.condition,
       }))
+      mergeExt({
+        signatures: delivery.extendedData?.signatures || {},
+        receiverStamp: delivery.extendedData?.receiverStamp || '',
+      })
     }
-  }, [delivery, lr])
+  }, [delivery, lr]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = () => runSave('POD / delivery saved', () =>
     lrProcessApi.saveDeliverySheet(lrNumber, {
@@ -47,8 +66,17 @@ function PodEntryForm({ lrNumber, lr, process, saving, runSave, onBack }) {
       deliveryDate: form.deliveryDate,
       deliveryLocation: form.deliveryLocation,
       receiverName: form.receiverName,
+      podNo: form.podNo,
+      deliveryNoteNo: form.deliveryNoteNo,
+      condition: form.condition,
+      packagesTotal: Number(form.packages),
+      actualWeight: Number(form.actualWeight),
+      chargedWeight: Number(form.chargedWeight),
       remarks: form.remarks,
+      extendedData: { signatures: extended.signatures, receiverStamp: extended.receiverStamp },
     }))
+
+  const docs = process?.deliveryDocuments || []
 
   return (
     <ERPContentPage module="Operations" title="POD (Proof of Delivery)" fillViewport>
@@ -62,16 +90,17 @@ function PodEntryForm({ lrNumber, lr, process, saving, runSave, onBack }) {
 
         <div className="grid shrink-0 gap-1 lg:grid-cols-[1fr_11rem]">
           <OpsSection title="POD Information" icon={PackageCheck}>
-            <OpsGrid cols={4}>
+            <OpsGrid cols={5}>
               <Input label="LR No." value={lrNumber} readOnly />
+              <Input label="POD No." value={form.podNo} onChange={(e) => u('podNo', e.target.value)} />
+              <Input label="Delivery Note No." value={form.deliveryNoteNo} onChange={(e) => u('deliveryNoteNo', e.target.value)} />
               <Input label="Delivery Date" type="date" value={form.deliveryDate} onChange={(e) => u('deliveryDate', e.target.value)} />
               <Select label="Delivery Status" options={SHIPMENT_STATUSES} value={form.shipmentStatus} onChange={(e) => u('shipmentStatus', e.target.value)} />
-              <Input label="Vehicle" value={lr.vehicle || '—'} readOnly />
             </OpsGrid>
           </OpsSection>
           <OpsStatusPanel status={form.shipmentStatus} rows={[
             { label: 'LR Status', value: lr.status },
-            { label: 'Freight', value: lr.paymentType || '—' },
+            { label: 'Vehicle', value: lr.vehicle || '—' },
           ]} />
         </div>
 
@@ -80,6 +109,7 @@ function PodEntryForm({ lrNumber, lr, process, saving, runSave, onBack }) {
             <OpsGrid cols={2}>
               <Input label="Consignee" value={lr.consignee || '—'} readOnly />
               <Input label="Customer" value={lr.customerName || lr.consignor || '—'} readOnly />
+              <Input label="Receiver Name" value={form.receiverName} onChange={(e) => u('receiverName', e.target.value)} />
             </OpsGrid>
           </OpsSection>
           <OpsSection title="Delivery Location" icon={MapPin}>
@@ -97,10 +127,23 @@ function PodEntryForm({ lrNumber, lr, process, saving, runSave, onBack }) {
           <Select label="Condition" options={['Good', 'Damaged', 'Short']} value={form.condition} onChange={(e) => u('condition', e.target.value)} />
         </OpsGrid>
 
-        <OpsGrid cols={2}>
-          <Input label="Receiver Name" value={form.receiverName} onChange={(e) => u('receiverName', e.target.value)} />
-          <Textarea label="Remarks / Delivery Note" rows={2} maxLength={200} value={form.remarks} onChange={(e) => u('remarks', e.target.value)} />
+        <OpsGrid cols={3}>
+          <OpsSection title="Receiver Signature">
+            <OpsSignaturePad label="Receiver Signature" value={extended.signatures?.receiver} onChange={(v) => mergeExt({ signatures: { ...extended.signatures, receiver: v } })} />
+          </OpsSection>
+          <OpsSection title="Company Stamp">
+            <OpsSignaturePad label="Stamp / Seal" value={extended.receiverStamp} onChange={(v) => mergeExt({ receiverStamp: v })} height={80} />
+          </OpsSection>
+          <OpsSection title="Delivery Photos">
+            <OpsPhotoGrid lrNumber={lrNumber} photos={docs} uploadFn={lrProcessApi.uploadDeliveryDocument} onUploaded={reload} />
+          </OpsSection>
         </OpsGrid>
+
+        <OpsSection title="POD Attachments">
+          <OpsAttachments lrNumber={lrNumber} documents={docs.filter((d) => d.docType === 'POD')} docType="POD" uploadFn={lrProcessApi.uploadDeliveryDocument} onUploaded={reload} />
+        </OpsSection>
+
+        <Textarea label="Remarks / Delivery Note" rows={2} maxLength={200} value={form.remarks} onChange={(e) => u('remarks', e.target.value)} />
 
         <OpsFooter saving={saving} onCancel={() => navigate('/lr?status=delivered')} onSave={handleSave} onSavePrint={handleSave} />
       </div>

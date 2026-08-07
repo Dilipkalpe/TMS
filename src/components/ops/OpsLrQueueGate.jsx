@@ -145,6 +145,7 @@ export default function OpsLrQueueGate({
     ...ctx,
     saving,
     runSave,
+    reload,
     onBack: clearLr,
     openProcess: () => navigate(lrProcessPath(lrNumber, processStep)),
     basePath,

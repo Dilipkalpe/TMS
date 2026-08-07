@@ -5,7 +5,10 @@ import Input, { Select, Textarea } from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import OpsLrQueueGate from '../../components/ops/OpsLrQueueGate'
 import { OpsFooter, OpsGrid, OpsLrTable, OpsPageHeader, OpsSection, OpsStatusPanel } from '../../components/ops/OpsFormParts'
-import { ClipboardList, Truck, MapPin, User, ArrowLeft } from 'lucide-react'
+import {
+  LOADING_CHECKLIST, OpsAttachments, OpsChecklist, OpsSignaturePad, useOpsExtended,
+} from '../../components/ops/OpsPhase2Parts'
+import { ClipboardList, Truck, MapPin, User, ArrowLeft, Plus } from 'lucide-react'
 import { lrProcessApi } from '../../services/api'
 import { formatLrDate, parsePackagesWeight } from '../../utils/lrDisplayHelpers'
 
@@ -25,9 +28,10 @@ function mapLrRows(process, lr) {
   }))
 }
 
-function LoadingSlipForm({ lrNumber, lr, process, saving, runSave, onBack }) {
+function LoadingSlipForm({ lrNumber, lr, process, saving, runSave, reload, onBack }) {
   const navigate = useNavigate()
   const sheet = process?.loadingSheet
+  const ext = sheet?.extendedData || {}
   const [form, setForm] = useState({
     slipNo: sheet?.sheetNumber || '—',
     loadingLocation: sheet?.loadingLocation || lr.from || '',
@@ -38,28 +42,45 @@ function LoadingSlipForm({ lrNumber, lr, process, saving, runSave, onBack }) {
     supervisor: sheet?.supervisorName || '',
   })
   const [rows, setRows] = useState(() => mapLrRows(process, lr))
+  const [extended, mergeExt] = useOpsExtended({
+    checklist: ext.checklist || {},
+    signatures: ext.signatures || {},
+  })
+  const [addLr, setAddLr] = useState('')
   const u = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => {
     setRows(mapLrRows(process, lr))
-    if (process?.loadingSheet) {
+    const s = process?.loadingSheet
+    if (s) {
       setForm({
-        slipNo: process.loadingSheet.sheetNumber || '—',
-        loadingLocation: process.loadingSheet.loadingLocation || lr.from || '',
-        loadingStatus: process.loadingSheet.loadingStatus || 'Completed',
-        sealNo: process.loadingSheet.sealNumber || '',
-        remarks: process.loadingSheet.remarks || '',
-        loader: process.loadingSheet.loaderName || '',
-        supervisor: process.loadingSheet.supervisorName || '',
+        slipNo: s.sheetNumber || '—',
+        loadingLocation: s.loadingLocation || lr.from || '',
+        loadingStatus: s.loadingStatus || 'Completed',
+        sealNo: s.sealNumber || '',
+        remarks: s.remarks || '',
+        loader: s.loaderName || '',
+        supervisor: s.supervisorName || '',
+      })
+      mergeExt({
+        checklist: s.extendedData?.checklist || {},
+        signatures: s.extendedData?.signatures || {},
       })
     }
-  }, [process, lr])
+  }, [process, lr]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const totals = useMemo(() => ({
     packages: rows.reduce((s, r) => s + Number(r.packages || 0), 0),
     actualWeight: rows.reduce((s, r) => s + parseFloat(r.actualWeight || 0), 0).toFixed(3),
     chargedWeight: rows.reduce((s, r) => s + parseFloat(r.chargedWeight || 0), 0).toFixed(3),
   }), [rows])
+
+  const addRow = () => {
+    const num = addLr.trim()
+    if (!num || rows.some((r) => r.lrNumber === num)) return
+    setRows([...rows, { lrNumber: num, lrDate: '—', customer: '—', consignee: '—', destination: '—', packages: 0, actualWeight: 0, chargedWeight: 0 }])
+    setAddLr('')
+  }
 
   const handleSave = () => runSave('Loading slip saved', () =>
     lrProcessApi.saveLoadingSheet(lrNumber, {
@@ -74,7 +95,10 @@ function LoadingSlipForm({ lrNumber, lr, process, saving, runSave, onBack }) {
       supervisorName: form.supervisor,
       sealNumber: form.sealNo,
       loadingAt: new Date().toISOString(),
+      extendedData: { checklist: extended.checklist, signatures: extended.signatures },
     }))
+
+  const docs = process?.deliveryDocuments || []
 
   return (
     <ERPContentPage module="Operations" title="Loading Slip" fillViewport>
@@ -125,9 +149,30 @@ function LoadingSlipForm({ lrNumber, lr, process, saving, runSave, onBack }) {
           </OpsSection>
         </div>
 
-        <OpsSection title="LR Details to be Loaded" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <OpsSection title="LR Details to be Loaded" className="flex min-h-0 flex-1 flex-col overflow-hidden"
+          action={
+            <div className="flex items-center gap-1">
+              <Input className="!py-0.5" placeholder="Add LR No." value={addLr} onChange={(e) => setAddLr(e.target.value)} />
+              <Button size="sm" icon={Plus} onClick={addRow}>Add</Button>
+            </div>
+          }>
           <OpsLrTable rows={rows} totals={totals} />
         </OpsSection>
+
+        <OpsGrid cols={3}>
+          <OpsSection title="Loading Checklist">
+            <OpsChecklist items={LOADING_CHECKLIST} values={extended.checklist} onChange={(v) => mergeExt({ checklist: v })} />
+          </OpsSection>
+          <OpsSection title="Signatures">
+            <div className="grid gap-1 sm:grid-cols-2">
+              <OpsSignaturePad label="Loader Signature" value={extended.signatures?.loader} onChange={(v) => mergeExt({ signatures: { ...extended.signatures, loader: v } })} />
+              <OpsSignaturePad label="Supervisor Signature" value={extended.signatures?.supervisor} onChange={(v) => mergeExt({ signatures: { ...extended.signatures, supervisor: v } })} />
+            </div>
+          </OpsSection>
+          <OpsSection title="Attachments">
+            <OpsAttachments lrNumber={lrNumber} documents={docs.filter((d) => d.docType?.includes('Loading'))} docType="Loading Document" uploadFn={lrProcessApi.uploadDeliveryDocument} onUploaded={reload} />
+          </OpsSection>
+        </OpsGrid>
 
         <OpsGrid cols={2}>
           <Textarea label="Loading Notes" rows={2} value={form.remarks} onChange={(e) => u('remarks', e.target.value)} />
@@ -137,12 +182,7 @@ function LoadingSlipForm({ lrNumber, lr, process, saving, runSave, onBack }) {
           ]} />
         </OpsGrid>
 
-        <OpsFooter
-          saving={saving}
-          onCancel={() => navigate('/lr?status=loading-pending')}
-          onSave={handleSave}
-          onSavePrint={handleSave}
-        />
+        <OpsFooter saving={saving} onCancel={() => navigate('/lr?status=loading-pending')} onSave={handleSave} onSavePrint={handleSave} />
       </div>
     </ERPContentPage>
   )
