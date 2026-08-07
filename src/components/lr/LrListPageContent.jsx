@@ -1,149 +1,145 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  Columns3, Download, Eye, Filter, MoreVertical, Plus, Printer, RefreshCw, Search as SearchIcon,
-} from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronUp, Filter } from 'lucide-react'
 import Button from '../ui/Button'
 import Badge from '../ui/Badge'
-import Card from '../ui/Card'
 import Input, { Select } from '../ui/Input'
 import ERPListPage from '../ui/ERPListPage'
-import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
+import StatusSummaryCards from '../ui/StatusSummaryCards'
+import { usePagedApiResource } from '../../hooks/usePagedApiResource'
+import { useKeyboardPageActions } from '../../hooks/useKeyboardPageActions'
 import { lrApi, lrOperationsApi } from '../../services/api'
-import { lrDetailPath, lrEditPath } from '../../utils/docPath'
+import { lrDetailPath, lrEditPath, lrProcessPath } from '../../utils/docPath'
 import {
   formatLrDate, lrBillingStatus, lrDeliveryStatus, lrPodStatus, lrTotalAmount, parsePackagesWeight,
 } from '../../utils/lrDisplayHelpers'
 import { formatCurrency } from '../ui/ReportFilters'
 import { usePrint } from '../../context/PrintContext'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 import LRPrintFormat from '../print/LRPrintFormat'
+import { LR_STATUS_STEPS } from '../../constants/lrStatusFlow'
+import { LR_KPI_CARDS, defaultDetailSectionForStatus, lrRowActions } from '../../constants/lrStatusNavigation'
 
-const STATUS_OPTIONS = ['(All)', 'LR Created', 'Loading Completed', 'In Transit', 'Delivery Completed', 'POD Uploaded', 'Invoice Generated', 'Closed']
+const STATUS_OPTIONS = ['(All)', ...LR_STATUS_STEPS]
 const BOOKING_TYPES = ['(All)', 'FTL', 'PTL']
 const FREIGHT_TYPES = ['(All)', 'To Pay', 'Paid', 'TBB', 'To Be Billed']
 
-function KpiCard({ label, value, sub, color, icon: Icon }) {
-  const colors = {
-    blue: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200',
-    orange: 'border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-900 dark:bg-orange-950/40',
-    green: 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40',
-    violet: 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-900 dark:bg-violet-950/40',
-    cyan: 'border-cyan-200 bg-cyan-50 text-cyan-900 dark:border-cyan-900 dark:bg-cyan-950/40',
-  }
-  return (
-    <div className={`rounded-xl border p-4 ${colors[color]}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium opacity-80">{label}</p>
-          <p className="mt-1 text-2xl font-bold">{value}</p>
-          {sub && <p className="mt-0.5 text-[11px] opacity-70">{sub}</p>}
-        </div>
-        {Icon && <Icon className="h-8 w-8 opacity-40" />}
-      </div>
-    </div>
-  )
+const EMPTY_FILTERS = {
+  dateFrom: '',
+  dateTo: '',
+  status: '(All)',
+  bookingType: '(All)',
+  freightType: '(All)',
+}
+
+function buildLrListParams({ page, pageSize, search, filters }) {
+  const params = { page, pageSize, includeTotal: page === 1 }
+  if (search?.trim()) params.search = search.trim()
+  if (filters.status && filters.status !== '(All)') params.status = filters.status
+  if (filters.freightType && filters.freightType !== '(All)') params.paymentType = filters.freightType
+  if (filters.bookingType && filters.bookingType !== '(All)') params.businessType = filters.bookingType
+  if (filters.dateFrom) params.dateFrom = filters.dateFrom
+  if (filters.dateTo) params.dateTo = filters.dateTo
+  return params
 }
 
 export default function LrListPageContent({ embedded = false, onChanged }) {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { company, print } = usePrint()
+  const { user } = useAuth()
   const [summary, setSummary] = useState({})
-  const [filters, setFilters] = useState({
-    dateFrom: '', dateTo: '', lrNo: '', customer: '', consignee: '',
-    from: '', to: '', vehicle: '', branch: '(All)', status: '(All)',
-    bookingType: '(All)', freightType: '(All)',
-  })
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS)
+  const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS)
+  const [showFilters, setShowFilters] = useState(false)
 
   const paged = usePagedApiResource(
-    ({ page, pageSize, search }) => {
-      const params = buildListParams({ page, pageSize, search })
-      if (filters.status && filters.status !== '(All)') params.status = filters.status
-      return lrApi.list(params)
-    },
-    [filters.status],
+    ({ page, pageSize, search }) => lrApi.list(buildLrListParams({ page, pageSize, search, filters: appliedFilters })),
+    [appliedFilters],
   )
+
+  const reloadSummary = useCallback(() => {
+    lrOperationsApi.summary().then(setSummary).catch(() => {})
+  }, [])
 
   useEffect(() => {
-    lrOperationsApi.summary().then(setSummary).catch(() => {})
-  }, [paged.items.length, onChanged])
+    reloadSummary()
+  }, [paged.items.length, onChanged, reloadSummary])
 
-  const filteredItems = useMemo(() => {
-    let rows = [...(paged.items || [])]
-    const f = filters
-    if (f.lrNo) rows = rows.filter((r) => r.lrNumber?.toLowerCase().includes(f.lrNo.toLowerCase()))
-    if (f.customer) rows = rows.filter((r) => (r.customerName || r.consignor || '').toLowerCase().includes(f.customer.toLowerCase()))
-    if (f.consignee) rows = rows.filter((r) => (r.consignee || '').toLowerCase().includes(f.consignee.toLowerCase()))
-    if (f.from) rows = rows.filter((r) => (r.from || '').toLowerCase().includes(f.from.toLowerCase()))
-    if (f.to) rows = rows.filter((r) => (r.to || '').toLowerCase().includes(f.to.toLowerCase()))
-    if (f.vehicle) rows = rows.filter((r) => (r.vehicle || '').toLowerCase().includes(f.vehicle.toLowerCase()))
-    if (f.bookingType && f.bookingType !== '(All)') rows = rows.filter((r) => (r.businessType || 'FTL') === f.bookingType)
-    if (f.freightType && f.freightType !== '(All)') rows = rows.filter((r) => r.paymentType === f.freightType)
-    if (f.dateFrom) rows = rows.filter((r) => !r.lrDate || r.lrDate >= f.dateFrom)
-    if (f.dateTo) rows = rows.filter((r) => !r.lrDate || r.lrDate <= f.dateTo)
-    return rows
-  }, [paged.items, filters])
-
-  const totalAmount = useMemo(
-    () => filteredItems.reduce((s, r) => s + lrTotalAmount(r), 0),
-    [filteredItems],
-  )
-
-  const kpi = useMemo(() => {
-    const c = summary.counts || {}
-    return {
-      total: summary.totalLR ?? paged.total ?? filteredItems.length,
-      pending: (c['loading-pending'] ?? 0) + (c['lr-created'] ?? 0) + (c['vehicle-assigned'] ?? 0),
-      delivered: c['delivered'] ?? c['pod-uploaded'] ?? 0,
-      inTransit: c['dispatched'] ?? c['transit-pass-generated'] ?? 0,
-      amount: totalAmount,
-    }
-  }, [summary, paged.total, filteredItems.length, totalAmount])
-
-  const columns = useMemo(() => [
-    { key: 'lrNumber', label: 'LR No', render: (r) => (
-      <Link to={lrDetailPath(r.lrNumber)} className="font-semibold text-primary hover:underline">{r.lrNumber}</Link>
-    ) },
-    { key: 'lrDate', label: 'Date', render: (r) => formatLrDate(r.lrDate) },
-    { key: 'customer', label: 'Customer', render: (r) => r.customerName || r.consignor || '—' },
-    { key: 'consignee', label: 'Consignee' },
-    { key: 'from', label: 'From' },
-    { key: 'to', label: 'To' },
-    { key: 'packages', label: 'Packages', render: (r) => parsePackagesWeight(r.quantity).packages },
-    { key: 'weight', label: 'Weight (Kg)', render: (r) => parsePackagesWeight(r.quantity).weight },
-    { key: 'freight', label: 'Freight (₹)', render: (r) => formatCurrency(r.freight) },
-    { key: 'vehicle', label: 'Vehicle No', render: (r) => r.vehicle || '—' },
-    {
-      key: 'deliveryStatus', label: 'Delivery Status',
-      render: (r) => { const d = lrDeliveryStatus(r.status); return <Badge variant={d.variant}>{d.label}</Badge> },
-    },
-    {
-      key: 'billingStatus', label: 'Billing Status',
-      render: (r) => { const b = lrBillingStatus(r.status); return <Badge variant={b.variant}>{b.label}</Badge> },
-    },
-    {
-      key: 'podStatus', label: 'POD Status',
-      render: (r) => { const p = lrPodStatus(r.status); return <Badge variant={p.variant}>{p.label}</Badge> },
-    },
-    { key: 'amount', label: 'Amount (₹)', render: (r) => formatCurrency(lrTotalAmount(r)) },
-    {
-      key: 'actions', label: 'Action',
-      render: (r) => (
-        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" variant="outline" icon={Eye} onClick={() => navigate(lrDetailPath(r.lrNumber))} />
-          <Button size="sm" variant="outline" icon={MoreVertical} onClick={() => navigate(lrEditPath(r.lrNumber))} />
-        </div>
-      ),
-    },
-  ], [navigate])
-
-  const clearFilters = () => setFilters({
-    dateFrom: '', dateTo: '', lrNo: '', customer: '', consignee: '',
-    from: '', to: '', vehicle: '', branch: '(All)', status: '(All)',
-    bookingType: '(All)', freightType: '(All)',
+  useKeyboardPageActions({
+    onNew: () => navigate('/lr/entry'),
+    enabled: !embedded,
   })
+
+  const applyFilters = () => {
+    setAppliedFilters({ ...draftFilters })
+    paged.setPage(1)
+  }
+
+  const clearFilters = () => {
+    setDraftFilters(EMPTY_FILTERS)
+    setAppliedFilters(EMPTY_FILTERS)
+    paged.setPage(1)
+  }
+
+  const openRow = (row) => {
+    const section = defaultDetailSectionForStatus(row.status)
+    navigate(`${lrDetailPath(row.lrNumber)}?section=${section}`)
+  }
+
+  const runPrimaryAction = (e, row) => {
+    e.stopPropagation()
+    if (row.status === 'Draft' || row.status === 'LR Created') {
+      navigate(lrEditPath(row.lrNumber))
+      return
+    }
+    navigate(lrProcessPath(row.lrNumber))
+  }
+
+  const runRowAction = (e, row, action) => {
+    e.stopPropagation()
+    if (action.id === 'view') {
+      openRow(row)
+      return
+    }
+    if (action.id === 'edit') {
+      navigate(lrEditPath(row.lrNumber))
+      return
+    }
+    if (action.id === 'approve-expense') {
+      navigate('/lr/expense-approval')
+      return
+    }
+    if (action.id === 'cancel') {
+      toast({ title: 'Cancel LR', message: 'Use LR detail page to cancel this LR.', type: 'info' })
+      return
+    }
+    const stepMap = {
+      'assign-vehicle': 'loading',
+      'transit-pass': 'transit',
+      dispatch: 'delivery',
+      pod: 'delivery',
+      invoice: 'invoice',
+      expense: 'expense',
+      close: 'close',
+    }
+    navigate(lrProcessPath(row.lrNumber, stepMap[action.id] || 'loading'))
+  }
+
+  const handleDelete = async (row) => {
+    if (!row?.lrNumber) return
+    if (!window.confirm(`Delete LR ${row.lrNumber}?`)) return
+    try {
+      await lrApi.remove(row.lrNumber)
+      toast({ title: 'Deleted', message: `LR ${row.lrNumber} removed.`, type: 'success' })
+      paged.refresh()
+      reloadSummary()
+      onChanged?.()
+    } catch (err) {
+      toast({ title: 'Delete failed', message: err.message, type: 'error' })
+    }
+  }
 
   const handlePrint = async (row) => {
     try {
@@ -154,77 +150,158 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
     }
   }
 
-  const header = (
-    <>
-      {!embedded && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-          <span>Home / LR / LR List</span>
-          <span className="text-xs">F2 New LR · F3 Search · F8 Refresh</span>
+  const kpiCards = useMemo(() => LR_KPI_CARDS.slice(0, 5).map((kpi) => ({
+    label: kpi.label,
+    count: summary[kpi.field] ?? 0,
+    icon: kpi.icon,
+    color: kpi.color,
+    onClick: () => navigate(kpi.stage === 'lr-list' ? '/lr/list' : `/lr?status=${kpi.stage}`),
+  })), [summary, navigate])
+
+  const activeFilterCount = useMemo(
+    () => Object.entries(appliedFilters).filter(([, v]) => v && v !== '(All)').length,
+    [appliedFilters],
+  )
+
+  const columns = useMemo(() => [
+    {
+      key: 'flow',
+      label: 'Action',
+      render: (r) => (
+        <Button size="sm" icon={ArrowRight} onClick={(e) => runPrimaryAction(e, r)}>
+          {r.status === 'Closed' ? 'View' : 'Continue'}
+        </Button>
+      ),
+    },
+    {
+      key: 'lrNumber',
+      label: 'LR No',
+      render: (r) => (
+        <Link to={lrDetailPath(r.lrNumber)} className="font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+          {r.lrNumber}
+        </Link>
+      ),
+    },
+    { key: 'lrDate', label: 'Date', render: (r) => formatLrDate(r.lrDate) },
+    { key: 'customer', label: 'Customer', render: (r) => r.customerName || r.consignor || '—' },
+    { key: 'consignee', label: 'Consignee' },
+    { key: 'from', label: 'From' },
+    { key: 'to', label: 'To' },
+    { key: 'packages', label: 'Packages', render: (r) => parsePackagesWeight(r.quantity).packages },
+    { key: 'weight', label: 'Weight (Kg)', render: (r) => parsePackagesWeight(r.quantity).weight },
+    { key: 'freight', label: 'Freight (₹)', render: (r) => formatCurrency(r.freight) },
+    { key: 'vehicle', label: 'Vehicle No', render: (r) => r.vehicle || '—' },
+    {
+      key: 'deliveryStatus',
+      label: 'Delivery',
+      render: (r) => { const d = lrDeliveryStatus(r.status); return <Badge variant={d.variant}>{d.label}</Badge> },
+    },
+    {
+      key: 'billingStatus',
+      label: 'Billing',
+      render: (r) => { const b = lrBillingStatus(r.status); return <Badge variant={b.variant}>{b.label}</Badge> },
+    },
+    {
+      key: 'podStatus',
+      label: 'POD',
+      render: (r) => { const p = lrPodStatus(r.status); return <Badge variant={p.variant}>{p.label}</Badge> },
+    },
+    { key: 'amount', label: 'Amount (₹)', render: (r) => formatCurrency(lrTotalAmount(r)) },
+    {
+      key: 'actions',
+      label: 'More',
+      render: (r) => {
+        const actions = lrRowActions(r.status || 'LR Created', user?.role).filter((a) => !a.primary)
+        return (
+          <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+            {actions.slice(0, 2).map((action) => (
+              <Button
+                key={action.id}
+                size="sm"
+                variant={action.danger ? 'outline' : 'outline'}
+                className={action.danger ? 'text-red-600' : ''}
+                onClick={(e) => runRowAction(e, r, action)}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        )
+      },
+    },
+  ], [user?.role, navigate])
+
+  const filterRow = (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          icon={Filter}
+          onClick={() => setShowFilters((v) => !v)}
+        >
+          Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          {showFilters ? <ChevronUp className="ml-1 h-3 w-3" /> : <ChevronDown className="ml-1 h-3 w-3" />}
+        </Button>
+        {activeFilterCount > 0 && (
+          <Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>
+        )}
+        {!embedded && (
+          <Link to="/lr" className="ml-auto text-xs text-primary hover:underline">
+            Open LR Management workflow →
+          </Link>
+        )}
+      </div>
+
+      {showFilters && (
+        <div className="grid gap-2 rounded-lg border border-primary/15 bg-slate-50/80 p-2 sm:grid-cols-2 lg:grid-cols-6 dark:bg-slate-900/40">
+          <Input label="Date From" type="date" value={draftFilters.dateFrom} onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
+          <Input label="Date To" type="date" value={draftFilters.dateTo} onChange={(e) => setDraftFilters((f) => ({ ...f, dateTo: e.target.value }))} />
+          <Select label="Status" options={STATUS_OPTIONS} value={draftFilters.status} onChange={(e) => setDraftFilters((f) => ({ ...f, status: e.target.value }))} />
+          <Select label="Booking Type" options={BOOKING_TYPES} value={draftFilters.bookingType} onChange={(e) => setDraftFilters((f) => ({ ...f, bookingType: e.target.value }))} />
+          <Select label="Freight Type" options={FREIGHT_TYPES} value={draftFilters.freightType} onChange={(e) => setDraftFilters((f) => ({ ...f, freightType: e.target.value }))} />
+          <div className="flex items-end gap-2">
+            <Button size="sm" onClick={applyFilters}>Apply</Button>
+            <Button size="sm" variant="outline" onClick={clearFilters}>Clear</Button>
+          </div>
         </div>
       )}
-
-      {!embedded && (
-        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <KpiCard label="Total LR" value={kpi.total.toLocaleString('en-IN')} sub="All Time" color="blue" />
-          <KpiCard label="Pending" value={kpi.pending.toLocaleString('en-IN')} sub="Not Delivered" color="orange" />
-          <KpiCard label="Delivered" value={kpi.delivered.toLocaleString('en-IN')} sub="Completed" color="green" />
-          <KpiCard label="In Transit" value={kpi.inTransit.toLocaleString('en-IN')} sub="Active Trips" color="violet" />
-          <KpiCard label="Total Amount" value={formatCurrency(kpi.amount)} sub="Filtered Total" color="cyan" />
-        </div>
-      )}
-
-      <Card className="mb-4 p-4">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <Button icon={Plus} onClick={() => navigate('/lr/entry')}>+ New LR (F2)</Button>
-          <Button variant="outline" icon={SearchIcon} onClick={() => document.querySelector('[data-lr-list-search]')?.focus()}>Search (F3)</Button>
-          <Button variant="outline" icon={Download}>Export Excel</Button>
-          <Button variant="outline" icon={Printer}>Print</Button>
-          <Button variant="outline" icon={Columns3}>Column</Button>
-          <Button variant="outline" icon={Filter} onClick={() => setShowAdvanced((v) => !v)}>Filter</Button>
-          <Button variant="outline" icon={RefreshCw} onClick={() => { paged.refresh(); onChanged?.() }}>Refresh</Button>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <Input label="Date From" type="date" value={filters.dateFrom} onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
-          <Input label="Date To" type="date" value={filters.dateTo} onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))} />
-          <Input label="LR No" value={filters.lrNo} onChange={(e) => setFilters((f) => ({ ...f, lrNo: e.target.value }))} />
-          <Input label="Customer" value={filters.customer} onChange={(e) => setFilters((f) => ({ ...f, customer: e.target.value }))} />
-          <Input label="Consignee" value={filters.consignee} onChange={(e) => setFilters((f) => ({ ...f, consignee: e.target.value }))} />
-          <Input label="From / Origin" value={filters.from} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))} />
-          <Input label="To / Destination" value={filters.to} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))} />
-          <Input label="Vehicle No" value={filters.vehicle} onChange={(e) => setFilters((f) => ({ ...f, vehicle: e.target.value }))} />
-          <Select label="Status" options={STATUS_OPTIONS} value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} />
-          <Select label="Booking Type" options={BOOKING_TYPES} value={filters.bookingType} onChange={(e) => setFilters((f) => ({ ...f, bookingType: e.target.value }))} />
-          <Select label="Freight Type" options={FREIGHT_TYPES} value={filters.freightType} onChange={(e) => setFilters((f) => ({ ...f, freightType: e.target.value }))} />
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button icon={SearchIcon} onClick={() => paged.setSearch(filters.lrNo || filters.customer)}>Search</Button>
-          <Button variant="outline" onClick={clearFilters}>Clear</Button>
-          <Button variant="outline">Save Filter</Button>
-          <button type="button" className="ml-auto text-xs text-primary hover:underline" onClick={() => setShowAdvanced((v) => !v)}>
-            {showAdvanced ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
-          </button>
-        </div>
-      </Card>
-    </>
+    </div>
   )
 
   return (
-    <div>
-      {header}
+    <div className="flex min-h-0 flex-1 flex-col">
+      {!embedded && (
+        <>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <span>Home / LR / LR List</span>
+            <span>F2 New LR · F3 Search · F8 Refresh</span>
+          </div>
+          <div className="mb-2">
+            <StatusSummaryCards cards={kpiCards} />
+          </div>
+        </>
+      )}
+
       <ERPListPage
         module="LR"
-        title={embedded ? undefined : 'LR List'}
-        showAdd={false}
-        searchPlaceholder="Search LR, customer, vehicle…"
+        title={embedded ? undefined : undefined}
+        showAdd
+        addLabel="New LR (F2)"
+        addPosition="start"
+        onAdd={() => navigate('/lr/entry')}
+        searchPlaceholder="Search LR, customer, consignee, vehicle, route…"
+        filterRow={filterRow}
         columns={columns}
-        data={filteredItems}
+        data={paged.items}
         loading={paged.loading}
         error={paged.error}
-        onRefreshExternal={() => { paged.refresh(); onChanged?.() }}
-        onRowClick={(r) => navigate(lrDetailPath(r.lrNumber))}
+        onRefreshExternal={() => { paged.refresh(); reloadSummary(); onChanged?.() }}
+        onRowClick={openRow}
+        onEdit={(r) => navigate(lrEditPath(r.lrNumber))}
+        onDelete={handleDelete}
         onPrint={handlePrint}
+        rowPrintTitle="Print LR"
         exportFilename="lr-list"
         serverMode
         serverTotal={paged.total}
@@ -235,9 +312,7 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
         serverPageSize={paged.pageSize}
         onServerPageSizeChange={paged.setPageSize}
         onServerSearch={paged.setSearch}
-        addPosition="end"
-        addLabel="New LR"
-        onAdd={() => navigate('/lr/entry')}
+        searchValue={paged.search}
       />
     </div>
   )

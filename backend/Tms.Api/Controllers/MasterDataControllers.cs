@@ -563,26 +563,34 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         [FromQuery] string? paymentType,
         [FromQuery] string? status,
         [FromQuery] string? stage,
+        [FromQuery] string? businessType,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true,
         [FromQuery] string? sortColumn = null,
         [FromQuery] string? sortDirection = null,
         CancellationToken ct = default)
-        => QueryLrs(search, paymentType, status, stage, page, pageSize, includeTotal, sortColumn, sortDirection, ct);
+        => QueryLrs(search, paymentType, status, stage, businessType, dateFrom, dateTo, page, pageSize, includeTotal, sortColumn, sortDirection, ct);
 
     [HttpGet("list")]
     public Task<ActionResult<PagedResult<LrDto>>> List(
         [FromQuery] string? search,
+        [FromQuery] string? paymentType,
         [FromQuery] string? status,
         [FromQuery] string? stage,
-        [FromQuery] int pageNo = 1,
+        [FromQuery] string? businessType,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageNo = 0,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true,
         [FromQuery] string? sortColumn = null,
         [FromQuery] string? sortDirection = null,
         CancellationToken ct = default)
-        => QueryLrs(search, null, status, stage, pageNo, pageSize, includeTotal, sortColumn, sortDirection, ct);
+        => QueryLrs(search, paymentType, status, stage, businessType, dateFrom, dateTo, pageNo > 0 ? pageNo : page, pageSize, includeTotal, sortColumn, sortDirection, ct);
 
     [HttpGet("status-summary")]
     public async Task<ActionResult<object>> StatusSummary(CancellationToken ct)
@@ -596,6 +604,9 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         string? paymentType,
         string? status,
         string? stage,
+        string? businessType,
+        DateOnly? dateFrom,
+        DateOnly? dateTo,
         int page,
         int pageSize,
         bool includeTotal,
@@ -606,6 +617,12 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         var q = tenants.Filter(branches.Filter(db.LorryReceipts.AsNoTracking().Include(l => l.Branch)));
         if (!string.IsNullOrWhiteSpace(paymentType) && paymentType != "(All)")
             q = q.Where(l => l.PaymentType == paymentType);
+        if (!string.IsNullOrWhiteSpace(businessType) && businessType != "(All)")
+            q = q.Where(l => l.BusinessType == businessType);
+        if (dateFrom.HasValue)
+            q = q.Where(l => l.LrDate >= dateFrom);
+        if (dateTo.HasValue)
+            q = q.Where(l => l.LrDate <= dateTo);
         if (!string.IsNullOrWhiteSpace(status) && status != "(All)")
             q = q.Where(l => l.Status == status);
         if (!string.IsNullOrWhiteSpace(stage) && stage != "lr-list" && stage != "(All)")
