@@ -1,374 +1,98 @@
-import { useCallback, useMemo, useState } from 'react'
-import ERPPageTitle from '../components/ui/ERPPageTitle'
-import StatusSummaryCards from '../components/ui/StatusSummaryCards'
-import AnalyticsChart from '../components/ui/AnalyticsChart'
-import ERPDataTable from '../components/ui/ERPDataTable'
-import Card, { CardHeader } from '../components/ui/Card'
-import Tabs from '../components/ui/Tabs'
-import Badge, { statusVariant } from '../components/ui/Badge'
-import AnalyticsFilterBar from '../components/dashboard/AnalyticsFilterBar'
-import WidgetPickerModal from '../components/dashboard/WidgetPickerModal'
-import { useDashboardMetrics, useDashboardRecent, DEFAULT_WIDGET_IDS } from '../hooks/useDashboardMetrics'
-import { useDashboardOverview } from '../hooks/useDashboardOverview'
-import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { RefreshCw, Settings2 } from 'lucide-react'
+import Button from '../components/ui/Button'
+import Modal from '../components/ui/Modal'
+import DashboardKpiRow, { DashboardQuickActions } from '../components/dashboard/DashboardWidgets'
+import { DashboardChartsRow, DashboardTablesRow } from '../components/dashboard/DashboardTables'
+import DashboardLegacyTabs from '../components/dashboard/DashboardLegacyTabs'
+import { useDashboardHome } from '../hooks/useDashboardHome'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { exportJson } from '../utils/export'
-import { formatCurrency } from '../components/ui/ReportFilters'
-import { TMS_COLORS } from '../config/theme'
-
-const colorMap = {
-  indigo: 'violet',
-  cyan: 'blue',
-  emerald: 'green',
-  amber: 'amber',
-  orange: 'orange',
-  green: 'green',
-  red: 'red',
-  slate: 'slate',
-  violet: 'violet',
-  blue: 'blue',
-}
-
-const WIDGET_DEFS = [
-  { id: 'monthly-revenue', title: 'Monthly Revenue', type: 'bar' },
-  { id: 'monthly-expenses', title: 'Monthly Expenses', type: 'area' },
-  { id: 'profit-multi', title: 'Revenue vs Expense vs Profit', type: 'multiLine' },
-  { id: 'revenue-stack', title: 'Revenue & Expense Stack', type: 'stacked' },
-  { id: 'trip-status', title: 'Trip Status', type: 'donut' },
-  { id: 'payment-mix', title: 'Payment Status', type: 'pie' },
-  { id: 'expense-breakdown', title: 'Expense Breakdown', type: 'donut' },
-  { id: 'fleet-status', title: 'Fleet Status', type: 'pie' },
-  { id: 'vehicle-util', title: 'Vehicle Utilization', type: 'horizontal' },
-  { id: 'weekly-bookings', title: 'Weekly Bookings', type: 'line' },
-  { id: 'route-perf', title: 'Route Performance', type: 'bar' },
-  { id: 'top-drivers', title: 'Top Drivers', type: 'grouped' },
-  { id: 'route-radar', title: 'Route Radar', type: 'radar' },
-  { id: 'fleet-gauge', title: 'Fleet Utilization Gauge', type: 'gauge' },
-]
 
 export default function Dashboard() {
-  const [period, setPeriod] = useState('12m')
-  const [compare, setCompare] = useState(false)
-  const [refreshSeed, setRefreshSeed] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [widgetOpen, setWidgetOpen] = useState(false)
-  const [visibleWidgets, setVisibleWidgets] = useLocalStorage('tms-dashboard-widgets', DEFAULT_WIDGET_IDS)
+  const { user } = useAuth()
   const { toast } = useToast()
-
-  const overview = useDashboardOverview(refreshSeed)
-  const metrics = useDashboardMetrics({ period, compare, refreshSeed })
-  const { trips: recentTrips } = useDashboardRecent(refreshSeed)
-
-  const overviewCards = overview.kpiCards.map((stat) => ({
-    label: stat.label,
-    count: stat.value,
-    color: colorMap[stat.color] || stat.color,
-    icon: stat.icon,
-  }))
-
-  const bookingColumns = [
-    { key: 'id', label: 'Booking ID' },
-    { key: 'customer', label: 'Customer' },
-    { key: 'route', label: 'Route' },
-    { key: 'date', label: 'Date' },
-    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-    { key: 'payment', label: 'Payment', render: (r) => <Badge variant={statusVariant(r.payment)}>{r.payment}</Badge> },
-  ]
-
-  const deliveryColumns = [
-    { key: 'id', label: 'Booking' },
-    { key: 'customer', label: 'Customer' },
-    { key: 'route', label: 'Route' },
-    { key: 'date', label: 'Date' },
-    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ]
-
-  const invoiceColumns = [
-    { key: 'invoiceNo', label: 'Invoice' },
-    { key: 'customerName', label: 'Customer' },
-    { key: 'invoiceDate', label: 'Date' },
-    { key: 'balance', label: 'Balance', render: (r) => formatCurrency(r.balance) },
-    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ]
-
-  const tripColumns = [
-    { key: 'lr', label: 'LR No.' },
-    { key: 'vehicle', label: 'Vehicle' },
-    { key: 'driver', label: 'Driver' },
-    { key: 'from', label: 'From' },
-    { key: 'to', label: 'To' },
-    { key: 'freight', label: 'Freight' },
-  ]
-
-  const branchColumns = [
-    { key: 'branchName', label: 'Branch', render: (r) => `${r.branchCode} — ${r.branchName}` },
-    { key: 'bookings', label: 'Bookings' },
-    { key: 'revenue', label: 'Revenue', render: (r) => formatCurrency(r.revenue) },
-    { key: 'collection', label: 'Collection', render: (r) => formatCurrency(r.collection) },
-    { key: 'outstanding', label: 'Outstanding', render: (r) => formatCurrency(r.outstanding) },
-    { key: 'expenses', label: 'Expenses', render: (r) => formatCurrency(r.expenses) },
-    { key: 'delivered', label: 'Delivered' },
-    { key: 'pendingDelivery', label: 'Pending' },
-    { key: 'deliveryPerformancePct', label: 'Delivery %', render: (r) => `${r.deliveryPerformancePct}%` },
-    { key: 'lrCount', label: 'LRs' },
-    { key: 'vehicles', label: 'Vehicles' },
-    { key: 'drivers', label: 'Drivers' },
-    { key: 'pendingInvoices', label: 'Open Inv.' },
-    { key: 'invoiceOutstanding', label: 'Inv. Due', render: (r) => formatCurrency(r.invoiceOutstanding) },
-  ]
-
-  const branchOverviewCards = useMemo(() => {
-    const rows = overview.branchSummary || []
-    const sum = (key) => rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
-    return [
-      { label: 'Branches', count: String(rows.length), color: 'blue', icon: 'Building2' },
-      { label: 'Bookings', count: String(sum('bookings')), color: 'indigo', icon: 'CalendarPlus' },
-      { label: 'Revenue', count: formatCurrency(sum('revenue')), color: 'emerald', icon: 'TrendingUp' },
-      { label: 'Outstanding', count: formatCurrency(sum('outstanding')), color: 'red', icon: 'AlertCircle' },
-      { label: 'Expenses', count: formatCurrency(sum('expenses')), color: 'orange', icon: 'Receipt' },
-      { label: 'Pending Deliveries', count: String(sum('pendingDelivery')), color: 'amber', icon: 'Package' },
-    ]
-  }, [overview.branchSummary])
-
-  const chartConfigs = useMemo(() => {
-    const compareSuffix = compare ? ' · vs prev period' : ''
-    return {
-      'monthly-revenue': {
-        title: 'Monthly Revenue',
-        subtitle: `₹ Lakhs · ${metrics.periodLabel}${compareSuffix}`,
-        type: 'bar',
-        data: metrics.revSlice,
-        color: TMS_COLORS.primary,
-        badge: metrics.revChange.text,
-        badgePositive: metrics.revChange.positive,
-      },
-      'monthly-expenses': {
-        title: 'Monthly Expenses',
-        subtitle: `₹ Lakhs · Operating cost${compareSuffix}`,
-        type: 'area',
-        data: metrics.expSlice,
-        color: '#ef4444',
-        badge: metrics.expChange.text,
-        badgePositive: !metrics.expChange.positive,
-      },
-      'profit-multi': {
-        title: 'Revenue vs Expense vs Profit',
-        subtitle: `Multi-line trend${compareSuffix}`,
-        type: 'multiLine',
-        data: metrics.profitTrend,
-      },
-      'revenue-stack': {
-        title: 'Revenue & Expense Stack',
-        subtitle: `Last ${Math.min(metrics.profitTrend.length, 6)} months`,
-        type: 'stacked',
-        data: metrics.profitTrend,
-      },
-      'trip-status': { title: 'Trip Status', subtitle: 'Distribution', type: 'donut', data: metrics.tripAnalysis },
-      'payment-mix': { title: 'Payment Status', subtitle: 'Collection mix', type: 'pie', data: metrics.paymentMix },
-      'expense-breakdown': { title: 'Expense Breakdown', subtitle: 'By category', type: 'donut', data: metrics.expenseBreakdown },
-      'fleet-status': { title: 'Fleet Status', subtitle: 'Vehicle allocation', type: 'pie', data: metrics.fleetStatus },
-      'vehicle-util': { title: 'Vehicle Utilization', subtitle: 'Top 5 vehicles', type: 'horizontal', data: metrics.vehicleUtilization },
-      'weekly-bookings': { title: 'Weekly Bookings', subtitle: 'This week', type: 'line', data: metrics.weeklyBookings, color: '#8b5cf6' },
-      'route-perf': { title: 'Route Performance', subtitle: 'Trip volume score', type: 'bar', data: metrics.routePerformance, color: '#10b981' },
-      'top-drivers': { title: 'Top Drivers', subtitle: 'Trips completed', type: 'grouped', data: metrics.driverPerformance },
-      'route-radar': { title: 'Route Radar', subtitle: 'Performance index', type: 'radar', data: metrics.routePerformance },
-      'fleet-gauge': { title: 'Fleet Utilization Gauge', subtitle: 'Overall fleet efficiency', type: 'gauge', gaugeValue: metrics.fleetGauge },
-    }
-  }, [metrics, compare])
-
-  const visibleCharts = WIDGET_DEFS.filter((w) => visibleWidgets.includes(w.id)).map((w) => ({
-    id: w.id,
-    ...chartConfigs[w.id],
-  }))
+  const navigate = useNavigate()
+  const [refreshSeed, setRefreshSeed] = useState(0)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
+  const home = useDashboardHome(refreshSeed)
 
   const handleRefresh = useCallback(async () => {
-    setLoading(true)
-    await Promise.all([overview.refresh(), metrics.refresh()])
+    await home.refresh()
     setRefreshSeed((s) => s + 1)
-    setLoading(false)
-    toast({ title: 'Dashboard refreshed', message: 'Company/branch scoped data updated', type: 'success' })
-  }, [toast, metrics, overview])
+    toast({ title: 'Dashboard refreshed', type: 'success' })
+  }, [home, toast])
 
-  const handleExport = useCallback(() => {
-    exportJson(
-      {
-        period,
-        compare,
-        exportedAt: new Date().toISOString(),
-        overview: overview.data,
-        metrics: {
-          revenue: metrics.revSlice,
-          expenses: metrics.expSlice,
-          profitTrend: metrics.profitTrend,
-          kpis: metrics.kpis,
-        },
-      },
-      `tms-analytics-${period}.json`,
-    )
-    toast({ title: 'Export complete', message: 'Analytics JSON downloaded', type: 'success' })
-  }, [period, compare, metrics, overview, toast])
-
-  const toggleWidget = (id) => {
-    setVisibleWidgets((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    )
-  }
-
-  const tabs = [
-    {
-      id: 'overview',
-      label: 'Overview',
-      content: (
-        <div className="space-y-4 p-2 sm:p-3">
-          {overview.error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{overview.error}</p>
-          )}
-          {overview.alerts.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {overview.alerts.map((a) => (
-                <div
-                  key={`${a.type}-${a.title}`}
-                  className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
-                >
-                  <p className="font-semibold">{a.title}</p>
-                  <p className="text-xs opacity-90">{a.message}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          <StatusSummaryCards cards={overviewCards} />
-        </div>
-      ),
-    },
-    {
-      id: 'branch-wise',
-      label: 'Overview - Branch Wise',
-      content: (
-        <div className="space-y-4 p-2 sm:p-3">
-          {overview.error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{overview.error}</p>
-          )}
-          <StatusSummaryCards cards={branchOverviewCards} />
-          <Card padding={false}>
-            <div className="p-4">
-              <CardHeader
-                title="Branch-wise Operations & Finance"
-                subtitle="Consolidated bookings, revenue, collections, expenses, fleet and invoice dues by branch"
-              />
-            </div>
-            <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} />
-          </Card>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card padding={false}>
-              <div className="p-4"><CardHeader title="Top Customers" subtitle="By freight revenue" /></div>
-              <ERPDataTable
-                columns={[
-                  { key: 'name', label: 'Customer' },
-                  { key: 'count', label: 'Bookings' },
-                  { key: 'amount', label: 'Freight', render: (r) => formatCurrency(r.amount) },
-                ]}
-                data={overview.topCustomers}
-                showActions={false}
-              />
-            </Card>
-            <Card padding={false}>
-              <div className="p-4"><CardHeader title="Top Routes" subtitle="By booking volume" /></div>
-              <ERPDataTable
-                columns={[
-                  { key: 'name', label: 'Route' },
-                  { key: 'count', label: 'Trips' },
-                  { key: 'amount', label: 'Freight', render: (r) => formatCurrency(r.amount) },
-                ]}
-                data={overview.topRoutes}
-                showActions={false}
-              />
-            </Card>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card padding={false}>
-              <div className="p-4"><CardHeader title="Recent Bookings" /></div>
-              <ERPDataTable columns={bookingColumns} data={overview.recentBookings} showActions={false} />
-            </Card>
-            <Card padding={false}>
-              <div className="p-4"><CardHeader title="Recent Deliveries" /></div>
-              <ERPDataTable columns={deliveryColumns} data={overview.recentDeliveries} showActions={false} />
-            </Card>
-          </div>
-
-          <Card padding={false}>
-            <div className="p-4"><CardHeader title="Pending Invoices" subtitle="Open balances" /></div>
-            <ERPDataTable columns={invoiceColumns} data={overview.pendingInvoices} showActions={false} />
-          </Card>
-        </div>
-      ),
-    },
-    {
-      id: 'analytics',
-      label: 'Analytics',
-      content: (
-        <div className="p-2 sm:p-3">
-          <AnalyticsFilterBar
-            period={period}
-            onPeriodChange={setPeriod}
-            compare={compare}
-            onCompareChange={setCompare}
-            onRefresh={handleRefresh}
-            onExport={handleExport}
-            onCustomize={() => setWidgetOpen(true)}
-            loading={loading || metrics.loading || overview.loading}
-            periodLabel={metrics.periodLabel}
-          />
-          <div className="grid grid-cols-1 space-y-3 sm:grid-cols-2 sm:space-y-0 xl:grid-cols-3 2xl:grid-cols-4 [&>*]:mb-3">
-            {visibleCharts.map((chart) => (
-              <AnalyticsChart key={chart.id} {...chart} />
-            ))}
-          </div>
-          {visibleCharts.length === 0 && (
-            <p className="py-12 text-center text-sm text-slate-500">
-              No widgets selected. Click <strong>Widgets</strong> to customize your dashboard.
-            </p>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'bookings',
-      label: 'Recent Bookings',
-      content: (
-        <div className="p-2 sm:p-3">
-          <ERPDataTable columns={bookingColumns} data={overview.recentBookings} showActions={false} />
-        </div>
-      ),
-    },
-    {
-      id: 'trips',
-      label: 'Recent Trips',
-      content: (
-        <div className="p-2 sm:p-3">
-          <ERPDataTable columns={tripColumns} data={recentTrips} showActions={false} />
-        </div>
-      ),
-    },
-  ]
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.key === 'F2') { e.preventDefault(); navigate('/lr/generate') }
+      if (e.key === 'F6') { e.preventDefault(); navigate('/bookings/new') }
+      if (e.key === 'F7') { e.preventDefault(); navigate('/lr?status=loading-pending') }
+      if (e.key === 'F8') { e.preventDefault(); navigate('/lr?status=delivered') }
+      if (e.key === 'F10') { e.preventDefault(); navigate('/lr?status=expense-pending') }
+      if (e.key === 'F11') { e.preventDefault(); navigate('/reports') }
+      if (e.key === 'F12') { e.preventDefault(); navigate('/vehicles') }
+      if (e.key === 'F3') { e.preventDefault(); document.querySelector('[data-global-search]')?.focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [navigate])
 
   return (
-    <div className="flex min-h-full flex-col">
-      <ERPPageTitle module="Dashboard" title="Overview" />
-      <div className="flex flex-col rounded-lg border border-primary/20 bg-white shadow-sm dark:bg-slate-900">
-        <Tabs tabs={tabs} defaultTab="overview" />
+    <div className="flex min-h-full flex-col space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">Dashboard</h1>
+          <p className="text-sm text-slate-500">
+            Welcome back, {user?.name ?? 'User'}!
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" icon={Settings2} onClick={() => setCustomizeOpen(true)}>
+            Customize
+          </Button>
+          <Button icon={RefreshCw} onClick={handleRefresh} disabled={home.loading}>
+            Refresh
+          </Button>
+        </div>
       </div>
-      <WidgetPickerModal
-        open={widgetOpen}
-        onClose={() => setWidgetOpen(false)}
-        widgets={WIDGET_DEFS}
-        visibleIds={visibleWidgets}
-        onToggle={toggleWidget}
-        onReset={() => setVisibleWidgets(DEFAULT_WIDGET_IDS)}
-        onSelectAll={() => setVisibleWidgets(WIDGET_DEFS.map((w) => w.id))}
-        onClearAll={() => setVisibleWidgets([])}
+
+      {home.error && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{home.error}</p>
+      )}
+
+      <DashboardKpiRow kpis={home.data?.kpis ?? []} loading={home.loading} />
+
+      <DashboardChartsRow
+        lrTrend={home.data?.lrTrend ?? []}
+        lrStatusSummary={home.data?.lrStatusSummary ?? []}
+        lrStatusTotal={home.data?.lrStatusTotal ?? 0}
+        topDestinations={home.data?.topDestinations ?? []}
+        loading={home.loading}
       />
+
+      <DashboardTablesRow
+        recentLrs={home.data?.recentLrs ?? []}
+        pendingDeliveries={home.data?.pendingDeliveries ?? []}
+        notifications={home.data?.notifications ?? []}
+        loading={home.loading}
+      />
+
+      <DashboardQuickActions />
+
+      <Modal
+        open={customizeOpen}
+        onClose={() => setCustomizeOpen(false)}
+        title="Dashboard Customization"
+        size="xl"
+      >
+        <p className="mb-3 text-sm text-slate-500">
+          Full analytics, branch-wise KPIs, and widget picker — all preserved from the previous dashboard.
+        </p>
+        <DashboardLegacyTabs refreshSeed={refreshSeed} />
+      </Modal>
     </div>
   )
 }

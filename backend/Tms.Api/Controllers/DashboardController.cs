@@ -19,7 +19,8 @@ public class DashboardController(
     TenantCacheService cache,
     DashboardReadService dashboardRead,
     DocumentFlowService documentFlow,
-    DashboardOverviewService overviewService) : ControllerBase
+    DashboardOverviewService overviewService,
+    DashboardHomeService homeService) : ControllerBase
 {
     Guid CompanyId => TenantScope.ResolveCompanyId(tenants);
     Guid? BranchId => branches.EffectiveBranchId;
@@ -30,6 +31,14 @@ public class DashboardController(
     {
         var key = TenantCacheService.DashboardKey("overview", CompanyId, BranchId);
         var data = await cache.GetOrCreateAsync(key, () => overviewService.BuildAsync(ct), DashboardCacheTtl);
+        return Ok(data);
+    }
+
+    [HttpGet("home")]
+    public async Task<ActionResult<DashboardHomeDto>> Home(CancellationToken ct)
+    {
+        var key = TenantCacheService.DashboardKey("home", CompanyId, BranchId);
+        var data = await cache.GetOrCreateAsync(key, () => homeService.BuildAsync(ct), DashboardCacheTtl);
         return Ok(data);
     }
 

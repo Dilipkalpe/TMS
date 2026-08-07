@@ -63,6 +63,9 @@ export default function GlobalSearch({ className = '' } = {}) {
   return (
     <div ref={ref} className={`relative ${className}`}>
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-400 sm:inline dark:border-slate-600 dark:bg-slate-900">
+        Ctrl + K
+      </span>
       <input
         type="search"
         value={query}
@@ -73,8 +76,9 @@ export default function GlobalSearch({ className = '' } = {}) {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        placeholder="Search bookings, LR, vehicles… (Ctrl+K)"
-        className="w-64 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 lg:w-80"
+        placeholder="Search LR, Vehicle, Customer…"
+        data-global-search
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-16 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
       />
       {open && query.length >= 2 && (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">

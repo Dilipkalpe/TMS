@@ -106,7 +106,7 @@ export default function Sidebar() {
             {!collapsed && (
               <div>
                 <p className="text-sm font-bold text-white">TMS Pro</p>
-                <p className="text-[10px] font-medium tracking-wide text-accent">Transport · Freight · Fleet</p>
+                <p className="text-[10px] font-medium tracking-wide text-slate-400">Transport Management System</p>
               </div>
             )}
           </div>
@@ -126,6 +126,15 @@ export default function Sidebar() {
         </nav>
 
         <div className="hidden border-t border-slate-700/50 p-3 lg:block">
+          {!collapsed && (
+            <div className="mb-3 rounded-lg bg-slate-800/50 px-2 py-2 text-[10px] leading-relaxed text-slate-400">
+              <p className="mb-1 font-semibold uppercase tracking-wide text-slate-500">Shortcuts</p>
+              <p>F2 New LR · F3 Search</p>
+              <p>F6 Booking · F7 Loading</p>
+              <p>F8 Delivery · F11 Reports</p>
+              <p>Ctrl+S Save · Ctrl+P Print</p>
+            </div>
+          )}
           <button
             onClick={toggleCollapsed}
             className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-400 transition-all hover:bg-slate-800 hover:text-white"

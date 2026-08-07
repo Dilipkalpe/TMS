@@ -101,6 +101,7 @@ builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = Compre
 
 builder.Services.AddScoped<DashboardReadService>();
 builder.Services.AddScoped<DashboardOverviewService>();
+builder.Services.AddScoped<DashboardHomeService>();
 builder.Services.AddScoped<AccountingReadService>();
 
 builder.Services.AddScoped<PayrollService>();
@@ -385,7 +386,7 @@ app.MapGet("/api/health", async (TmsDbContext db, IConfiguration config) =>
             status = dbOk ? "healthy" : "unhealthy",
             service = "TMS Pro API",
             database = dbOk ? "connected" : "disconnected",
-            build = "2026-08-04-lr-enterprise-tabs",
+            build = "2026-08-07-tms-dashboard-redesign",
             notifications = new
             {
                 enabled = notificationsEnabled,

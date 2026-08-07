@@ -346,6 +346,7 @@ export const lrBusinessApi = {
 
 export const dashboardApi = {
   overview: () => apiRequest('/dashboard/overview'),
+  home: () => apiRequest('/dashboard/home'),
   stats: () => apiRequest('/dashboard/stats'),
   recentBookings: () => apiRequest('/dashboard/recent-bookings'),
   recentTrips: () => apiRequest('/dashboard/recent-trips'),
