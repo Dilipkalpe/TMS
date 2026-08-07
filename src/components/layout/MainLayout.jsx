@@ -25,7 +25,7 @@ function RouteAutoFocus() {
 
 export default function MainLayout() {
   const location = useLocation()
-  const isFillPage = /^\/lr\/(entry|ultra-entry)\/?$/.test(location.pathname)
+  const isFillPage = /^\/(lr\/(entry|ultra-entry)|operations\/(loading-slip|transit-pass|delivery\/pod|billing\/invoice|trip-expenses))\/?$/.test(location.pathname)
 
   return (
     <PageTitleProvider>

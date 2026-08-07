@@ -128,6 +128,11 @@ export const GeofenceAlertsPage = lazy(() => import('../pages/gps/GeofenceAlerts
 export const OperationsHub = lazy(() => import('../pages/operations/OperationsHub'))
 
 export const FuelPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.FuelPage })))
+export const LoadingSlipPage = lazy(() => import('../pages/operations/LoadingSlipPage'))
+export const TransitPassCreatePage = lazy(() => import('../pages/operations/TransitPassCreatePage'))
+export const PodEntryPage = lazy(() => import('../pages/operations/PodEntryPage'))
+export const CreateInvoicePage = lazy(() => import('../pages/operations/CreateInvoicePage'))
+export const TripExpensesEntryPage = lazy(() => import('../pages/operations/TripExpensesEntryPage'))
 export const EpodPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.EpodPage })))
 export const PodPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.PodPage })))
 export const CustomerPortalPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.CustomerPortalPage })))

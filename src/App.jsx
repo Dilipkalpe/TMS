@@ -39,6 +39,7 @@ import {
   MaintenancePage, OperationsHub, FleetMapPage, RouteOptimizerPage,
   VehicleHistoryPage, GeofenceManagerPage, GeofenceAlertsPage,
   FuelPage, EpodPage, PodPage, CustomerPortalPage, TripsPage, ShipmentsPage,
+  LoadingSlipPage, TransitPassCreatePage, PodEntryPage, CreateInvoicePage, TripExpensesEntryPage,
   FinanceModulePage, DocumentsPage, NotificationsPage, AnalyticsPage,
   MarketplacePage, WarehousePage, IotPage, AiPage, PlatformHub,
 } from './routes/lazyPages'
@@ -103,12 +104,16 @@ export default function App() {
         <Route path="vehicles/:id" element={<VehicleDetails />} />
         <Route path="maintenance" element={<MaintenancePage />} />
         <Route path="operations" element={<OperationsHub />} />
+        <Route path="operations/loading-slip" element={<LoadingSlipPage />} />
+        <Route path="operations/transit-pass" element={<TransitPassCreatePage />} />
+        <Route path="operations/delivery/pod" element={<PodEntryPage />} />
+        <Route path="operations/billing/invoice" element={<CreateInvoicePage />} />
+        <Route path="operations/trip-expenses" element={<TripExpensesEntryPage />} />
         <Route path="operations/lr-management" element={<Navigate to="/lr" replace />} />
-        <Route path="operations/loading" element={<Navigate to="/lr?status=loading-pending" replace />} />
-        <Route path="operations/transit-pass" element={<Navigate to="/lr?status=transit-pass-generated" replace />} />
-        <Route path="operations/delivery" element={<Navigate to="/lr?status=delivered" replace />} />
-        <Route path="operations/invoice" element={<Navigate to="/lr?status=pod-uploaded" replace />} />
-        <Route path="operations/lr-expenses" element={<Navigate to="/lr?status=expense-pending" replace />} />
+        <Route path="operations/loading" element={<Navigate to="/operations/loading-slip" replace />} />
+        <Route path="operations/delivery" element={<Navigate to="/operations/delivery/pod" replace />} />
+        <Route path="operations/invoice" element={<Navigate to="/operations/billing/invoice" replace />} />
+        <Route path="operations/lr-expenses" element={<Navigate to="/operations/trip-expenses" replace />} />
         <Route path="operations/expense-approval" element={<Navigate to="/lr/expense-approval" replace />} />
         <Route path="operations/lr-closing" element={<Navigate to="/lr?status=expense-approved" replace />} />
         <Route path="operations/fuel" element={<FuelPage />} />

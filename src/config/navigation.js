@@ -14,12 +14,38 @@ export const navigation = [
       { title: 'Expense Approval', path: '/lr/expense-approval' },
     ],
   },
-  { title: 'Loading Slip', path: '/lr?status=loading-pending', icon: 'ClipboardList', feature: 'lr' },
-  { title: 'Transit Pass', path: '/lr?status=transit-pass-generated', icon: 'FileBadge', feature: 'lr' },
+  { title: 'Loading Slip', path: '/operations/loading-slip', icon: 'ClipboardList', feature: 'lr' },
+  { title: 'Transit Pass', path: '/operations/transit-pass', icon: 'FileBadge', feature: 'lr' },
   { title: 'In Transit', path: '/lr?status=dispatched', icon: 'Truck', feature: 'lr' },
-  { title: 'Delivery / POD', path: '/lr?status=delivered', icon: 'PackageCheck', feature: 'lr' },
-  { title: 'Billing', path: '/accounting', icon: 'Receipt', feature: 'accounting' },
-  { title: 'Trip Expenses', path: '/lr?status=expense-pending', icon: 'Wallet' },
+  {
+    title: 'Delivery / POD',
+    icon: 'PackageCheck',
+    feature: 'lr',
+    children: [
+      { title: 'POD Entry', path: '/operations/delivery/pod' },
+      { title: 'Delivery Queue', path: '/lr?status=delivered' },
+    ],
+  },
+  {
+    title: 'Billing',
+    icon: 'Receipt',
+    feature: 'accounting',
+    children: [
+      { title: 'Create Invoice', path: '/operations/billing/invoice' },
+      { title: 'Invoice Queue', path: '/lr?status=pod-uploaded' },
+      { title: 'Freight Invoices', path: '/accounting/freight-invoices' },
+      { title: 'Accounting Hub', path: '/accounting' },
+    ],
+  },
+  {
+    title: 'Trip Expenses',
+    icon: 'Wallet',
+    children: [
+      { title: 'Add Trip Expenses', path: '/operations/trip-expenses' },
+      { title: 'Expense Queue', path: '/lr?status=expense-pending' },
+      { title: 'Expense Approval', path: '/lr/expense-approval' },
+    ],
+  },
   { title: 'Accounts', path: '/accounting', icon: 'Calculator', feature: 'accounting' },
   {
     title: 'Reports',
