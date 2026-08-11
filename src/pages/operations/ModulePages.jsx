@@ -825,18 +825,19 @@ export function DocumentsPage() {
   const [form, setForm] = useState({ entityType: 'Vehicle', entityId: '', docType: 'Insurance', title: '', fileUrl: '', expiresAt: '' })
 
   const load = useCallback(async () => {
-    try {
-      const [all, exp, v] = await Promise.all([
-        documentsApi.list(),
-        documentsApi.expiring(30),
-        vehiclesApi.list({ pageSize: 200 }),
-      ])
-      setDocs(all ?? [])
-      setExpiring(exp)
-      setVehicles(v.items ?? v ?? [])
-    } catch (e) {
-      toast({ title: 'Load failed', message: e.message, type: 'error' })
+    const [allRes, expRes, vRes] = await Promise.allSettled([
+      documentsApi.list(),
+      documentsApi.expiring(30),
+      vehiclesApi.list({ pageSize: 200 }),
+    ])
+    if (allRes.status === 'fulfilled') setDocs(allRes.value ?? [])
+    else {
+      setDocs([])
+      toast({ title: 'Documents list failed', message: allRes.reason?.message || 'Unable to load documents', type: 'error' })
     }
+    if (expRes.status === 'fulfilled') setExpiring(expRes.value)
+    else toast({ title: 'Expiring docs failed', message: expRes.reason?.message || 'Unable to load expiring docs', type: 'error' })
+    if (vRes.status === 'fulfilled') setVehicles(vRes.value?.items ?? vRes.value ?? [])
   }, [toast])
 
   useEffect(() => { load() }, [load])
@@ -871,6 +872,7 @@ export function DocumentsPage() {
               <tr key={d.id} className="border-t"><td className="px-4 py-2">{d.title}</td><td className="px-4 py-2">{d.docType}</td><td className="px-4 py-2">{d.entityType}:{d.entityId}</td><td className="px-4 py-2">{d.expiresAt ?? '—'}</td></tr>
             ))}</tbody>
           </table>
+          {docs.length === 0 && <p className="p-4 text-sm text-slate-500">No documents yet. Use Add document.</p>}
         </Card>
       )}
       {tab === 'expiring' && (

@@ -235,7 +235,8 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
 [Route("api/documents")]
 public class DocumentsController(TmsDbContext db, ITenantContext tenants) : ControllerBase
 {
-    [HttpGet]
+    // Use explicit "list" path — bare GET /api/documents collides with POST Save and can yield 405.
+    [HttpGet("list")]
     public async Task<IActionResult> List([FromQuery] int limit = 200) =>
         Ok(await TenantScope.Documents(db, tenants).AsNoTracking()
             .OrderByDescending(d => d.CreatedAt)

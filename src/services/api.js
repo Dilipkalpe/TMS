@@ -80,7 +80,10 @@ const API_TIMEOUT_MS = 60000
 
 export async function apiRequest(path, options = {}) {
   const { method = 'GET', body, auth = true, timeout = API_TIMEOUT_MS } = options
-  const headers = auth ? buildAuthHeaders() : { 'Content-Type': 'application/json', Accept: 'application/json' }
+  const hasBody = body != null && method !== 'GET' && method !== 'HEAD'
+  const headers = auth
+    ? buildAuthHeaders({ json: hasBody })
+    : { Accept: 'application/json', ...(hasBody ? { 'Content-Type': 'application/json' } : {}) }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
@@ -90,7 +93,7 @@ export async function apiRequest(path, options = {}) {
     res = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body != null ? JSON.stringify(sanitizeApiBody(body)) : undefined,
+      body: hasBody ? JSON.stringify(sanitizeApiBody(body)) : undefined,
       signal: controller.signal,
     })
   } catch (err) {
@@ -709,7 +712,7 @@ export const financeApi = {
 }
 
 export const documentsApi = {
-  list: (limit = 200) => apiRequest(`/documents?limit=${limit}`),
+  list: (limit = 200) => apiRequest(`/documents/list?limit=${limit}`),
   expiring: (days = 30) => apiRequest(`/documents/expiring?days=${days}`),
   save: (data) => apiRequest('/documents', { method: 'POST', body: data }),
 }
