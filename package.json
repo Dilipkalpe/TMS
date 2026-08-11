@@ -33,6 +33,9 @@
     "perf:cleanup": "powershell -ExecutionPolicy Bypass -File scripts/perf-cleanup.ps1",
     "db:relocate-postgres": "powershell -ExecutionPolicy Bypass -File scripts/relocate-postgres-data.ps1",
     "marketing:video": "node scripts/build-marketing-video.mjs",
+    "training:capture": "node scripts/capture-training-screenshots.mjs",
+    "training:doc": "node scripts/generate-user-training-doc.mjs",
+    "training:all": "npm run training:capture && npm run training:doc",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -42,6 +45,7 @@
   "dependencies": {
     "leaflet": "^1.9.4",
     "lucide-react": "^1.21.0",
+    "pptxgenjs": "^3.12.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-leaflet": "^5.0.0",
@@ -56,6 +60,7 @@
     "docx": "^9.7.1",
     "fluent-ffmpeg": "^2.1.3",
     "jsdom": "^25.0.1",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4.3.1",
     "vite": "^8.0.12",
     "vitest": "^3.0.5"

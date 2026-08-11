@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { getToken, settingsApi } from '../services/api'
+import { loadPrintTemplateConfig } from '../services/printTemplateService'
 import { useAuth } from './AuthContext'
 import { DEFAULT_COMPANY } from '../utils/printUtils'
 import { getStoredPrintLogoUrl } from '../utils/printLogo'
@@ -52,6 +53,7 @@ export function PrintProvider({ children }) {
   useEffect(() => {
     if (booting || !isAuthenticated || !getToken()) return
     loadCompany()
+    loadPrintTemplateConfig().catch(() => {})
   }, [booting, isAuthenticated, loadCompany])
 
   const print = useCallback((node) => {

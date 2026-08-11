@@ -2,7 +2,8 @@ function fmt(n) {
   return Number(n ?? 0).toLocaleString('en-IN')
 }
 
-export default function TransportBillPrint({ bill, company, booking }) {
+export default function TransportBillPrint({ bill: billProp, company, booking, variant = 'T1' }) {
+  const bill = billProp || {}
   const isRcm = bill.billType === 'RCM'
   const lines = Array.isArray(bill.lines) ? bill.lines : [
     {
@@ -15,7 +16,7 @@ export default function TransportBillPrint({ bill, company, booking }) {
   const netPayable = Number(bill.netPayable ?? bill.totalAmount ?? 0)
 
   return (
-    <div className="p-8 text-sm text-black" style={{ fontFamily: 'Arial, sans-serif', maxWidth: 800 }}>
+    <div className={`print-document print-variant-${variant} p-8 text-sm text-black`} style={{ fontFamily: 'Arial, sans-serif', maxWidth: 800 }}>
       <div className="border-b-2 border-slate-800 pb-3">
         <h1 className="text-xl font-bold">{company?.name ?? 'TMS Pro Transport'}</h1>
         <p>{company?.address ?? ''}</p>

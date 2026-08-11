@@ -10,6 +10,7 @@ import { lrProcessPath } from '../../utils/docPath'
 import { gridActionForStage } from '../../constants/lrStatusNavigation'
 import { useToast } from '../../context/ToastContext'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
+import BillingInvoiceFlowBanner from '../billing/BillingInvoiceFlowBanner'
 
 /** CRUD gate: list queue (Read) → select LR → form (Create/Update via lrProcessApi). */
 export default function OpsLrQueueGate({
@@ -19,6 +20,8 @@ export default function OpsLrQueueGate({
   queueHint,
   processStep,
   basePath,
+  listPath,
+  allowBlankEntry = false,
   children,
 }) {
   const navigate = useNavigate()
@@ -102,8 +105,23 @@ export default function OpsLrQueueGate({
   ]
 
   if (!lrNumber) {
+    if (allowBlankEntry) {
+      return children({
+        lrNumber: null,
+        process: null,
+        lr: null,
+        saving,
+        runSave,
+        reload: async () => {},
+        onBack: listPath ? () => navigate(listPath) : clearLr,
+        openProcess: () => {},
+        basePath,
+        isBlank: true,
+      })
+    }
     return (
       <ERPContentPage module={module} title={title}>
+        {module === 'Billing' && <BillingInvoiceFlowBanner currentStep={2} />}
         <div className="mb-3 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
           {queueHint}
         </div>
@@ -146,7 +164,7 @@ export default function OpsLrQueueGate({
     saving,
     runSave,
     reload,
-    onBack: clearLr,
+    onBack: listPath ? () => navigate(listPath) : clearLr,
     openProcess: () => navigate(lrProcessPath(lrNumber, processStep)),
     basePath,
   })

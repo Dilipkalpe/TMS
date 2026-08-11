@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Tms.Api.Data;
@@ -7,6 +8,9 @@ namespace Tms.Api.Services;
 /// <summary>Adds branch_id to LR / vendor / commercial tables and backfills from bookings / HO.</summary>
 public static class BranchIsolationMigrator
 {
+    static readonly Regex TableFromAlter = new(@"^ALTER\s+TABLE\s+(\w+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    static readonly Regex TableFromUpdate = new(@"^UPDATE\s+(\w+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public static async Task EnsureAsync(TmsDbContext db, CancellationToken ct = default)
     {
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();
@@ -15,26 +19,30 @@ public static class BranchIsolationMigrator
 
         await SchemaMigrationHelper.EnsureBranchesPrimaryKeyAsync(conn, ct);
 
-        await using (var check = new NpgsqlCommand(
-            """
-            SELECT COUNT(*) FROM information_schema.columns
-            WHERE table_name = 'lorry_receipts' AND column_name = 'branch_id'
-            """, conn))
-        {
-            var exists = Convert.ToInt64(await check.ExecuteScalarAsync(ct)) > 0;
-            // Still run backfill statements even if column exists (idempotent UPDATEs).
-            if (!exists)
-            {
-                // fall through to full script
-            }
-        }
-
         var text = await LoadSqlAsync(ct);
         foreach (var stmt in ParseSql(text))
         {
-            await using var cmd = new NpgsqlCommand(stmt, conn);
-            await cmd.ExecuteNonQueryAsync(ct);
+            var table = ExtractTableName(stmt);
+            if (table != null && !await SchemaMigrationHelper.TableExistsAsync(conn, table, ct))
+                continue;
+
+            try
+            {
+                await SchemaMigrationHelper.ExecuteNonQueryAsync(conn, stmt, ct);
+            }
+            catch (PostgresException ex) when (ex.SqlState is "42P01" or "42703")
+            {
+                // Optional module tables may not exist on partial installs.
+            }
         }
+    }
+
+    static string? ExtractTableName(string stmt)
+    {
+        var m = TableFromAlter.Match(stmt);
+        if (m.Success) return m.Groups[1].Value;
+        m = TableFromUpdate.Match(stmt);
+        return m.Success ? m.Groups[1].Value : null;
     }
 
     static async Task<string> LoadSqlAsync(CancellationToken ct)

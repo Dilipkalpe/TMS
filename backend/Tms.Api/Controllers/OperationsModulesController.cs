@@ -63,8 +63,8 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
                 EF.Functions.ILike(x.Sheet.SheetNumber, p) ||
                 EF.Functions.ILike(x.Sheet.LrNumber, p) ||
                 EF.Functions.ILike(x.Sheet.VehicleNumber ?? "", p) ||
-                EF.Functions.ILike(x.Lr.Consignor, p) ||
-                EF.Functions.ILike(x.Lr.Consignee, p));
+                EF.Functions.ILike(x.Lr.Consignor ?? "", p) ||
+                EF.Functions.ILike(x.Lr.Consignee ?? "", p));
         }
 
         q = q.OrderByDescending(x => x.Sheet.LoadingAt);
@@ -138,16 +138,156 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             passNumber = x.Pass.PassNumber,
             passDate = x.Pass.IssueDate,
             lrNumber = x.Pass.LrNumber,
-            tripNo = x.Pass.VehicleNumber,
+            loadingSheetId = x.Pass.LoadingSheetId,
+            tripNo = x.Pass.TripNo ?? x.Pass.VehicleNumber,
             fromBranch = x.Pass.RouteFrom,
             toBranch = x.Pass.RouteTo,
             vehicleNumber = x.Pass.VehicleNumber ?? x.Lr.VehicleNumber,
             driver = x.Pass.DriverName ?? x.Lr.DriverName,
             validFrom = x.Pass.IssueDate,
-            validTo = x.Pass.IssueDate.AddDays(3),
-            status = x.Lr.Status == LrStatuses.InTransit ? "Active" :
-                x.Lr.Status == LrStatuses.Closed ? "Completed" : "Active",
+            validTo = x.Pass.ExpectedDelivery ?? x.Pass.IssueDate.AddDays(3),
+            status = x.Lr.Status == LrStatuses.InTransit ? "In Transit" :
+                x.Lr.Status == LrStatuses.TransitPassGenerated ? "Ready for Dispatch" :
+                x.Lr.Status == LrStatuses.DeliveryCompleted || x.Lr.Status == LrStatuses.PodUploaded ? "Delivered" :
+                x.Lr.Status == LrStatuses.Closed ? "Completed" : "Draft",
+            lrStatus = x.Lr.Status,
             createdBy = x.Pass.CreatedBy,
+            branchName = x.Lr.Branch != null ? x.Lr.Branch.Name : null,
+        }).ToPagedListAsync(pNo, size, includeTotal, ct);
+
+        return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
+    }
+
+    [HttpGet("dispatch/summary")]
+    public async Task<ActionResult<object>> DispatchSummary(CancellationToken ct)
+    {
+        var ready = await ScopedLrs().CountAsync(l => l.Status == LrStatuses.TransitPassGenerated, ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var todayDispatched = await tenants.Filter(db.LrDeliverySheets.AsNoTracking())
+            .CountAsync(d => d.ShipmentStatus == "In Transit" && DateOnly.FromDateTime(d.UpdatedAt) == today, ct);
+        var inTransit = await ScopedLrs().CountAsync(l => l.Status == LrStatuses.InTransit, ct);
+        var cancelled = await tenants.Filter(db.LrTransitPasses.AsNoTracking())
+            .CountAsync(p => EF.Functions.JsonContains(p.ExtendedDataJson, """{"passStatus":"Cancelled"}"""), ct);
+        return Ok(new { total = ready + inTransit, pending = ready, todayDispatched, inTransit, cancelled });
+    }
+
+    [HttpGet("dispatch")]
+    public async Task<ActionResult<PagedResult<object>>> DispatchList(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default)
+    {
+        var q = from p in tenants.Filter(db.LrTransitPasses.AsNoTracking())
+                join lr in ScopedLrs() on p.LrNumber equals lr.LrNumber
+                where lr.Status == LrStatuses.TransitPassGenerated
+                select new { Pass = p, Lr = lr };
+
+        if (dateFrom.HasValue) q = q.Where(x => x.Pass.IssueDate >= dateFrom);
+        if (dateTo.HasValue) q = q.Where(x => x.Pass.IssueDate <= dateTo);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = $"%{search.Trim()}%";
+            q = q.Where(x =>
+                EF.Functions.ILike(x.Pass.PassNumber, s) ||
+                EF.Functions.ILike(x.Pass.LrNumber, s) ||
+                EF.Functions.ILike(x.Pass.VehicleNumber ?? "", s) ||
+                EF.Functions.ILike(x.Pass.DriverName ?? "", s));
+        }
+
+        q = q.OrderByDescending(x => x.Pass.IssueDate);
+        var (pNo, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.Select(x => new
+        {
+            id = x.Pass.Id,
+            dispatchNo = (string?)null,
+            transitPassNo = x.Pass.PassNumber,
+            passNumber = x.Pass.PassNumber,
+            lrNumber = x.Pass.LrNumber,
+            dispatchDate = x.Pass.IssueDate,
+            vehicleNumber = x.Pass.VehicleNumber ?? x.Lr.VehicleNumber,
+            driver = x.Pass.DriverName ?? x.Lr.DriverName,
+            from = x.Pass.RouteFrom,
+            to = x.Pass.RouteTo,
+            destination = x.Pass.RouteTo,
+            lrCount = 1,
+            status = "Pending",
+            createdBy = x.Pass.CreatedBy,
+        }).ToPagedListAsync(pNo, size, includeTotal, ct);
+
+        return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
+    }
+
+    [HttpGet("in-transit/summary")]
+    public async Task<ActionResult<object>> InTransitSummary(CancellationToken ct)
+    {
+        // Active In Transit excludes "Reached Destination" — those belong in Delivery Complete.
+        var q = tenants.Filter(db.LrDeliverySheets.AsNoTracking())
+            .Where(d => d.ShipmentStatus == "In Transit"
+                && !EF.Functions.JsonContains(d.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}"""));
+        var total = await q.CountAsync(ct);
+        var delayed = await q.CountAsync(d => EF.Functions.JsonContains(d.ExtendedDataJson, """{"inTransitStatus":"Delayed"}"""), ct);
+        var atDestination = await tenants.Filter(db.LrDeliverySheets.AsNoTracking())
+            .CountAsync(d => d.ShipmentStatus == "In Transit"
+                && EF.Functions.JsonContains(d.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}"""), ct);
+        var today = await q.CountAsync(d => DateOnly.FromDateTime(d.UpdatedAt) == DateOnly.FromDateTime(DateTime.UtcNow), ct);
+        return Ok(new { total, dispatched = total, delayed, atDestination, today });
+    }
+
+    [HttpGet("in-transit")]
+    public async Task<ActionResult<PagedResult<object>>> InTransitList(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default)
+    {
+        var q = from d in tenants.Filter(db.LrDeliverySheets.AsNoTracking())
+                join lr in ScopedLrs() on d.LrNumber equals lr.LrNumber
+                join p in tenants.Filter(db.LrTransitPasses.AsNoTracking()) on d.LrNumber equals p.LrNumber into passes
+                from pass in passes.DefaultIfEmpty()
+                where d.ShipmentStatus == "In Transit"
+                    && lr.Status == LrStatuses.InTransit
+                    && !EF.Functions.JsonContains(d.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}""")
+                select new { Sheet = d, Lr = lr, Pass = pass };
+
+        if (dateFrom.HasValue) q = q.Where(x => x.Sheet.UpdatedAt >= dateFrom.Value.ToDateTime(TimeOnly.MinValue));
+        if (dateTo.HasValue) q = q.Where(x => x.Sheet.UpdatedAt <= dateTo.Value.ToDateTime(TimeOnly.MaxValue));
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = $"%{search.Trim()}%";
+            q = q.Where(x =>
+                EF.Functions.ILike(x.Sheet.LrNumber, s) ||
+                EF.Functions.ILike(x.Sheet.TripNo ?? "", s) ||
+                EF.Functions.ILike(x.Lr.VehicleNumber ?? "", s) ||
+                EF.Functions.ILike(x.Lr.DriverName ?? "", s));
+        }
+
+        q = q.OrderByDescending(x => x.Sheet.UpdatedAt);
+        var (pNo, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.Select(x => new
+        {
+            id = x.Sheet.Id,
+            tripNo = x.Sheet.TripNo,
+            dispatchNo = x.Sheet.TripNo,
+            transitPassNo = x.Pass != null ? x.Pass.PassNumber : null,
+            lrNumber = x.Sheet.LrNumber,
+            vehicleNumber = x.Lr.VehicleNumber,
+            driver = x.Lr.DriverName,
+            from = x.Lr.FromCity,
+            to = x.Lr.ToCity,
+            destination = x.Lr.ToCity,
+            dispatchTime = x.Sheet.UpdatedAt,
+            expectedDelivery = x.Pass != null ? x.Pass.ExpectedDelivery : null,
+            status = "In Transit",
+            createdBy = x.Sheet.CreatedBy,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
@@ -156,19 +296,26 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
     [HttpGet("delivery-complete/summary")]
     public async Task<ActionResult<object>> DeliveryCompleteSummary(CancellationToken ct)
     {
-        var q = tenants.Filter(db.LrDeliverySheets.AsNoTracking());
-        var total = await q.CountAsync(ct);
+        var sheets = tenants.Filter(db.LrDeliverySheets.AsNoTracking());
+        var completed = sheets.Where(d => d.ShipmentStatus == "Delivered"
+            || d.ShipmentStatus == "POD Received"
+            || d.ShipmentStatus == "Closed");
+        var pendingDelivery = await sheets.CountAsync(d =>
+            d.ShipmentStatus == "In Transit"
+            && EF.Functions.JsonContains(d.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}"""), ct);
+        var total = await completed.CountAsync(ct) + pendingDelivery;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var todayCount = await q.CountAsync(d => d.DeliveryDate == today, ct);
+        var todayCount = await completed.CountAsync(d => d.DeliveryDate == today, ct);
         var monthStart = new DateOnly(today.Year, today.Month, 1);
-        var monthCount = await q.CountAsync(d => d.DeliveryDate >= monthStart, ct);
-        var pendingPod = await q.CountAsync(d => d.ShipmentStatus == "Delivered", ct);
+        var monthCount = await completed.CountAsync(d => d.DeliveryDate >= monthStart, ct);
+        var pendingPod = await completed.CountAsync(d => d.ShipmentStatus == "Delivered", ct);
         return Ok(new
         {
             total,
             today = todayCount,
             thisMonth = monthCount,
             pendingPod,
+            pendingDelivery,
             avgDays = 1.42,
         });
     }
@@ -220,12 +367,37 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
                 select new { Sheet = d, Lr = lr };
 
         if (deliveryCompleteOnly)
-            q = q.Where(x => x.Sheet.ShipmentStatus == "Delivered" || x.Sheet.ShipmentStatus == "Delivery Completed");
+        {
+            // Completed deliveries + In Transit trips that reached destination (ready to confirm delivery).
+            q = q.Where(x =>
+                x.Sheet.ShipmentStatus == "Delivered"
+                || x.Sheet.ShipmentStatus == "POD Received"
+                || x.Sheet.ShipmentStatus == "Closed"
+                || (x.Sheet.ShipmentStatus == "In Transit"
+                    && x.Lr.Status == LrStatuses.InTransit
+                    && EF.Functions.JsonContains(x.Sheet.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}""")));
+        }
 
         if (!string.IsNullOrWhiteSpace(status) && status != "(All)")
-            q = q.Where(x => x.Sheet.ShipmentStatus == status);
-        if (dateFrom.HasValue) q = q.Where(x => x.Sheet.DeliveryDate >= dateFrom);
-        if (dateTo.HasValue) q = q.Where(x => x.Sheet.DeliveryDate <= dateTo);
+        {
+            if (status == "Delivery Completed")
+                q = q.Where(x => x.Lr.Status == LrStatuses.DeliveryCompleted || x.Lr.Status == LrStatuses.PodUploaded);
+            else if (status is "Ready for Delivery" or "Reached Destination" or "Pending Delivery")
+                q = q.Where(x => x.Sheet.ShipmentStatus == "In Transit"
+                    && EF.Functions.JsonContains(x.Sheet.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}"""));
+            else
+                q = q.Where(x => x.Sheet.ShipmentStatus == status);
+        }
+        if (dateFrom.HasValue)
+            q = q.Where(x =>
+                (x.Sheet.DeliveryDate != null && x.Sheet.DeliveryDate >= dateFrom)
+                || (x.Sheet.DeliveryDate == null
+                    && DateOnly.FromDateTime(x.Sheet.UpdatedAt) >= dateFrom));
+        if (dateTo.HasValue)
+            q = q.Where(x =>
+                (x.Sheet.DeliveryDate != null && x.Sheet.DeliveryDate <= dateTo)
+                || (x.Sheet.DeliveryDate == null
+                    && DateOnly.FromDateTime(x.Sheet.UpdatedAt) <= dateTo));
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = $"%{search.Trim()}%";
@@ -233,7 +405,7 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
                 EF.Functions.ILike(x.Sheet.LrNumber, s) ||
                 EF.Functions.ILike(x.Sheet.SheetNumber, s) ||
                 EF.Functions.ILike(x.Lr.CustomerName ?? "", s) ||
-                EF.Functions.ILike(x.Lr.Consignee, s));
+                EF.Functions.ILike(x.Lr.Consignee ?? "", s));
         }
 
         q = q.OrderByDescending(x => x.Sheet.UpdatedAt);
@@ -244,17 +416,27 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             podNo = x.Sheet.SheetNumber,
             lrNumber = x.Sheet.LrNumber,
             tripNo = x.Lr.VehicleNumber,
+            vehicleNumber = x.Lr.VehicleNumber,
+            driver = x.Lr.DriverName,
             customer = x.Lr.CustomerName ?? x.Lr.Consignor,
             from = x.Lr.FromCity,
             to = x.Lr.ToCity,
             deliveryDate = x.Sheet.DeliveryDate,
             receiverName = x.Sheet.ReceiverName,
             podStatus = x.Sheet.ShipmentStatus == "POD Received" ? "Received" :
-                x.Sheet.ShipmentStatus == "Delivered" ? "Delivered" : "Pending",
-            verificationStatus = x.Sheet.ShipmentStatus == "POD Received" ? "Verified" : "Pending",
+                x.Sheet.ShipmentStatus == "Delivered" ? "Delivered" :
+                x.Sheet.ShipmentStatus == "In Transit" ? "Pending" : "Pending",
+            verificationStatus = x.Sheet.ShipmentStatus == "POD Received"
+                ? "Verified"
+                : EF.Functions.JsonContains(x.Sheet.ExtendedDataJson, """{"podVerification":{"status":"Rejected"}}""")
+                    ? "Rejected"
+                    : "Pending",
             receivedOn = x.Sheet.UpdatedAt,
             receivedBy = x.Sheet.CreatedBy,
-            deliveryStatus = x.Sheet.ShipmentStatus,
+            deliveryStatus = x.Sheet.ShipmentStatus == "In Transit"
+                && EF.Functions.JsonContains(x.Sheet.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}""")
+                    ? "Ready for Delivery"
+                    : x.Sheet.ShipmentStatus,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));

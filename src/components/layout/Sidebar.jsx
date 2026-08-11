@@ -1,91 +1,89 @@
 import * as Icons from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { useState } from 'react'
 import { navigation, platformNavigation } from '../../config/navigation'
 import { useSidebar } from '../../context/SidebarContext'
 import { useAuth } from '../../context/AuthContext'
 import { useCompany } from '../../context/CompanyContext'
 import { useSubscription } from '../../context/SubscriptionContext'
-import { ChevronDown, ChevronLeft, Truck, X } from 'lucide-react'
-import TallyModeToggle from '../keyboard/TallyModeToggle'
+import CompanySelector from './CompanySelector'
+import { Truck, X } from 'lucide-react'
 
 function NavIcon({ name }) {
   const Icon = Icons[name] || Icons.Circle
   return <Icon className="h-5 w-5 shrink-0" />
 }
 
-function NavItem({ item, collapsed, onNavigate }) {
-  const location = useLocation()
-  const hasChildren = item.children?.length > 0
-  const isChildActive = hasChildren && item.children.some((c) => location.pathname === c.path || location.pathname.startsWith(c.path + '/'))
-  const [open, setOpen] = useState(isChildActive)
+function prefixActive(pathname, prefix) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`)
+}
 
-  if (!hasChildren) {
-    const lrHub = item.path === '/lr/list'
-    const isActive = lrHub
-      ? location.pathname === '/lr' || location.pathname === '/lr/list' || location.pathname.startsWith('/lr/')
-      : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-    return (
-      <NavLink
-        to={item.path}
-        end={!lrHub}
-        onClick={onNavigate}
-        className={() =>
-          `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-            isActive
-              ? 'bg-primary text-white shadow-sm shadow-primary/25 ring-1 ring-accent/30'
-              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-          }`
-        }
-      >
-        <NavIcon name={item.icon} />
-        {!collapsed && <span>{item.title}</span>}
-      </NavLink>
-    )
+function isExcluded(pathname, item) {
+  const excludes = [
+    ...(item.excludePrefix ? [item.excludePrefix] : []),
+    ...(item.excludePrefixes || []),
+  ]
+  return excludes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
+function navIsActive(pathname, item) {
+  const p = pathname
+  if (isExcluded(p, item)) return false
+  if (item.exact) return p === item.path
+  const prefixes = item.matchPrefixes?.length
+    ? item.matchPrefixes
+    : (item.matchPrefix ? [item.matchPrefix] : null)
+  if (prefixes) {
+    return p === item.path || prefixes.some((prefix) => prefixActive(p, prefix))
   }
+  if (item.path === '/') return p === '/'
+  return p === item.path || p.startsWith(`${item.path}/`)
+}
+
+function NavItem({ item, mode, onNavigate }) {
+  const location = useLocation()
+  const iconOnly = mode === 'icon'
+  const active = navIsActive(location.pathname, item)
 
   return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-          isChildActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-        }`}
-      >
-        <NavIcon name={item.icon} />
-        {!collapsed && (
-          <>
-            <span className="flex-1 text-left">{item.title}</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-          </>
-        )}
-      </button>
-      {!collapsed && open && (
-        <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-700 pl-3">
-          {item.children.map((child) => (
-            <NavLink
-              key={child.path}
-              to={child.path}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                `block rounded-lg px-3 py-2 text-sm transition-all ${
-                  isActive ? 'bg-primary/20 text-primary font-medium' : 'text-slate-400 hover:text-white'
-                }`
-              }
-            >
-              {child.title}
-            </NavLink>
-          ))}
-        </div>
-      )}
-    </div>
+    <NavLink
+      to={item.path}
+      end={item.path === '/' || Boolean(item.exact)}
+      onClick={onNavigate}
+      title={iconOnly ? item.title : undefined}
+      className={() =>
+        `flex items-center rounded-xl py-2.5 text-sm font-medium transition-all ${
+          iconOnly ? 'justify-center px-2' : 'gap-3 px-3'
+        } ${
+          active
+            ? 'bg-primary text-white shadow-sm shadow-primary/25 ring-1 ring-accent/30'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+        }`
+      }
+    >
+      <NavIcon name={item.icon} />
+      {!iconOnly && <span>{item.title}</span>}
+    </NavLink>
+  )
+}
+
+function NavList({ items, platformItems, mode, onNavigate }) {
+  return (
+    <>
+      {platformItems.map((item) => (
+        <NavItem key={item.title} item={item} mode={mode} onNavigate={onNavigate} />
+      ))}
+      {platformItems.length > 0 && <div className="my-2 border-t border-slate-700/50" />}
+      {items.map((item) => (
+        <NavItem key={item.title} item={item} mode={mode} onNavigate={onNavigate} />
+      ))}
+    </>
   )
 }
 
 export default function Sidebar() {
-  const { collapsed, mobileOpen, toggleCollapsed, closeMobile } = useSidebar()
+  const { menuExpanded, collapseMenu } = useSidebar()
   const { user } = useAuth()
-  const { needsCompanySelection } = useCompany()
+  const { needsCompanySelection, companyName } = useCompany()
   const { hasFeature } = useSubscription()
 
   const items = needsCompanySelection
@@ -93,67 +91,66 @@ export default function Sidebar() {
     : navigation.filter((item) => !item.feature || hasFeature(item.feature))
   const platformItems = user?.isPlatformAdmin ? platformNavigation : []
 
+  const closePopup = () => collapseMenu()
+
   return (
     <>
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={closeMobile} />
-      )}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col bg-secondary transition-all duration-300 lg:static ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } ${collapsed ? 'w-[72px]' : 'w-64'}`}
-      >
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-700/50 px-3 sm:h-14 sm:px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark ring-2 ring-accent/40">
-              <Truck className="h-5 w-5 text-white" />
-            </div>
-            {!collapsed && (
-              <div>
-                <p className="text-sm font-bold text-white">TMS Pro</p>
-                <p className="text-[10px] font-medium tracking-wide text-slate-400">Transport Management System</p>
-              </div>
-            )}
+      <aside className="hidden h-screen w-[4.5rem] shrink-0 flex-col border-r border-slate-700/40 bg-secondary lg:flex">
+        <div className="app-sidebar-brand flex h-14 shrink-0 items-center justify-center border-b border-slate-700/50 px-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark ring-2 ring-accent/40">
+            <Truck className="h-5 w-5 text-white" />
           </div>
-          <button onClick={closeMobile} className="text-slate-400 hover:text-white lg:hidden">
-            <X className="h-5 w-5" />
-          </button>
         </div>
-
-        <nav className="app-scroll mobile-scroll-y flex-1 space-y-1 overflow-y-auto p-3">
-          {platformItems.map((item) => (
-            <NavItem key={item.title} item={item} collapsed={collapsed} onNavigate={closeMobile} />
-          ))}
-          {platformItems.length > 0 && <div className="my-2 border-t border-slate-700/50" />}
-          {items.map((item) => (
-            <NavItem key={item.title} item={item} collapsed={collapsed} onNavigate={closeMobile} />
-          ))}
+        <nav className="app-scroll flex-1 space-y-1 overflow-y-auto p-2">
+          <NavList items={items} platformItems={platformItems} mode="icon" onNavigate={() => {}} />
         </nav>
-
-        <div className="hidden border-t border-slate-700/50 p-3 lg:block">
-          {!collapsed && (
-            <div className="mb-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Keyboard</p>
-                <TallyModeToggle compact />
-              </div>
-              <div className="rounded-lg bg-slate-800/50 px-2 py-2 text-[10px] leading-relaxed text-slate-400">
-                <p>F1 Help · F2 Save · F3 Search · F4 Lookup</p>
-                <p>F6/F7 Grid row · Ctrl+S Save · Ctrl+P Print</p>
-                <p>Alt+L LR · Alt+B Billing · Alt+H Home</p>
-                <p>Enter next field (Tally Mode)</p>
-              </div>
-            </div>
-          )}
-          <button
-            onClick={toggleCollapsed}
-            className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-400 transition-all hover:bg-slate-800 hover:text-white"
-          >
-            <ChevronLeft className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
-            {!collapsed && <span>Collapse</span>}
-          </button>
-        </div>
       </aside>
+
+      {menuExpanded && (
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-[1px]"
+            onClick={closePopup}
+            aria-hidden="true"
+          />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+            className="fixed inset-y-0 left-0 z-[70] flex h-screen w-72 max-w-[85vw] flex-col bg-secondary shadow-2xl ring-1 ring-white/10 transition-transform duration-300 ease-out"
+          >
+            <div className="app-sidebar-brand flex h-14 shrink-0 items-center justify-between border-b border-slate-700/50 px-4">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark ring-2 ring-accent/40">
+                  <Truck className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-white">TMS Pro</p>
+                  {user?.isPlatformAdmin ? (
+                    <CompanySelector variant="sidebar" />
+                  ) : (
+                    <p className="truncate text-[10px] font-medium tracking-wide text-slate-400">
+                      {companyName || user?.companyName || 'Transport Management System'}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closePopup}
+                className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <nav className="app-scroll mobile-scroll-y flex-1 space-y-1 overflow-y-auto p-3">
+              <NavList items={items} platformItems={platformItems} mode="full" onNavigate={closePopup} />
+            </nav>
+          </aside>
+        </>
+      )}
     </>
   )
 }

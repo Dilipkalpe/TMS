@@ -49,8 +49,8 @@ export default function PayslipList() {
       error={paged.error}
       onRefreshExternal={paged.refresh}
       sortKey="periodLabel"
-      showActions={false}
       onRowClick={(r) => navigate(`/payroll/payslips/${r.entryId}`)}
+      onView={(r) => navigate(`/payroll/payslips/${r.entryId}`)}
       onPrint={handlePrint}
       rowPrintTitle="Print payslip"
       exportFilename="payslips-export.csv"

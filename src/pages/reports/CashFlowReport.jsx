@@ -85,7 +85,7 @@ export default function CashFlowReport() {
         ) : detailRows.length === 0 ? (
           <p className="text-sm text-slate-500">No cash entries for this month.</p>
         ) : (
-          <ERPDataTable columns={detailColumns} data={detailRows} showSerial showActions={false} />
+          <ERPDataTable columns={detailColumns} data={detailRows} showSerial showActions={false} selectable={false} />
         )}
       </Modal>
     </>

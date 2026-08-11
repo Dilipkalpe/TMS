@@ -41,6 +41,12 @@ database/notifications/schema.sql
 # Branches
 database/branches/schema.sql
 
+# Users (multi-branch assignment)
+database/users/schema.sql
+
+# Audit actor columns (created_by / updated_by)
+database/audit/schema.sql
+
 # Portal
 database/portal/schema.sql
 

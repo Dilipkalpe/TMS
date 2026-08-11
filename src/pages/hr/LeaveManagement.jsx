@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -23,25 +23,6 @@ export default function LeaveManagement() {
   )
   const { data: leaveTypes } = useApiResource(() => hrApi.leaveTypes(), [])
 
-  const columns = [
-    { key: 'employeeName', label: 'Employee' },
-    { key: 'leaveTypeName', label: 'Leave Type' },
-    { key: 'fromDate', label: 'From', render: (r) => r.fromDate?.slice(0, 10) },
-    { key: 'toDate', label: 'To', render: (r) => r.toDate?.slice(0, 10) },
-    { key: 'days', label: 'Days' },
-    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (r) => r.status === 'Pending' ? (
-        <div className="flex gap-1">
-          <Button size="sm" icon={CheckCircle} disabled={busy} onClick={() => act('approve', r.id)}>Approve</Button>
-          <Button size="sm" variant="outline" icon={XCircle} disabled={busy} onClick={() => act('reject', r.id)}>Reject</Button>
-        </div>
-      ) : null,
-    },
-  ]
-
   const act = async (action, id) => {
     setBusy(true)
     try {
@@ -55,6 +36,36 @@ export default function LeaveManagement() {
       setBusy(false)
     }
   }
+
+  const rowActions = useMemo(() => [
+    {
+      id: 'approve',
+      icon: CheckCircle,
+      label: 'Approve',
+      variant: 'primary',
+      onClick: (r) => act('approve', r.id),
+      hidden: (r) => r.status !== 'Pending',
+      disabled: () => busy,
+    },
+    {
+      id: 'reject',
+      icon: XCircle,
+      label: 'Reject',
+      variant: 'danger',
+      onClick: (r) => act('reject', r.id),
+      hidden: (r) => r.status !== 'Pending',
+      disabled: () => busy,
+    },
+  ], [busy])
+
+  const columns = [
+    { key: 'employeeName', label: 'Employee' },
+    { key: 'leaveTypeName', label: 'Leave Type' },
+    { key: 'fromDate', label: 'From', render: (r) => r.fromDate?.slice(0, 10) },
+    { key: 'toDate', label: 'To', render: (r) => r.toDate?.slice(0, 10) },
+    { key: 'days', label: 'Days' },
+    { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
+  ]
 
   const submitLeave = async () => {
     if (!form.employeeId || !form.leaveTypeId || !form.fromDate || !form.toDate) {
@@ -127,7 +138,13 @@ export default function LeaveManagement() {
         {loading ? (
           <p className="p-4 text-slate-500">Loading…</p>
         ) : (
-          <ERPDataTable columns={columns} data={leaves ?? []} emptyMessage="No leave requests." />
+          <ERPDataTable
+            columns={columns}
+            data={leaves ?? []}
+            emptyMessage="No leave requests."
+            selectable
+            rowActions={rowActions}
+          />
         )}
       </Card>
     </ERPContentPage>

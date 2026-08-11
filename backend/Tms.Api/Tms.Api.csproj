@@ -57,6 +57,7 @@
     <None Include="..\..\database\maintenance\phase4.sql" Link="database\maintenance\phase4.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\maintenance\install.sql" Link="database\maintenance\install.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\notifications\schema.sql" Link="database\notifications\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\print-templates\schema.sql" Link="database\print-templates\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\portal\schema.sql" Link="database\portal\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\routing\schema.sql" Link="database\routing\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\branches\schema.sql" Link="database\branches\schema.sql" CopyToOutputDirectory="PreserveNewest" />
@@ -65,12 +66,18 @@
     <None Include="..\..\database\users\schema.sql" Link="database\users\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\booking_finance\schema.sql" Link="database\booking_finance\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\lr\schema.sql" Link="database\lr\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\lr\module_extensions.sql" Link="database\lr\module_extensions.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\lr\phase2_extended_data.sql" Link="database\lr\phase2_extended_data.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\lr\business_type.sql" Link="database\lr\business_type.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\lr\consignor_consignee.sql" Link="database\lr\consignor_consignee.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\lr\items.sql" Link="database\lr\items.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\lr\status_history.sql" Link="database\lr\status_history.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\commercial\schema.sql" Link="database\commercial\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\document_numbering\schema.sql" Link="database\document_numbering\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\stored_procedures.sql" Link="database\reports\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\sp_dashboard_stats.sql" Link="database\reports\sp_dashboard_stats.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\sp_dashboard_home.sql" Link="database\reports\sp_dashboard_home.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\reports\sp_dashboard_charts.sql" Link="database\reports\sp_dashboard_charts.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\sp_accounting_customer_ledger.sql" Link="database\reports\sp_accounting_customer_ledger.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\report_indexes.sql" Link="database\reports\report_indexes.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\sp_accounting_ledger_report.sql" Link="database\reports\sp_accounting_ledger_report.sql" CopyToOutputDirectory="PreserveNewest" />

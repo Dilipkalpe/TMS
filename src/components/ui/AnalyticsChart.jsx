@@ -118,14 +118,34 @@ function LineAreaChart({ data, dataKey = 'value', color = '#1e5a8a', fill = true
 }
 
 /* ─── MULTI LINE ─── */
+const MULTI_LINE_PRESETS = {
+  finance: [
+    { key: 'revenue', label: 'Revenue', color: '#1e5a8a' },
+    { key: 'expense', label: 'Expense', color: '#ef4444' },
+    { key: 'profit', label: 'Profit', color: '#10b981' },
+  ],
+  lr: [
+    { key: 'created', label: 'Created', color: '#1e5a8a' },
+    { key: 'delivered', label: 'Delivered', color: '#10b981' },
+    { key: 'pending', label: 'Pending', color: '#f59e0b' },
+  ],
+}
+
+function resolveMultiLineSeries(data) {
+  const sample = data?.[0] || {}
+  if ('created' in sample || 'delivered' in sample || 'pending' in sample) return MULTI_LINE_PRESETS.lr
+  return MULTI_LINE_PRESETS.finance
+}
+
 function MultiLineChart({ data }) {
-  const max = getMax(data, ['revenue', 'expense', 'profit'])
+  const series = resolveMultiLineSeries(data)
+  const max = getMax(data, series.map((s) => s.key))
   const w = 100
   const h = 60
   const pad = 2
   const mkLine = (key, color) => {
     const pts = data.map((d, i) => {
-      const x = pad + (i / (data.length - 1)) * (w - pad * 2)
+      const x = pad + (i / Math.max(data.length - 1, 1)) * (w - pad * 2)
       const y = h - pad - ((d[key] ?? 0) / max) * (h - pad * 2)
       return `${x},${y}`
     }).join(' ')
@@ -134,16 +154,10 @@ function MultiLineChart({ data }) {
   return (
     <div>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-full min-h-[120px] w-full" preserveAspectRatio="none">
-        {mkLine('revenue', '#1e5a8a')}
-        {mkLine('expense', '#ef4444')}
-        {mkLine('profit', '#10b981')}
+        {series.map((s) => mkLine(s.key, s.color))}
       </svg>
       <div className="mt-2 flex flex-wrap justify-center gap-3 text-[10px]">
-        {[
-          { label: 'Revenue', color: '#1e5a8a' },
-          { label: 'Expense', color: '#ef4444' },
-          { label: 'Profit', color: '#10b981' },
-        ].map((l) => (
+        {series.map((l) => (
           <span key={l.label} className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
             <span className="h-2 w-2 rounded-full" style={{ background: l.color }} />
             {l.label}

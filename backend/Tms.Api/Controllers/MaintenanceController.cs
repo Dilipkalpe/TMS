@@ -13,20 +13,52 @@ namespace Tms.Api.Controllers;
 public class MaintenanceController(TmsDbContext db, MaintenanceService maintenance, NotificationDispatcher notifications, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     [HttpGet("overview")]
-    public async Task<IActionResult> Overview()
+    public async Task<IActionResult> Overview(CancellationToken ct)
     {
-        await maintenance.SaveDailySnapshotsAsync();
-        var predictions = await maintenance.ComputePredictionsAsync();
-        var analytics = await maintenance.GetAnalyticsAsync();
-        var lowStock = await tenants.Filter(db.SpareParts.AsNoTracking()).CountAsync(p => p.StockQty <= p.MinStock);
-        var totalCost = await TenantScope.MaintenanceRecords(db, tenants).SumAsync(r => r.Cost);
-        var inMaint = await TenantScope.Vehicles(db, tenants, branches).CountAsync(v => v.Status.ToLower() == "maintenance");
-        var openWorkOrders = await TenantScope.MaintenanceWorkOrders(db, tenants).CountAsync(w => w.Status == "OPEN" || w.Status == "SCHEDULED");
+        // Fast path: counts + due lists. Predictions capped / no fuel-expense scans.
+        // Keep queries sequential — DbContext is not thread-safe.
+        var lowStock = await tenants.Filter(db.SpareParts.AsNoTracking()).CountAsync(p => p.StockQty <= p.MinStock, ct);
+        var totalCost = await TenantScope.MaintenanceRecords(db, tenants).SumAsync(r => (decimal?)r.Cost, ct) ?? 0;
+        var inMaint = await TenantScope.Vehicles(db, tenants, branches)
+            .CountAsync(v => v.Status != null && v.Status.ToLower() == "maintenance", ct);
+        var openWorkOrders = await TenantScope.MaintenanceWorkOrders(db, tenants)
+            .CountAsync(w => w.Status == "OPEN" || w.Status == "SCHEDULED", ct);
+        var activeSchedules = await TenantScope.MaintenanceSchedules(db, tenants).CountAsync(s => s.IsActive, ct);
+        var totalRecords = await TenantScope.MaintenanceRecords(db, tenants).CountAsync(ct);
+
+        var horizon = DateTime.UtcNow.AddDays(30);
+        var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants)
+            .AsNoTracking()
+            .Include(s => s.Vehicle)
+            .Where(s => s.IsActive && (s.NextDueAt == null || s.NextDueAt <= horizon))
+            .OrderBy(s => s.NextDueAt)
+            .Take(50)
+            .ToListAsync(ct);
+        var lowStockParts = await tenants.Filter(db.SpareParts.AsNoTracking())
+            .Where(p => p.StockQty <= p.MinStock)
+            .OrderBy(p => p.Name)
+            .Take(50)
+            .ToListAsync(ct);
+
+        List<MaintenancePredictionDto> predictions = [];
+        MaintenanceAnalyticsDto? analytics = null;
+        try
+        {
+            predictions = await maintenance.ComputePredictionsAsync(ct, syncKm: false, includeExternalSignals: false, maxVehicles: 200);
+            analytics = await maintenance.GetAnalyticsAsync(ct, predictions);
+        }
+        catch
+        {
+            // Page must still return counts/lists even if prediction engine fails.
+        }
+
+        var now = DateTime.UtcNow;
+        analytics ??= new MaintenanceAnalyticsDto(0, [], [], []);
 
         return Ok(new
         {
-            activeSchedules = await TenantScope.MaintenanceSchedules(db, tenants).CountAsync(s => s.IsActive),
-            totalRecords = await TenantScope.MaintenanceRecords(db, tenants).CountAsync(),
+            activeSchedules,
+            totalRecords,
             vehiclesInMaintenance = inMaint,
             totalMaintenanceCost = totalCost,
             lowStockParts = lowStock,
@@ -36,17 +68,46 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
             cost90Days = analytics.TotalCost90Days,
             riskDistribution = analytics.RiskDistribution,
             componentSummary = analytics.ComponentSummary,
-            predictions = predictions.Take(10),
+            predictions,
+            analytics,
+            alerts = new
+            {
+                maintenanceAlerts = dueSchedules.Select(s => new
+                {
+                    type = "MAINTENANCE_DUE",
+                    vehicleId = s.VehicleId,
+                    registrationNo = s.Vehicle?.Number,
+                    serviceType = s.ServiceType,
+                    component = MatchComponentName(s.ServiceType),
+                    nextDueAt = s.NextDueAt,
+                    overdue = s.NextDueAt.HasValue && s.NextDueAt.Value < now,
+                }),
+                componentAlerts = predictions
+                    .SelectMany(p => p.ComponentAlerts.Select(a => new
+                    {
+                        vehicleId = p.VehicleId,
+                        registrationNo = p.RegistrationNo,
+                        a.Component,
+                        a.Severity,
+                        a.Message,
+                    }))
+                    .Take(20),
+                complianceAlerts = predictions
+                    .Where(p => p.ComplianceAlerts.Count > 0)
+                    .Select(p => new { p.VehicleId, p.RegistrationNo, alerts = p.ComplianceAlerts })
+                    .Take(20),
+                lowStockParts,
+            },
         });
     }
 
     [HttpGet("predictions")]
-    public async Task<IActionResult> Predictions() =>
-        Ok(await maintenance.ComputePredictionsAsync());
+    public async Task<IActionResult> Predictions(CancellationToken ct) =>
+        Ok(await maintenance.ComputePredictionsAsync(ct, syncKm: false, includeExternalSignals: false, maxVehicles: 200));
 
     [HttpGet("analytics")]
-    public async Task<IActionResult> Analytics() =>
-        Ok(await maintenance.GetAnalyticsAsync());
+    public async Task<IActionResult> Analytics(CancellationToken ct) =>
+        Ok(await maintenance.GetAnalyticsAsync(ct));
 
     [HttpGet("vehicles/{vehicleId}")]
     public async Task<IActionResult> VehicleProfile(string vehicleId)
@@ -58,7 +119,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     [HttpPost("vehicles/{vehicleId}/notify")]
     public async Task<IActionResult> NotifyVehicle(string vehicleId)
     {
-        var predictions = await maintenance.ComputePredictionsAsync();
+        var predictions = await maintenance.ComputePredictionsAsync(includeExternalSignals: false, maxVehicles: 500);
         var p = predictions.FirstOrDefault(x => x.VehicleId == vehicleId);
         if (p == null) return NotFound(new { message = "Vehicle not found" });
 
@@ -100,18 +161,23 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     }
 
     [HttpGet("alerts")]
-    public async Task<IActionResult> Alerts()
+    public async Task<IActionResult> Alerts(CancellationToken ct)
     {
-        var predictions = await maintenance.ComputePredictionsAsync();
+        var predictions = await maintenance.ComputePredictionsAsync(ct, syncKm: false, includeExternalSignals: false, maxVehicles: 200);
         var horizon = DateTime.UtcNow.AddDays(30);
         var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants)
+            .AsNoTracking()
             .Include(s => s.Vehicle)
             .Where(s => s.IsActive && (s.NextDueAt == null || s.NextDueAt <= horizon))
             .OrderBy(s => s.NextDueAt)
-            .ToListAsync();
+            .Take(50)
+            .ToListAsync(ct);
 
-        var parts = await tenants.Filter(db.SpareParts.AsNoTracking()).OrderBy(p => p.Name).Take(500).ToListAsync();
-        var lowStock = parts.Where(p => p.StockQty <= p.MinStock).ToList();
+        var lowStock = await tenants.Filter(db.SpareParts.AsNoTracking())
+            .Where(p => p.StockQty <= p.MinStock)
+            .OrderBy(p => p.Name)
+            .Take(50)
+            .ToListAsync(ct);
         var now = DateTime.UtcNow;
 
         return Ok(new
@@ -138,7 +204,8 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
                 .Take(20),
             complianceAlerts = predictions
                 .Where(p => p.ComplianceAlerts.Count > 0)
-                .Select(p => new { p.VehicleId, p.RegistrationNo, alerts = p.ComplianceAlerts }),
+                .Select(p => new { p.VehicleId, p.RegistrationNo, alerts = p.ComplianceAlerts })
+                .Take(20),
             lowStockParts = lowStock,
         });
     }
@@ -156,7 +223,6 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     [HttpGet("schedules")]
     public async Task<IActionResult> Schedules([FromQuery] int limit = 500)
     {
-        await maintenance.SyncKmBasedSchedulesAsync();
         var take = Math.Min(Math.Max(limit, 1), 1000);
         var items = await TenantScope.MaintenanceSchedules(db, tenants)
             .Include(s => s.Vehicle)
@@ -418,13 +484,11 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
         if (string.IsNullOrWhiteSpace(body.Sku) || string.IsNullOrWhiteSpace(body.Name))
             return BadRequest(new { message = "sku and name are required" });
 
-        var companyId = TenantScope.ResolveCompanyId(tenants);
         var existing = await tenants.Filter(db.SpareParts.AsQueryable())
-            .FirstOrDefaultAsync(p => p.Sku == body.Sku);
+            .FirstOrDefaultAsync(p => p.Sku == body.Sku.Trim());
         if (existing != null)
         {
-            if (!TenantScope.CanAccessTenantEntity(tenants, existing)) return NotFound();
-            existing.Name = body.Name;
+            existing.Name = body.Name.Trim();
             existing.UnitCost = body.UnitCost;
             existing.StockQty = body.StockQty;
             existing.MinStock = body.MinStock;
@@ -436,7 +500,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
         var part = new SparePart
         {
             Id = Guid.NewGuid(),
-            CompanyId = companyId,
+            CompanyId = TenantScope.ResolveCompanyId(tenants),
             Sku = body.Sku.Trim(),
             Name = body.Name.Trim(),
             UnitCost = body.UnitCost,
@@ -456,7 +520,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     public async Task<IActionResult> UpdateStock(Guid id, [FromBody] UpdateStockRequest body)
     {
         var part = await tenants.Filter(db.SpareParts.AsQueryable()).FirstOrDefaultAsync(p => p.Id == id);
-        if (part == null) return NotFound(new { message = "Part not found" });
+        if (part == null) return NotFound();
         part.StockQty = body.StockQty;
         part.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();

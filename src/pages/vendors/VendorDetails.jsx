@@ -76,9 +76,9 @@ export default function VendorDetails() {
   ]
 
   const tabs = [
-    { id: 'bills', label: 'Purchase Bills', content: <ERPDataTable columns={billColumns} data={purchaseBills} showActions={false} /> },
-    { id: 'ledger', label: 'Ledger', content: <ERPDataTable columns={ledgerColumns} data={vendorLedger} showActions={false} /> },
-    { id: 'payments', label: 'Payment History', content: <ERPDataTable columns={ledgerColumns} data={vendorLedger.filter((l) => l.credit > 0)} showActions={false} /> },
+    { id: 'bills', label: 'Purchase Bills', content: <ERPDataTable columns={billColumns} data={purchaseBills} showActions={false} selectable={false} /> },
+    { id: 'ledger', label: 'Ledger', content: <ERPDataTable columns={ledgerColumns} data={vendorLedger} showActions={false} selectable={false} /> },
+    { id: 'payments', label: 'Payment History', content: <ERPDataTable columns={ledgerColumns} data={vendorLedger.filter((l) => l.credit > 0)} showActions={false} selectable={false} /> },
   ]
 
   return (

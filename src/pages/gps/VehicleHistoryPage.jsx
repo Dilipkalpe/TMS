@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import { Select } from '../../components/ui/Input'
 import GpsNav from './GpsNav'
 import { gpsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
@@ -39,16 +40,18 @@ export default function VehicleHistoryPage() {
       <GpsNav />
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link to="/operations/gps"><Button variant="secondary">← Live map</Button></Link>
-        <select
+        <Select
+          label={false}
           value={hours}
           onChange={(e) => setHours(Number(e.target.value))}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
-        >
-          <option value={6}>Last 6 hours</option>
-          <option value={24}>Last 24 hours</option>
-          <option value={72}>Last 3 days</option>
-          <option value={168}>Last 7 days</option>
-        </select>
+          className="min-w-[10rem]"
+          options={[
+            { value: 6, label: 'Last 6 hours' },
+            { value: 24, label: 'Last 24 hours' },
+            { value: 72, label: 'Last 3 days' },
+            { value: 168, label: 'Last 7 days' },
+          ]}
+        />
         <Button onClick={load}>Refresh</Button>
       </div>
       {data?.summary && (

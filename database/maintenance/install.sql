@@ -1,6 +1,6 @@
 -- Full maintenance module install (idempotent) — run on production if module fails to load
 -- Usage on VPS:
---   docker exec -i $(docker ps -q -f name=postgres) psql -U tms -d tms_pro -f - < database/maintenance/install.sql
+--   psql -U tms -d tms_pro -f database/maintenance/install.sql
 
 ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS odometer INT NOT NULL DEFAULT 0;
 

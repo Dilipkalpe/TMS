@@ -178,7 +178,16 @@ function TripExpensesForm({ lrNumber, lr, process, saving, runSave, reload, onBa
           </div>
         </OpsSection>
 
-        <OpsFooter saving={saving} onCancel={() => navigate('/lr?status=expense-pending')} onSave={addExpense} onSavePrint={addExpense} />
+        <OpsFooter
+          saving={saving}
+          onCancel={() => navigate('/lr/list?status=expense-pending')}
+          onSave={addExpense}
+          onSavePrint={addExpense}
+          onClear={() => {
+            setDraft({ category: 'Diesel', amount: '', description: '', expenseDate: new Date().toISOString().slice(0, 10), billNo: '', paymentMode: 'Cash' })
+            setPendingBill(null)
+          }}
+        />
       </div>
     </ERPContentPage>
   )

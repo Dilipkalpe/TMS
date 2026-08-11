@@ -31,7 +31,7 @@ export default function BrokerOutstandingReport() {
         summary={`${items.length} broker(s) · Total payable ${formatCurrency(totalPayable)}`}
       />
       {loading ? <p className="text-sm text-slate-500">Loading…</p> : (
-        <ERPDataTable columns={columns} data={items} showActions={false} />
+        <ERPDataTable columns={columns} data={items} showActions={false} selectable={false} />
       )}
     </ERPContentPage>
   )

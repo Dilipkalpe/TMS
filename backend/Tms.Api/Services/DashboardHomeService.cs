@@ -30,17 +30,90 @@ public record DashboardHomeDto(
     IReadOnlyList<DashboardHomeRecentLrDto> RecentLrs,
     IReadOnlyList<DashboardHomePendingDeliveryDto> PendingDeliveries,
     IReadOnlyList<DashboardHomeNotificationDto> Notifications,
+    DateOnly DateFrom,
+    DateOnly DateTo,
     DateTime ServerTime);
 
-public class DashboardHomeService(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
+public class DashboardHomeService(
+    DashboardReadService dashboardRead,
+    TmsDbContext db,
+    ITenantContext tenants,
+    IBranchContext branches,
+    ILogger<DashboardHomeService> logger)
 {
-    public async Task<DashboardHomeDto> BuildAsync(CancellationToken ct = default)
+    public async Task<DashboardHomeDto> BuildAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
     {
-        var lrs = TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking();
-        var bookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var companyId = TenantScope.ResolveCompanyId(tenants);
+        var branchId = branches.EffectiveBranchId;
 
+        var fromSp = await dashboardRead.TryGetHomeAsync(companyId, branchId, fromDate, toDate, ct);
+        if (fromSp != null) return fromSp;
+
+        logger.LogDebug("Building dashboard home via EF fallback");
+        return await BuildViaEfAsync(fromDate, toDate, ct);
+    }
+
+    async Task<DashboardHomeDto> BuildViaEfAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        var allLrs = TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking();
+        var lrs = allLrs.Where(l => l.LrDate >= fromDate && l.LrDate <= toDate);
+        var bookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking()
+            .Where(b => b.BookingDate >= fromDate && b.BookingDate <= toDate);
+
+        var spanDays = toDate.DayNumber - fromDate.DayNumber + 1;
+        var prevTo = fromDate.AddDays(-1);
+        var prevFrom = prevTo.AddDays(-(spanDays - 1));
+
+        // Trend comparison needs the previous window; pass unfiltered LR set (date filters applied inside).
+        var counts = await LoadCountsAsync(lrs, ct);
+        var revenue = await LoadRevenueAsync(lrs, bookings, ct);
+        var trends = await LoadTrendWindowsAsync(allLrs, bookings, fromDate, toDate, prevFrom, prevTo, ct);
+        var trendFrom = spanDays > 31 ? toDate.AddDays(-30) : fromDate;
+        var lrTrend = await BuildLrTrendAsync(lrs, trendFrom, toDate, ct);
+        var (slices, statusTotal) = await BuildStatusSummaryAsync(lrs, ct);
+        var destinations = await BuildTopDestinationsAsync(lrs, bookings, ct);
+        var recentLrs = await LoadRecentLrsAsync(allLrs, ct);
+        var pendingDeliveries = await LoadPendingDeliveriesAsync(allLrs, ct);
+        var notifications = await BuildNotificationsAsync(allLrs, ct);
+
+        var kpis = new List<DashboardHomeKpiDto>
+        {
+            MakeKpi("Total LR", "totalLr", counts.TotalLr, TrendPct(trends.TotalCur, trends.TotalPrev)),
+            MakeKpi("In Transit", "inTransit", counts.InTransit, TrendPct(trends.InTransitCur, trends.InTransitPrev)),
+            MakeKpi("Delivered", "delivered", counts.Delivered, TrendPct(trends.DeliveredCur, trends.DeliveredPrev)),
+            MakeKpi("Pending Delivery", "pendingDelivery", counts.PendingDelivery, TrendPct(trends.PendingCur, trends.PendingPrev), invertTrend: true),
+            MakeKpi("LR Revenue", "todaysRevenue", revenue.LrRevenue, TrendPctRevenue(trends.LrRevenueCur, trends.LrRevenuePrev)),
+            MakeKpi("Booking Revenue", "monthlyRevenue", revenue.BookingRevenue, TrendPctRevenue(trends.BookingRevenueCur, trends.BookingRevenuePrev)),
+        };
+
+        return new DashboardHomeDto(
+            kpis,
+            lrTrend,
+            slices,
+            statusTotal,
+            destinations,
+            recentLrs,
+            pendingDeliveries,
+            notifications,
+            fromDate,
+            toDate,
+            DateTime.UtcNow);
+    }
+
+    sealed record CountSnapshot(int TotalLr, int InTransit, int Delivered, int PendingDelivery);
+
+    sealed record RevenueSnapshot(decimal LrRevenue, decimal BookingRevenue);
+
+    sealed record TrendSnapshot(
+        int TotalCur, int TotalPrev,
+        int InTransitCur, int InTransitPrev,
+        int DeliveredCur, int DeliveredPrev,
+        int PendingCur, int PendingPrev,
+        decimal LrRevenueCur, decimal LrRevenuePrev,
+        decimal BookingRevenueCur, decimal BookingRevenuePrev);
+
+    static async Task<CountSnapshot> LoadCountsAsync(IQueryable<LorryReceipt> lrs, CancellationToken ct)
+    {
         var totalLr = await lrs.CountAsync(ct);
         var inTransit = await lrs.CountAsync(l => l.Status == LrStatuses.InTransit, ct);
         var delivered = await lrs.CountAsync(l =>
@@ -56,60 +129,73 @@ public class DashboardHomeService(TmsDbContext db, ITenantContext tenants, IBran
             l.Status != LrStatuses.PodUploaded &&
             l.Status != LrStatuses.Draft, ct);
 
-        var todaysRevenue = await lrs.Where(l => l.LrDate == today).SumAsync(l => (decimal?)l.Freight, ct) ?? 0;
-        if (todaysRevenue == 0)
-            todaysRevenue = await bookings.Where(b => b.BookingDate == today).SumAsync(b => (decimal?)b.Freight, ct) ?? 0;
+        return new CountSnapshot(totalLr, inTransit, delivered, pendingDelivery);
+    }
 
-        var monthlyRevenue = await lrs.Where(l => l.LrDate >= monthStart).SumAsync(l => (decimal?)l.Freight, ct) ?? 0;
-        if (monthlyRevenue == 0)
-            monthlyRevenue = await bookings.Where(b => b.BookingDate >= monthStart).SumAsync(b => (decimal?)b.Freight, ct) ?? 0;
+    static async Task<RevenueSnapshot> LoadRevenueAsync(
+        IQueryable<LorryReceipt> lrs,
+        IQueryable<Booking> bookings,
+        CancellationToken ct)
+    {
+        var lrRev = await lrs.SumAsync(l => (decimal?)l.Freight, ct) ?? 0;
+        var bookingRev = await bookings.SumAsync(b => (decimal?)b.Freight, ct) ?? 0;
+        return new RevenueSnapshot(lrRev, bookingRev);
+    }
 
-        var kpis = new List<DashboardHomeKpiDto>
-        {
-            MakeKpi("Total LR", "totalLr", totalLr, await TrendCountAsync(lrs, null, ct)),
-            MakeKpi("In Transit", "inTransit", inTransit, await TrendCountAsync(lrs, LrStatuses.InTransit, ct)),
-            MakeKpi("Delivered", "delivered", delivered, await TrendCountAsync(lrs, "delivered-group", ct)),
-            MakeKpi("Pending Delivery", "pendingDelivery", pendingDelivery, await TrendCountAsync(lrs, "pending-delivery", ct), invertTrend: true),
-            MakeKpi("Today's Revenue", "todaysRevenue", todaysRevenue, await TrendRevenueAsync(lrs, bookings, 1, ct)),
-            MakeKpi("Monthly Revenue", "monthlyRevenue", monthlyRevenue, await TrendRevenueAsync(lrs, bookings, 30, ct)),
-        };
+    static async Task<TrendSnapshot> LoadTrendWindowsAsync(
+        IQueryable<LorryReceipt> lrs,
+        IQueryable<Booking> bookings,
+        DateOnly curFrom,
+        DateOnly curTo,
+        DateOnly prevFrom,
+        DateOnly prevTo,
+        CancellationToken ct)
+    {
+        var fetchFrom = prevFrom < curFrom ? prevFrom : curFrom;
+        var fetchTo = curTo;
 
-        var lrTrend = await BuildLrTrendAsync(lrs, ct);
-        var (slices, statusTotal) = await BuildStatusSummaryAsync(lrs, ct);
-        var topDestinations = await BuildTopDestinationsAsync(lrs, bookings, ct);
+        var windowRows = await lrs
+            .Where(l => l.LrDate >= fetchFrom && l.LrDate <= fetchTo)
+            .Select(l => new { l.LrDate, l.Status, l.Freight })
+            .ToListAsync(ct);
 
-        var recentLrs = (await lrs
-            .OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber)
-            .Take(8)
-            .ToListAsync(ct))
-            .Select(l => new DashboardHomeRecentLrDto(
-                l.LrNumber,
-                l.LrDate.ToString("dd/MM/yyyy"),
-                l.CustomerName ?? l.Consignor ?? "—",
-                l.FromCity,
-                l.ToCity,
-                l.Status))
-            .ToList();
+        int CountRange(DateOnly from, DateOnly to, Func<string, bool>? statusMatch = null) =>
+            windowRows.Count(l =>
+                l.LrDate >= from && l.LrDate <= to &&
+                (statusMatch == null || statusMatch(l.Status)));
 
-        var pendingDeliveries = (await lrs
-            .Where(l => l.Status == LrStatuses.InTransit ||
-                        l.Status == LrStatuses.TransitPassGenerated ||
-                        l.Status == LrStatuses.LoadingCompleted)
-            .OrderBy(l => l.LrDate)
-            .Take(8)
-            .ToListAsync(ct))
-            .Select(l => new DashboardHomePendingDeliveryDto(
-                l.LrNumber,
-                l.ToCity,
-                l.CustomerName ?? l.Consignor ?? "—",
-                l.LrDate.AddDays(3).ToString("dd/MM/yyyy")))
-            .ToList();
+        static bool IsDelivered(string s) =>
+            s is LrStatuses.DeliveryCompleted or LrStatuses.PodUploaded or LrStatuses.Closed;
 
-        var notifications = await BuildNotificationsAsync(lrs, ct);
+        static bool IsPending(string s) =>
+            s != LrStatuses.Closed && s != LrStatuses.DeliveryCompleted &&
+            s != LrStatuses.PodUploaded && s != LrStatuses.Draft;
 
-        return new DashboardHomeDto(
-            kpis, lrTrend, slices, statusTotal, topDestinations,
-            recentLrs, pendingDeliveries, notifications, DateTime.UtcNow);
+        decimal SumLrRange(DateOnly from, DateOnly to) =>
+            windowRows.Where(l => l.LrDate >= from && l.LrDate <= to).Sum(l => l.Freight);
+
+        var lrRevenueCur = SumLrRange(curFrom, curTo);
+        var lrRevenuePrev = SumLrRange(prevFrom, prevTo);
+
+        var bookingRows = await bookings
+            .Where(b => b.BookingDate >= prevFrom && b.BookingDate <= curTo)
+            .Select(b => new { b.BookingDate, b.Freight })
+            .ToListAsync(ct);
+
+        decimal SumBookingRange(DateOnly from, DateOnly to) =>
+            bookingRows.Where(b => b.BookingDate >= from && b.BookingDate <= to).Sum(b => b.Freight);
+
+        return new TrendSnapshot(
+            CountRange(curFrom, curTo),
+            CountRange(prevFrom, prevTo),
+            CountRange(curFrom, curTo, s => s == LrStatuses.InTransit),
+            CountRange(prevFrom, prevTo, s => s == LrStatuses.InTransit),
+            CountRange(curFrom, curTo, IsDelivered),
+            CountRange(prevFrom, prevTo, IsDelivered),
+            CountRange(curFrom, curTo, IsPending),
+            CountRange(prevFrom, prevTo, IsPending),
+            lrRevenueCur, lrRevenuePrev,
+            SumBookingRange(curFrom, curTo), SumBookingRange(prevFrom, prevTo));
     }
 
     static DashboardHomeKpiDto MakeKpi(string label, string key, decimal value, decimal? trendPct, bool invertTrend = false)
@@ -119,101 +205,75 @@ public class DashboardHomeService(TmsDbContext db, ITenantContext tenants, IBran
         return new DashboardHomeKpiDto(label, key, value, trendPct.HasValue ? Math.Abs(Math.Round(trendPct.Value, 1)) : null, up);
     }
 
-    async Task<decimal?> TrendCountAsync(IQueryable<LorryReceipt> lrs, string? statusFilter, CancellationToken ct)
+    static decimal? TrendPct(int cur, int prev)
     {
-        var end = DateOnly.FromDateTime(DateTime.UtcNow);
-        var curStart = end.AddDays(-6);
-        var prevStart = end.AddDays(-13);
-        var prevEnd = end.AddDays(-7);
-
-        async Task<int> CountRangeAsync(DateOnly from, DateOnly to)
-        {
-            var q = lrs.Where(l => l.LrDate >= from && l.LrDate <= to);
-            q = statusFilter switch
-            {
-                LrStatuses.InTransit => q.Where(l => l.Status == LrStatuses.InTransit),
-                "delivered-group" => q.Where(l =>
-                    l.Status == LrStatuses.DeliveryCompleted || l.Status == LrStatuses.PodUploaded ||
-                    l.Status == LrStatuses.Closed),
-                "pending-delivery" => q.Where(l =>
-                    l.Status != LrStatuses.Closed && l.Status != LrStatuses.DeliveryCompleted &&
-                    l.Status != LrStatuses.PodUploaded && l.Status != LrStatuses.Draft),
-                null => q,
-                _ => q.Where(l => l.Status == statusFilter),
-            };
-            return await q.CountAsync(ct);
-        }
-
-        var cur = await CountRangeAsync(curStart, end);
-        var prev = await CountRangeAsync(prevStart, prevEnd);
         if (prev == 0) return cur > 0 ? 100 : 0;
         return Math.Round(100m * (cur - prev) / prev, 1);
     }
 
-    async Task<decimal?> TrendRevenueAsync(
-        IQueryable<LorryReceipt> lrs,
-        IQueryable<Booking> bookings,
-        int days,
-        CancellationToken ct)
+    static decimal? TrendPctRevenue(decimal cur, decimal prev)
     {
-        var end = DateOnly.FromDateTime(DateTime.UtcNow);
-        var curStart = end.AddDays(-(days - 1));
-        var span = days;
-        var prevStart = curStart.AddDays(-span);
-        var prevEnd = curStart.AddDays(-1);
-
-        async Task<decimal> SumLr(DateOnly from, DateOnly to) =>
-            await lrs.Where(l => l.LrDate >= from && l.LrDate <= to).SumAsync(l => (decimal?)l.Freight, ct) ?? 0;
-
-        var cur = await SumLr(curStart, end);
-        var prev = await SumLr(prevStart, prevEnd);
-        if (cur == 0)
-        {
-            cur = await bookings.Where(b => b.BookingDate >= curStart && b.BookingDate <= end)
-                .SumAsync(b => (decimal?)b.Freight, ct) ?? 0;
-            prev = await bookings.Where(b => b.BookingDate >= prevStart && b.BookingDate <= prevEnd)
-                .SumAsync(b => (decimal?)b.Freight, ct) ?? 0;
-        }
         if (prev == 0) return cur > 0 ? 100 : 0;
         return Math.Round(100m * (cur - prev) / prev, 1);
     }
 
-    async Task<IReadOnlyList<DashboardHomeTrendPointDto>> BuildLrTrendAsync(
-        IQueryable<LorryReceipt> lrs, CancellationToken ct)
+    static async Task<IReadOnlyList<DashboardHomeTrendPointDto>> BuildLrTrendAsync(
+        IQueryable<LorryReceipt> lrs, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
-        var end = DateOnly.FromDateTime(DateTime.UtcNow);
-        var start = end.AddDays(-6);
-        var rows = await lrs.Where(l => l.LrDate >= start && l.LrDate <= end).ToListAsync(ct);
+        var rows = await lrs
+            .Select(l => new { l.LrDate, l.Status })
+            .ToListAsync(ct);
+
+        var grouped = rows
+            .GroupBy(l => l.LrDate)
+            .ToDictionary(
+                g => g.Key,
+                g => new
+                {
+                    Created = g.Count(),
+                    Delivered = g.Count(l =>
+                        l.Status is LrStatuses.DeliveryCompleted or LrStatuses.PodUploaded or LrStatuses.Closed),
+                    Pending = g.Count(l =>
+                        l.Status is LrStatuses.LRCreated or LrStatuses.LoadingCompleted or LrStatuses.InTransit),
+                });
+
         var points = new List<DashboardHomeTrendPointDto>();
-        for (var d = start; d <= end; d = d.AddDays(1))
+        for (var d = fromDate; d <= toDate; d = d.AddDays(1))
         {
-            var dayRows = rows.Where(l => l.LrDate == d).ToList();
+            grouped.TryGetValue(d, out var row);
             points.Add(new DashboardHomeTrendPointDto(
                 d.ToString("dd MMM"),
-                dayRows.Count,
-                dayRows.Count(l => l.Status is LrStatuses.DeliveryCompleted or LrStatuses.PodUploaded or LrStatuses.Closed),
-                dayRows.Count(l => l.Status is LrStatuses.LRCreated or LrStatuses.LoadingCompleted or LrStatuses.InTransit)));
+                row?.Created ?? 0,
+                row?.Delivered ?? 0,
+                row?.Pending ?? 0));
         }
         return points;
     }
 
-    async Task<(IReadOnlyList<DashboardHomeStatusSliceDto>, int)> BuildStatusSummaryAsync(
+    static async Task<(IReadOnlyList<DashboardHomeStatusSliceDto>, int)> BuildStatusSummaryAsync(
         IQueryable<LorryReceipt> lrs, CancellationToken ct)
     {
-        var total = await lrs.CountAsync(ct);
+        var statusCounts = await lrs
+            .GroupBy(l => l.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var total = statusCounts.Sum(x => x.Count);
         if (total == 0) return ([], 0);
 
-        var delivered = await lrs.CountAsync(l =>
-            l.Status == LrStatuses.DeliveryCompleted || l.Status == LrStatuses.PodUploaded ||
-            l.Status == LrStatuses.Closed || l.Status == LrStatuses.InvoiceGenerated ||
-            l.Status == LrStatuses.ExpenseAdded || l.Status == LrStatuses.ExpenseApproved, ct);
-        var inTransit = await lrs.CountAsync(l => l.Status == LrStatuses.InTransit, ct);
-        var pending = await lrs.CountAsync(l =>
-            l.Status == LrStatuses.LRCreated || l.Status == LrStatuses.LoadingCompleted ||
-            l.Status == LrStatuses.TransitPassGenerated || l.Status == LrStatuses.Draft, ct);
-        var cancelled = await lrs.CountAsync(l => l.Status == "Cancelled", ct);
+        int CountWhere(Func<string, bool> match) =>
+            statusCounts.Where(x => match(x.Status)).Sum(x => x.Count);
 
-        decimal Pct(int n) => total == 0 ? 0 : Math.Round(100m * n / total, 1);
+        var delivered = CountWhere(s =>
+            s is LrStatuses.DeliveryCompleted or LrStatuses.PodUploaded or LrStatuses.Closed
+                or LrStatuses.InvoiceGenerated or LrStatuses.ExpenseAdded or LrStatuses.ExpenseApproved);
+        var inTransit = CountWhere(s => s == LrStatuses.InTransit);
+        var pending = CountWhere(s =>
+            s is LrStatuses.LRCreated or LrStatuses.LoadingCompleted
+                or LrStatuses.TransitPassGenerated or LrStatuses.Draft);
+        var cancelled = CountWhere(s => s == "Cancelled");
+
+        decimal Pct(int n) => Math.Round(100m * n / total, 1);
 
         var slices = new List<DashboardHomeStatusSliceDto>
         {
@@ -227,7 +287,7 @@ public class DashboardHomeService(TmsDbContext db, ITenantContext tenants, IBran
         return (slices, total);
     }
 
-    async Task<IReadOnlyList<DashboardHomeDestinationDto>> BuildTopDestinationsAsync(
+    static async Task<IReadOnlyList<DashboardHomeDestinationDto>> BuildTopDestinationsAsync(
         IQueryable<LorryReceipt> lrs,
         IQueryable<Booking> bookings,
         CancellationToken ct)
@@ -252,23 +312,90 @@ public class DashboardHomeService(TmsDbContext db, ITenantContext tenants, IBran
         return fromBookings.Select(x => new DashboardHomeDestinationDto(x.Name, x.Count)).ToList();
     }
 
-    async Task<IReadOnlyList<DashboardHomeNotificationDto>> BuildNotificationsAsync(
+    static async Task<IReadOnlyList<DashboardHomeRecentLrDto>> LoadRecentLrsAsync(
         IQueryable<LorryReceipt> lrs, CancellationToken ct)
     {
-        var pendingVehicle = await lrs.CountAsync(l =>
-            l.Status == LrStatuses.LoadingCompleted && string.IsNullOrEmpty(l.VehicleNumber), ct);
-        var pendingExpense = await lrs.CountAsync(l =>
-            l.Status == LrStatuses.ExpenseAdded || l.Status == LrStatuses.InvoiceGenerated, ct);
+        var rows = await lrs
+            .OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber)
+            .Take(8)
+            .Select(l => new
+            {
+                l.LrNumber,
+                l.LrDate,
+                l.CustomerName,
+                l.Consignor,
+                l.FromCity,
+                l.ToCity,
+                l.Status,
+            })
+            .ToListAsync(ct);
+
+        return rows.Select(l => new DashboardHomeRecentLrDto(
+            l.LrNumber,
+            l.LrDate.ToString("dd/MM/yyyy"),
+            l.CustomerName ?? l.Consignor ?? "—",
+            l.FromCity,
+            l.ToCity,
+            l.Status)).ToList();
+    }
+
+    static async Task<IReadOnlyList<DashboardHomePendingDeliveryDto>> LoadPendingDeliveriesAsync(
+        IQueryable<LorryReceipt> lrs, CancellationToken ct)
+    {
+        var rows = await lrs
+            .Where(l => l.Status == LrStatuses.InTransit ||
+                        l.Status == LrStatuses.TransitPassGenerated ||
+                        l.Status == LrStatuses.LoadingCompleted)
+            .OrderBy(l => l.LrDate)
+            .Take(8)
+            .Select(l => new
+            {
+                l.LrNumber,
+                l.ToCity,
+                l.CustomerName,
+                l.Consignor,
+                l.LrDate,
+            })
+            .ToListAsync(ct);
+
+        return rows.Select(l => new DashboardHomePendingDeliveryDto(
+            l.LrNumber,
+            l.ToCity,
+            l.CustomerName ?? l.Consignor ?? "—",
+            l.LrDate.AddDays(3).ToString("dd/MM/yyyy"))).ToList();
+    }
+
+    static async Task<IReadOnlyList<DashboardHomeNotificationDto>> BuildNotificationsAsync(
+        IQueryable<LorryReceipt> lrs, CancellationToken ct)
+    {
+        // Never COUNT the full LR history — on demo seeds (~500k rows) that alone blocks the dashboard.
+        var cutoff = DateTime.UtcNow.AddDays(-60);
+        var recentScope = lrs.Where(l => l.UpdatedAt >= cutoff);
+
+        var pendingVehicle = await recentScope
+            .Where(l => l.Status == LrStatuses.LoadingCompleted && (l.VehicleNumber == null || l.VehicleNumber == ""))
+            .OrderByDescending(l => l.UpdatedAt)
+            .Take(100)
+            .CountAsync(ct);
+        var pendingExpense = await recentScope
+            .Where(l => l.Status == LrStatuses.ExpenseAdded || l.Status == LrStatuses.InvoiceGenerated)
+            .OrderByDescending(l => l.UpdatedAt)
+            .Take(100)
+            .CountAsync(ct);
+        var recent = await recentScope
+            .OrderByDescending(l => l.UpdatedAt)
+            .Take(3)
+            .Select(l => new { l.LrNumber, l.Status, l.FromCity, l.ToCity, l.UpdatedAt })
+            .ToListAsync(ct);
 
         var list = new List<DashboardHomeNotificationDto>();
         if (pendingVehicle > 0)
             list.Add(new("n-vehicle", "warning", "Vehicle assignment pending",
-                $"{pendingVehicle} LR waiting for vehicle assignment", null, "/lr?status=vehicle-assigned"));
+                $"{pendingVehicle}{(pendingVehicle >= 100 ? "+" : "")} LR waiting for vehicle assignment", null, "/lr?status=vehicle-assigned"));
         if (pendingExpense > 0)
             list.Add(new("n-expense", "info", "Expense approval pending",
-                $"{pendingExpense} LR pending expense approval", null, "/lr?status=expense-pending"));
+                $"{pendingExpense}{(pendingExpense >= 100 ? "+" : "")} LR pending expense approval", null, "/lr?status=expense-pending"));
 
-        var recent = await lrs.OrderByDescending(l => l.UpdatedAt).Take(3).ToListAsync(ct);
         foreach (var lr in recent)
         {
             list.Add(new(

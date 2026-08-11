@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import ERPDataTable from '../../components/ui/ERPDataTable'
 import { branchesApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { useBranch } from '../../context/BranchContext'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 
 const emptyForm = { code: '', name: '', city: '', state: '', phone: '', address: '', isHeadOffice: false, isActive: true }
 
@@ -79,6 +80,13 @@ export default function BranchesPage() {
     }
   }
 
+  const columns = useMemo(() => [
+    { key: 'code', label: 'Code', render: (b) => `${b.code}${b.isHeadOffice ? ' ★' : ''}` },
+    { key: 'name', label: 'Name' },
+    { key: 'city', label: 'City', render: (b) => b.city ?? '—' },
+    { key: 'status', label: 'Status', render: (b) => (b.isActive ? 'Active' : 'Inactive') },
+  ], [])
+
   return (
     <ERPContentPage module="Settings" title="Branches">
       <p className="mb-4 text-sm text-slate-500">
@@ -114,33 +122,16 @@ export default function BranchesPage() {
           {loading ? (
             <p className="p-4 text-sm text-slate-500">Loading…</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900">
-                <tr>
-                  <th className="px-4 py-2 text-left">Code</th>
-                  <th className="px-4 py-2 text-left">Name</th>
-                  <th className="px-4 py-2 text-left">City</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((b) => (
-                  <tr key={b.id} className="border-t">
-                    <td className="px-4 py-2 font-medium">{b.code}{b.isHeadOffice ? ' ★' : ''}</td>
-                    <td className="px-4 py-2">{b.name}</td>
-                    <td className="px-4 py-2">{b.city ?? '—'}</td>
-                    <td className="px-4 py-2">{b.isActive ? 'Active' : 'Inactive'}</td>
-                    <td className="px-4 py-2 text-right">
-                      <button type="button" className="mr-2 text-primary hover:underline" onClick={() => edit(b)} title="Edit"><Pencil className="inline h-4 w-4" /></button>
-                      {!b.isHeadOffice && (
-                        <button type="button" className="text-red-600 hover:underline" onClick={() => remove(b.id)} title="Delete"><Trash2 className="inline h-4 w-4" /></button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ERPDataTable
+              columns={columns}
+              data={rows}
+              selectable
+              onEdit={edit}
+              onDelete={(b) => remove(b.id)}
+              canDelete={(b) => !b.isHeadOffice}
+              getRowKey={(row) => row.id}
+              emptyMessage="No branches yet"
+            />
           )}
         </Card>
       </div>

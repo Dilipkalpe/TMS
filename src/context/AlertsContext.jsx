@@ -21,9 +21,21 @@ export function AlertsProvider({ children } = {}) {
       if (!isAuthenticated) setAllAlerts([])
       return
     }
-    dashboardApi.alerts()
-      .then((alerts) => setAllAlerts(Array.isArray(alerts) ? alerts : []))
-      .catch(() => setAllAlerts([]))
+    // Defer alerts so Dashboard /home paints first (alerts hit many tables).
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      dashboardApi.alerts()
+        .then((alerts) => {
+          if (!cancelled) setAllAlerts(Array.isArray(alerts) ? alerts : [])
+        })
+        .catch(() => {
+          if (!cancelled) setAllAlerts([])
+        })
+    }, 750)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [booting, isAuthenticated])
 
   const alerts = useMemo(() => allAlerts.filter((a) => !dismissed.includes(a.id)), [allAlerts, dismissed])

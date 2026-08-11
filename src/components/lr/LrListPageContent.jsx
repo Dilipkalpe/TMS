@@ -1,41 +1,102 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, ChevronDown, ChevronUp, Filter } from 'lucide-react'
-import Button from '../ui/Button'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Badge from '../ui/Badge'
-import Input, { Select } from '../ui/Input'
 import ERPListPage from '../ui/ERPListPage'
-import StatusSummaryCards from '../ui/StatusSummaryCards'
+import ERPPageTitle from '../ui/ERPPageTitle'
+import LrListActionBar from './LrListActionBar'
+import LrListKpiCards from './LrListKpiCards'
+import LrListFilterPanel from './LrListFilterPanel'
+import LrListTableToolbar from './LrListTableToolbar'
+import LrListActiveFilterChips from './LrListActiveFilterChips'
+import SlideDrawer from '../ui/SlideDrawer'
+import KeyboardShortcutBar, { LR_LIST_SHORTCUTS } from '../keyboard/KeyboardShortcutBar'
 import { usePagedApiResource } from '../../hooks/usePagedApiResource'
 import { useKeyboardPageActions } from '../../hooks/useKeyboardPageActions'
-import { lrApi, lrOperationsApi } from '../../services/api'
-import { lrDetailPath, lrEditPath, lrProcessPath } from '../../utils/docPath'
+import { branchesApi, lrApi, lrOperationsApi } from '../../services/api'
+import { lrDetailPath, lrEditPath } from '../../utils/docPath'
 import {
-  formatLrDate, lrBillingStatus, lrDeliveryStatus, lrPodStatus, lrTotalAmount, parsePackagesWeight,
+  formatLrDate,
+  lrBillingStatus,
+  lrDeliveryStatus,
+  lrPodStatus,
+  lrStatusBadgeVariant,
+  lrTotalAmount,
+  parsePackagesWeight,
 } from '../../utils/lrDisplayHelpers'
+import { clearLrFilterKeys } from '../../utils/lrListFilterUtils'
 import { formatCurrency } from '../ui/ReportFilters'
+import { exportToCsv } from '../../utils/export'
 import { usePrint } from '../../context/PrintContext'
 import { useToast } from '../../context/ToastContext'
-import { useAuth } from '../../context/AuthContext'
-import LRPrintFormat from '../print/LRPrintFormat'
+import { printModuleList } from '../../services/printService'
+import { printGridRowDocument } from '../../utils/printGridDocument'
+import { PRINT_MODULE_CODES } from '../../config/printModules'
 import { LR_STATUS_STEPS } from '../../constants/lrStatusFlow'
-import { LR_KPI_CARDS, defaultDetailSectionForStatus, lrRowActions } from '../../constants/lrStatusNavigation'
+import { defaultDetailSectionForStatus } from '../../constants/lrStatusNavigation'
 
+const FILTER_STORAGE_KEY = 'lr-list-saved-filters'
 const STATUS_OPTIONS = ['(All)', ...LR_STATUS_STEPS]
 const BOOKING_TYPES = ['(All)', 'FTL', 'PTL']
 const FREIGHT_TYPES = ['(All)', 'To Pay', 'Paid', 'TBB', 'To Be Billed']
 
+const STAGE_TO_LR_STATUS = {
+  'lr-list': '(All)',
+  'lr-created': 'LR Created',
+  'loading-pending': 'LR Created',
+  'loading-completed': 'Loading Completed',
+  'vehicle-assigned': 'Loading Completed',
+  'transit-pass-generated': 'Transit Pass Generated',
+  dispatched: 'In Transit',
+  delivered: 'Delivery Completed',
+  'pod-uploaded': 'POD Uploaded',
+  'invoice-generated': 'Invoice Generated',
+  'expense-pending': 'Expense Added',
+  'expense-approved': 'Expense Approved',
+  closed: 'Closed',
+}
+
 const EMPTY_FILTERS = {
   dateFrom: '',
   dateTo: '',
+  lrNo: '',
+  customer: '',
+  consignee: '',
+  fromCity: '',
+  toCity: '',
+  vehicle: '',
+  branch: '(All)',
   status: '(All)',
   bookingType: '(All)',
   freightType: '(All)',
 }
 
-function buildLrListParams({ page, pageSize, search, filters }) {
+const EXPORT_COLUMNS = [
+  { key: 'lrNumber', label: 'LR No' },
+  { key: 'lrDate', label: 'Date' },
+  { key: 'customer', label: 'Customer' },
+  { key: 'consignee', label: 'Consignee' },
+  { key: 'route', label: 'From / To' },
+  { key: 'packages', label: 'Packages' },
+  { key: 'weight', label: 'Weight (Kg)' },
+  { key: 'freight', label: 'Freight' },
+  { key: 'vehicle', label: 'Vehicle No' },
+  { key: 'deliveryStatus', label: 'Delivery Status' },
+  { key: 'billingStatus', label: 'Billing Status' },
+  { key: 'podStatus', label: 'POD Status' },
+  { key: 'amount', label: 'Amount' },
+]
+
+function buildFilterSearch(filters) {
+  return [filters.lrNo, filters.customer, filters.consignee, filters.fromCity, filters.toCity, filters.vehicle]
+    .map((v) => v?.trim())
+    .filter(Boolean)
+    .join(' ')
+}
+
+function buildLrListParams({ page, pageSize, filters }) {
   const params = { page, pageSize, includeTotal: page === 1 }
-  if (search?.trim()) params.search = search.trim()
+  const search = buildFilterSearch(filters)
+  if (search) params.search = search
   if (filters.status && filters.status !== '(All)') params.status = filters.status
   if (filters.freightType && filters.freightType !== '(All)') params.paymentType = filters.freightType
   if (filters.bookingType && filters.bookingType !== '(All)') params.businessType = filters.bookingType
@@ -44,18 +105,43 @@ function buildLrListParams({ page, pageSize, search, filters }) {
   return params
 }
 
+function mapExportRow(r) {
+  const d = lrDeliveryStatus(r.status)
+  const b = lrBillingStatus(r.status)
+  const p = lrPodStatus(r.status)
+  const pkg = parsePackagesWeight(r.quantity)
+  return {
+    lrNumber: r.lrNumber,
+    lrDate: formatLrDate(r.lrDate),
+    customer: r.customerName || r.consignor || '',
+    consignee: r.consignee || '',
+    route: `${r.from || r.fromCity || ''} to ${r.to || r.toCity || ''}`,
+    packages: pkg.packages,
+    weight: pkg.weight,
+    freight: formatCurrency(r.freight),
+    vehicle: r.vehicle || r.vehicleNumber || '',
+    deliveryStatus: d.label,
+    billingStatus: b.label,
+    podStatus: p.label,
+    amount: formatCurrency(lrTotalAmount(r)),
+  }
+}
+
 export default function LrListPageContent({ embedded = false, onChanged }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { toast } = useToast()
   const { company, print } = usePrint()
-  const { user } = useAuth()
   const [summary, setSummary] = useState({})
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS)
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS)
-  const [showFilters, setShowFilters] = useState(false)
+  const [branchOptions, setBranchOptions] = useState(['(All)'])
+  const [columnsSignal, setColumnsSignal] = useState(0)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const listRef = useRef(null)
 
   const paged = usePagedApiResource(
-    ({ page, pageSize, search }) => lrApi.list(buildLrListParams({ page, pageSize, search, filters: appliedFilters })),
+    ({ page, pageSize }) => lrApi.list(buildLrListParams({ page, pageSize, filters: appliedFilters })),
     [appliedFilters],
   )
 
@@ -63,68 +149,88 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
     lrOperationsApi.summary().then(setSummary).catch(() => {})
   }, [])
 
+  const refreshList = useCallback(() => {
+    paged.refresh()
+    reloadSummary()
+    onChanged?.()
+  }, [paged, reloadSummary, onChanged])
+
   useEffect(() => {
     reloadSummary()
   }, [paged.items.length, onChanged, reloadSummary])
 
-  useKeyboardPageActions({
-    onNew: () => navigate('/lr/entry'),
-    enabled: !embedded,
-  })
+  useEffect(() => {
+    branchesApi.list().then((rows) => {
+      const names = (rows || []).map((b) => b.name || b.code).filter(Boolean)
+      setBranchOptions(['(All)', ...names])
+    }).catch(() => {})
+  }, [])
 
-  const applyFilters = () => {
+  useEffect(() => {
+    if (embedded) return
+    try {
+      const raw = localStorage.getItem(FILTER_STORAGE_KEY)
+      if (!raw) return
+      const saved = JSON.parse(raw)
+      setDraftFilters((f) => ({ ...EMPTY_FILTERS, ...saved }))
+    } catch { /* ignore */ }
+  }, [embedded])
+
+  useEffect(() => {
+    if (embedded) return
+    const stage = searchParams.get('status')
+    if (!stage) return
+    const mapped = STAGE_TO_LR_STATUS[stage]
+    if (!mapped || mapped === '(All)') return
+    setDraftFilters((f) => ({ ...f, status: mapped }))
+    setAppliedFilters((f) => ({ ...f, status: mapped }))
+  }, [searchParams, embedded])
+
+  const applyFilters = useCallback(() => {
     setAppliedFilters({ ...draftFilters })
     paged.setPage(1)
-  }
+    setFilterOpen(false)
+  }, [draftFilters, paged])
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setDraftFilters(EMPTY_FILTERS)
     setAppliedFilters(EMPTY_FILTERS)
     paged.setPage(1)
-  }
+    setFilterOpen(false)
+  }, [paged])
+
+  const openFilterDrawer = useCallback(() => {
+    setDraftFilters({ ...appliedFilters })
+    setFilterOpen(true)
+  }, [appliedFilters])
+
+  const saveFilters = useCallback(() => {
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(draftFilters))
+      toast({ title: 'Filter saved', message: 'Your filter preset was saved.', type: 'success' })
+    } catch (err) {
+      toast({ title: 'Save failed', message: err.message, type: 'error' })
+    }
+  }, [draftFilters, toast])
+
+  const removeFilterKeys = useCallback((keys) => {
+    setDraftFilters((f) => clearLrFilterKeys(f, keys))
+    setAppliedFilters((f) => clearLrFilterKeys(f, keys))
+    paged.setPage(1)
+  }, [paged])
+
+  useKeyboardPageActions({
+    onNewF2: () => navigate('/lr/entry'),
+    onSearch: openFilterDrawer,
+    onPrint: () => listRef.current?.print?.(),
+    onPreview: refreshList,
+    onCancel: () => setFilterOpen(false),
+    enabled: !embedded,
+  }, [openFilterDrawer, refreshList, navigate, embedded])
 
   const openRow = (row) => {
     const section = defaultDetailSectionForStatus(row.status)
     navigate(`${lrDetailPath(row.lrNumber)}?section=${section}`)
-  }
-
-  const runPrimaryAction = (e, row) => {
-    e.stopPropagation()
-    if (row.status === 'Draft' || row.status === 'LR Created') {
-      navigate(lrEditPath(row.lrNumber))
-      return
-    }
-    navigate(lrProcessPath(row.lrNumber))
-  }
-
-  const runRowAction = (e, row, action) => {
-    e.stopPropagation()
-    if (action.id === 'view') {
-      openRow(row)
-      return
-    }
-    if (action.id === 'edit') {
-      navigate(lrEditPath(row.lrNumber))
-      return
-    }
-    if (action.id === 'approve-expense') {
-      navigate('/lr/expense-approval')
-      return
-    }
-    if (action.id === 'cancel') {
-      toast({ title: 'Cancel LR', message: 'Use LR detail page to cancel this LR.', type: 'info' })
-      return
-    }
-    const stepMap = {
-      'assign-vehicle': 'loading',
-      'transit-pass': 'transit',
-      dispatch: 'delivery',
-      pod: 'delivery',
-      invoice: 'invoice',
-      expense: 'expense',
-      close: 'close',
-    }
-    navigate(lrProcessPath(row.lrNumber, stepMap[action.id] || 'loading'))
   }
 
   const handleDelete = async (row) => {
@@ -133,30 +239,82 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
     try {
       await lrApi.remove(row.lrNumber)
       toast({ title: 'Deleted', message: `LR ${row.lrNumber} removed.`, type: 'success' })
-      paged.refresh()
-      reloadSummary()
-      onChanged?.()
+      refreshList()
     } catch (err) {
       toast({ title: 'Delete failed', message: err.message, type: 'error' })
     }
   }
 
   const handlePrint = async (row) => {
-    try {
-      const lr = await lrApi.get(row.lrNumber)
-      print(<LRPrintFormat lr={lr} company={company} />)
-    } catch (e) {
-      toast({ title: 'Print failed', message: e.message, type: 'error' })
-    }
+    await printGridRowDocument({
+      moduleCode: PRINT_MODULE_CODES.LR_LIST,
+      row,
+      company,
+      print,
+      toast,
+    })
   }
 
-  const kpiCards = useMemo(() => LR_KPI_CARDS.slice(0, 5).map((kpi) => ({
-    label: kpi.label,
-    count: summary[kpi.field] ?? 0,
-    icon: kpi.icon,
-    color: kpi.color,
-    onClick: () => navigate(kpi.stage === 'lr-list' ? '/lr/list' : `/lr?status=${kpi.stage}`),
-  })), [summary, navigate])
+  const handleExport = useCallback(() => {
+    const rows = paged.items.map(mapExportRow)
+    const ok = exportToCsv(rows, EXPORT_COLUMNS, 'lr-list.csv')
+    toast({ title: ok ? 'Export complete' : 'Nothing to export', type: ok ? 'success' : 'warning' })
+  }, [paged.items, toast])
+
+  const handlePrintList = useCallback(async () => {
+    const rows = paged.items.map(mapExportRow)
+    await printModuleList({
+      moduleCode: PRINT_MODULE_CODES.LR_LIST,
+      company,
+      print,
+      toast,
+      columns: EXPORT_COLUMNS,
+      rows,
+      documentTitle: 'LR List',
+      summary: `${paged.total.toLocaleString('en-IN')} record(s)`,
+    })
+  }, [paged.items, paged.total, company, print, toast])
+
+  const kpiCards = useMemo(() => [
+    {
+      label: 'Total LR',
+      subtitle: 'All Time',
+      count: summary.totalLR ?? 0,
+      icon: 'Layers',
+      color: 'blue',
+      onClick: () => { clearFilters(); navigate('/lr/list') },
+    },
+    {
+      label: 'Pending',
+      subtitle: 'Not Delivered',
+      count: summary.pendingNotDelivered ?? Math.max(0, (summary.totalLR ?? 0) - (summary.deliveredComplete ?? summary.delivered ?? 0)),
+      icon: 'Clock',
+      color: 'orange',
+      onClick: () => navigate('/lr/list?status=loading-pending'),
+    },
+    {
+      label: 'Delivered',
+      subtitle: 'Completed',
+      count: summary.deliveredComplete ?? summary.delivered ?? 0,
+      icon: 'PackageCheck',
+      color: 'green',
+      onClick: () => navigate('/lr/list?status=delivered'),
+    },
+    {
+      label: 'In Transit',
+      subtitle: 'Active Trips',
+      count: summary.inTransit ?? 0,
+      icon: 'Truck',
+      color: 'violet',
+      onClick: () => navigate('/lr/list?status=dispatched'),
+    },
+    {
+      label: 'Total Amount',
+      subtitle: 'All LR Amount',
+      count: formatCurrency(summary.totalAmount ?? 0),
+      color: 'teal',
+    },
+  ], [summary, navigate, clearFilters])
 
   const activeFilterCount = useMemo(
     () => Object.entries(appliedFilters).filter(([, v]) => v && v !== '(All)').length,
@@ -164,15 +322,6 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
   )
 
   const columns = useMemo(() => [
-    {
-      key: 'flow',
-      label: 'Action',
-      render: (r) => (
-        <Button size="sm" icon={ArrowRight} onClick={(e) => runPrimaryAction(e, r)}>
-          {r.status === 'Closed' ? 'View' : 'Continue'}
-        </Button>
-      ),
-    },
     {
       key: 'lrNumber',
       label: 'LR No',
@@ -184,132 +333,142 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
     },
     { key: 'lrDate', label: 'Date', render: (r) => formatLrDate(r.lrDate) },
     { key: 'customer', label: 'Customer', render: (r) => r.customerName || r.consignor || '—' },
-    { key: 'consignee', label: 'Consignee' },
-    { key: 'from', label: 'From' },
-    { key: 'to', label: 'To' },
+    { key: 'consignee', label: 'Consignee', render: (r) => r.consignee || '—' },
+    {
+      key: 'route',
+      label: 'From / To',
+      render: (r) => `${r.from || r.fromCity || '—'} to ${r.to || r.toCity || '—'}`,
+    },
     { key: 'packages', label: 'Packages', render: (r) => parsePackagesWeight(r.quantity).packages },
     { key: 'weight', label: 'Weight (Kg)', render: (r) => parsePackagesWeight(r.quantity).weight },
     { key: 'freight', label: 'Freight (₹)', render: (r) => formatCurrency(r.freight) },
-    { key: 'vehicle', label: 'Vehicle No', render: (r) => r.vehicle || '—' },
+    { key: 'vehicle', label: 'Vehicle No', render: (r) => r.vehicle || r.vehicleNumber || '—' },
     {
       key: 'deliveryStatus',
-      label: 'Delivery',
-      render: (r) => { const d = lrDeliveryStatus(r.status); return <Badge variant={d.variant}>{d.label}</Badge> },
+      label: 'Delivery Status',
+      render: (r) => {
+        const d = lrDeliveryStatus(r.status)
+        return <Badge variant={lrStatusBadgeVariant(d.variant)}>{d.label}</Badge>
+      },
     },
     {
       key: 'billingStatus',
-      label: 'Billing',
-      render: (r) => { const b = lrBillingStatus(r.status); return <Badge variant={b.variant}>{b.label}</Badge> },
+      label: 'Billing Status',
+      render: (r) => {
+        const b = lrBillingStatus(r.status)
+        return <Badge variant={lrStatusBadgeVariant(b.variant)}>{b.label}</Badge>
+      },
     },
     {
       key: 'podStatus',
-      label: 'POD',
-      render: (r) => { const p = lrPodStatus(r.status); return <Badge variant={p.variant}>{p.label}</Badge> },
-    },
-    { key: 'amount', label: 'Amount (₹)', render: (r) => formatCurrency(lrTotalAmount(r)) },
-    {
-      key: 'actions',
-      label: 'More',
+      label: 'POD Status',
       render: (r) => {
-        const actions = lrRowActions(r.status || 'LR Created', user?.role).filter((a) => !a.primary)
-        return (
-          <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
-            {actions.slice(0, 2).map((action) => (
-              <Button
-                key={action.id}
-                size="sm"
-                variant={action.danger ? 'outline' : 'outline'}
-                className={action.danger ? 'text-red-600' : ''}
-                onClick={(e) => runRowAction(e, r, action)}
-              >
-                {action.label}
-              </Button>
-            ))}
-          </div>
-        )
+        const p = lrPodStatus(r.status)
+        return <Badge variant={lrStatusBadgeVariant(p.variant)}>{p.label}</Badge>
       },
     },
-  ], [user?.role, navigate])
+    { key: 'amount', label: 'Amount (₹)', render: (r) => formatCurrency(lrTotalAmount(r)) },
+  ], [navigate])
 
-  const filterRow = (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          icon={Filter}
-          onClick={() => setShowFilters((v) => !v)}
-        >
-          Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          {showFilters ? <ChevronUp className="ml-1 h-3 w-3" /> : <ChevronDown className="ml-1 h-3 w-3" />}
-        </Button>
-        {activeFilterCount > 0 && (
-          <Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>
-        )}
-      </div>
-
-      {showFilters && (
-        <div className="grid gap-2 rounded-lg border border-primary/15 bg-slate-50/80 p-2 sm:grid-cols-2 lg:grid-cols-6 dark:bg-slate-900/40">
-          <Input label="Date From" type="date" value={draftFilters.dateFrom} onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
-          <Input label="Date To" type="date" value={draftFilters.dateTo} onChange={(e) => setDraftFilters((f) => ({ ...f, dateTo: e.target.value }))} />
-          <Select label="Status" options={STATUS_OPTIONS} value={draftFilters.status} onChange={(e) => setDraftFilters((f) => ({ ...f, status: e.target.value }))} />
-          <Select label="Booking Type" options={BOOKING_TYPES} value={draftFilters.bookingType} onChange={(e) => setDraftFilters((f) => ({ ...f, bookingType: e.target.value }))} />
-          <Select label="Freight Type" options={FREIGHT_TYPES} value={draftFilters.freightType} onChange={(e) => setDraftFilters((f) => ({ ...f, freightType: e.target.value }))} />
-          <div className="flex items-end gap-2">
-            <Button size="sm" onClick={applyFilters}>Apply</Button>
-            <Button size="sm" variant="outline" onClick={clearFilters}>Clear</Button>
-          </div>
-        </div>
-      )}
-    </div>
+  const tableToolbar = (
+    <LrListTableToolbar
+      pageSize={paged.pageSize}
+      onPageSizeChange={paged.setPageSize}
+      totalRecords={paged.total}
+      onExportExcel={handleExport}
+      onExportPdf={handlePrintList}
+      onManageColumns={() => setColumnsSignal((n) => n + 1)}
+    />
   )
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {!embedded && (
-        <>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-            <span>Home / LR / LR List</span>
-            <span>F2 Add LR · F3 Search · F8 Refresh</span>
-          </div>
-          <div className="mb-2">
-            <StatusSummaryCards cards={kpiCards} />
-          </div>
-        </>
-      )}
+  const listBlock = (
+    <ERPListPage
+      ref={listRef}
+      module="LR"
+      listVariant={embedded ? 'default' : 'lr'}
+      hideToolbar
+      showAdd={false}
+      openColumnsSignal={columnsSignal}
+      filterRow={embedded ? undefined : null}
+      tableToolbar={embedded ? undefined : tableToolbar}
+      columns={columns}
+      data={paged.items}
+      loading={paged.loading}
+      error={paged.error}
+      onRefreshExternal={refreshList}
+      onRowClick={openRow}
+      onView={openRow}
+      onEdit={(r) => navigate(lrEditPath(r.lrNumber))}
+      onDelete={handleDelete}
+      onPrint={handlePrint}
+      rowPrintTitle="Print LR"
+      getRowKey={(row) => row.lrNumber}
+      exportFilename="lr-list"
+      serverMode
+      serverTotal={paged.total}
+      serverHasMore={paged.hasMore}
+      totalIsApproximate={paged.totalIsApproximate}
+      serverPage={paged.page}
+      onServerPageChange={paged.setPage}
+      serverPageSize={paged.pageSize}
+      onServerPageSizeChange={paged.setPageSize}
+    />
+  )
 
-      <ERPListPage
+  if (embedded) {
+    return <div className="flex min-h-0 flex-1 flex-col gap-3">{listBlock}</div>
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <ERPPageTitle
         module="LR"
-        title={embedded ? undefined : undefined}
-        showAdd={!embedded}
-        addLabel="Add LR"
-        onAdd={() => navigate('/lr/entry')}
-        secondaryAddLabel="Add Bulk LR"
-        onSecondaryAdd={!embedded ? () => navigate('/lr/bulk') : undefined}
-        searchPlaceholder="Search LR, customer, consignee, vehicle, route…"
-        filterRow={filterRow}
-        columns={columns}
-        data={paged.items}
-        loading={paged.loading}
-        error={paged.error}
-        onRefreshExternal={() => { paged.refresh(); reloadSummary(); onChanged?.() }}
-        onRowClick={openRow}
-        onEdit={(r) => navigate(lrEditPath(r.lrNumber))}
-        onDelete={handleDelete}
-        onPrint={handlePrint}
-        rowPrintTitle="Print LR"
-        exportFilename="lr-list"
-        serverMode
-        serverTotal={paged.total}
-        serverHasMore={paged.hasMore}
-        totalIsApproximate={paged.totalIsApproximate}
-        serverPage={paged.page}
-        onServerPageChange={paged.setPage}
-        serverPageSize={paged.pageSize}
-        onServerPageSizeChange={paged.setPageSize}
-        onServerSearch={paged.setSearch}
-        searchValue={paged.search}
+        title="LR List"
+        breadcrumb={[
+          { label: 'Home', path: '/' },
+          { label: 'LR', path: '/lr/list' },
+          { label: 'LR List' },
+        ]}
       />
+      <div className="loading-slip-list-page lr-list-page flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-2 sm:p-3">
+          <LrListActionBar
+            onNew={() => navigate('/lr/entry')}
+            onNewBulk={() => navigate('/lr/bulk')}
+            onSearch={openFilterDrawer}
+            onExport={handleExport}
+            onPrint={handlePrintList}
+            onManageColumns={() => setColumnsSignal((n) => n + 1)}
+            onRefresh={refreshList}
+            onFilter={openFilterDrawer}
+            activeFilterCount={activeFilterCount}
+          />
+          <LrListKpiCards cards={kpiCards} />
+          {activeFilterCount > 0 && (
+            <LrListActiveFilterChips
+              filters={appliedFilters}
+              onRemove={removeFilterKeys}
+              onClearAll={clearFilters}
+            />
+          )}
+          <SlideDrawer open={filterOpen} onClose={() => setFilterOpen(false)} title="Filter LR List" width="lg">
+            <LrListFilterPanel
+              inDrawer
+              draftFilters={draftFilters}
+              onChange={setDraftFilters}
+              statusOptions={STATUS_OPTIONS}
+              bookingTypes={BOOKING_TYPES}
+              freightTypes={FREIGHT_TYPES}
+              branchOptions={branchOptions}
+              onSearch={applyFilters}
+              onClear={clearFilters}
+              onSave={saveFilters}
+            />
+          </SlideDrawer>
+          {listBlock}
+        </div>
+        <KeyboardShortcutBar shortcuts={LR_LIST_SHORTCUTS} />
+      </div>
     </div>
   )
 }

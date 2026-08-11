@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, FileText, Search } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import { Select } from '../../components/ui/Input'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { portalApi } from '../../services/api'
 import { PortalEmptyState } from './PortalLayout'
@@ -57,15 +58,13 @@ export default function PortalInvoices() {
             className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-800"
           />
         </div>
-        <select
+        <Select
+          label={false}
+          className="min-w-[9rem]"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
-        >
-          {STATUSES.map((s) => (
-            <option key={s} value={s === 'All' ? '' : s}>{s}</option>
-          ))}
-        </select>
+          options={STATUSES.map((s) => ({ value: s === 'All' ? '' : s, label: s }))}
+        />
       </div>
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">

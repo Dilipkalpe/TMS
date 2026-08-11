@@ -5,6 +5,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import VehicleLookupSelect from '../../components/ui/VehicleLookupSelect'
+import { Select } from '../../components/ui/Input'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import {
   fuelApi, gpsApi, podApi, customerPortalApi, tripsApi, shipmentsApi,
@@ -246,14 +247,20 @@ export function EpodPage() {
           OTP-based proof of delivery. For delivery without OTP, use{' '}
           <Link to="/operations/pod" className="text-primary hover:underline">Operations → POD</Link>.
         </p>
-        <select required value={bookingId} onChange={(e) => setBookingId(e.target.value)} className={inputClass}>
-          <option value="">Select booking…</option>
-          {bookings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.id} — {b.fromCity} → {b.toCity} ({b.status || '—'})
-            </option>
-          ))}
-        </select>
+        <Select
+          required
+          label={false}
+          value={bookingId}
+          onChange={(e) => setBookingId(e.target.value)}
+          placeholder="Select booking…"
+          options={[
+            { value: '', label: 'Select booking…' },
+            ...bookings.map((b) => ({
+              value: b.id,
+              label: `${b.id} — ${b.fromCity} → ${b.toCity} (${b.status || '—'})`,
+            })),
+          ]}
+        />
         {podInfo?.alreadyDelivered && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
             Already delivered{podInfo.deliveryDate ? ` on ${podInfo.deliveryDate}` : ''}.
@@ -353,14 +360,20 @@ export function PodPage() {
           For OTP proof use{' '}
           <Link to="/operations/epod" className="text-primary hover:underline">ePOD</Link>.
         </p>
-        <select required value={bookingId} onChange={(e) => setBookingId(e.target.value)} className={inputClass}>
-          <option value="">Select booking no…</option>
-          {bookings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.id} — {b.fromCity} → {b.toCity} ({b.status || '—'})
-            </option>
-          ))}
-        </select>
+        <Select
+          required
+          label={false}
+          value={bookingId}
+          onChange={(e) => setBookingId(e.target.value)}
+          placeholder="Select booking no…"
+          options={[
+            { value: '', label: 'Select booking no…' },
+            ...bookings.map((b) => ({
+              value: b.id,
+              label: `${b.id} — ${b.fromCity} → ${b.toCity} (${b.status || '—'})`,
+            })),
+          ]}
+        />
         {podInfo?.alreadyDelivered && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
             Already delivered{podInfo.deliveryDate ? ` on ${podInfo.deliveryDate}` : ''}.

@@ -76,6 +76,11 @@ public record ConsigneeDto(
     Guid? BranchId = null, string? BranchName = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
 
+public record ItemMasterDto(
+    string Id, string Name, string? Hsn, string? DefaultPackageType, string? Unit, string? Remarks, string Status,
+    Guid? BranchId = null, string? BranchName = null,
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+
 public record ExpenseDto(
     string Id, string Date, string Category, string? Description, string? Vehicle,
     string? Vendor, decimal Amount, string? PaymentMode, string Status,

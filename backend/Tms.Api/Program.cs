@@ -143,6 +143,7 @@ builder.Services.AddScoped<LookupQuickCreateService>();
 builder.Services.AddScoped<DriverSyncService>();
 builder.Services.AddScoped<DocumentFlowService>();
 builder.Services.AddScoped<DocumentNumberService>();
+builder.Services.AddScoped<CompanyDataPurgeService>();
 
 builder.Services.AddHttpClient();
 
@@ -265,8 +266,8 @@ if (!app.Environment.IsEnvironment("Testing"))
 
         logger.LogInformation("TMS API: preparing database…");
 
-        logger.LogInformation("Ensuring critical schema (branches PK, users email/mobile)…");
-        await SchemaMigrationHelper.EnsureCriticalSchemaAsync(db);
+        logger.LogInformation("Ensuring critical schema (branches PK, audit columns, users email/mobile)…");
+        await SchemaMigrationHelper.EnsureCriticalSchemaAsync(db, logger);
 
         if (runStartupMigrations)
         {
@@ -286,6 +287,9 @@ if (!app.Environment.IsEnvironment("Testing"))
                 logger.LogInformation("Ensuring branch schema…");
                 await BranchSchemaMigrator.EnsureAsync(db);
 
+                logger.LogInformation("Ensuring audit columns (created_by / updated_by, ADD only)…");
+                await AuditSchemaMigrator.EnsureAsync(db, AuditMigrationMode.ColumnsOnly);
+
                 logger.LogInformation("Ensuring branch isolation columns…");
                 await BranchIsolationMigrator.EnsureAsync(db);
 
@@ -300,7 +304,7 @@ if (!app.Environment.IsEnvironment("Testing"))
                 }
 
                 logger.LogInformation("Ensuring LR process schema…");
-                await LrSchemaMigrator.EnsureAsync(db);
+                await LrSchemaMigrator.EnsureAsync(db, logger);
 
                 logger.LogInformation("Ensuring booking-finance schema…");
                 await BookingFinanceSchemaMigrator.EnsureAsync(db);
@@ -308,11 +312,17 @@ if (!app.Environment.IsEnvironment("Testing"))
                 logger.LogInformation("Ensuring commercial schema…");
                 await CommercialSchemaMigrator.EnsureAsync(db);
 
+                logger.LogInformation("Ensuring document numbering schema…");
+                await DocumentNumberingSchemaMigrator.EnsureAsync(db);
+
                 logger.LogInformation("Ensuring maintenance schema…");
                 await MaintenanceSchemaMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring reporting stored procedures…");
                 await ReportsSchemaMigrator.EnsureAsync(db);
+
+                logger.LogInformation("Ensuring print template schema…");
+                await PrintTemplateSchemaMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring SaaS tenant schema…");
                 await TenantSchemaMigrator.EnsureAsync(db, logger);

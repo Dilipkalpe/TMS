@@ -11,7 +11,8 @@ import { LR_BUSINESS_TYPE_LABELS } from '../../constants/lrBusinessTypes'
 import { fromDocPath, lrEditPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
-import TransitPassPrintFormat from '../../components/print/TransitPassPrintFormat'
+import { printModuleDocument } from '../../services/printService'
+import { PRINT_MODULE_CODES } from '../../config/printModules'
 import LrStatusFlow from '../../components/lr/LrStatusFlow'
 import { lrStatusProgress } from '../../constants/lrStatusFlow'
 import {
@@ -185,14 +186,16 @@ export default function LRProcessPage() {
 
   const printTransitPass = () => {
     if (!process?.transitPass) return
-    print(
-      <TransitPassPrintFormat
-        pass={process.transitPass}
-        lr={lr}
-        company={company}
-        loadingItems={process.loadingSheet?.items}
-      />,
-    )
+    printModuleDocument({
+      moduleCode: PRINT_MODULE_CODES.TRANSIT_PASS,
+      company,
+      print,
+      documentData: {
+        pass: process.transitPass,
+        lr,
+        loadingItems: process.loadingSheet?.items,
+      },
+    })
   }
 
   const uploadDocument = () => run('Document uploaded', async () => {
@@ -234,7 +237,7 @@ export default function LRProcessPage() {
 
   if (loading || !process || !lr) {
     return (
-      <ERPContentPage module="LR Management" title="LR Process">
+      <ERPContentPage module="LR" title="LR Process">
         <p className="text-sm text-slate-500">Loading workflow…</p>
       </ERPContentPage>
     )
@@ -244,12 +247,12 @@ export default function LRProcessPage() {
 
   return (
     <ERPContentPage
-      module="LR Management"
+      module="LR"
       title={`LR Process — ${lrNumber}`}
       toolbar={(
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/operations')}>Operations desks</Button>
-          <Button variant="outline" onClick={() => navigate('/lr')}>All LRs</Button>
+          <Button variant="outline" onClick={() => navigate('/lr/list')}>All LRs</Button>
           <Link to={lrEditPath(lrNumber)}>
             <Button variant="outline" icon={FileText}>Edit LR</Button>
           </Link>

@@ -63,6 +63,15 @@ public static class SearchHelper
             || (c.Phone != null && EF.Functions.ILike(c.Phone, p)));
     }
 
+    public static IQueryable<ItemMaster> Filter(IQueryable<ItemMaster> q, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search)) return q;
+        var p = Pattern(search);
+        return q.Where(i => EF.Functions.ILike(i.Name, p)
+            || (i.Hsn != null && EF.Functions.ILike(i.Hsn, p))
+            || (i.Remarks != null && EF.Functions.ILike(i.Remarks, p)));
+    }
+
     public static IQueryable<Booking> Filter(IQueryable<Booking> q, string? search)
     {
         if (string.IsNullOrWhiteSpace(search)) return q;

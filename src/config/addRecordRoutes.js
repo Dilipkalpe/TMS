@@ -7,6 +7,7 @@ export const addRecordRoutes = {
   customers: '/customers/new',
   consignors: '/consignors/new',
   consignees: '/consignees/new',
+  items: '/items/new',
   freightRates: '/freight-rates/new',
   quotations: '/quotations/new',
   vendors: '/vendors/new',

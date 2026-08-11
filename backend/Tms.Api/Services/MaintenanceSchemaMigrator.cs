@@ -58,10 +58,38 @@ public static class MaintenanceSchemaMigrator
         """,
         "ALTER TABLE maintenance_schedules ADD COLUMN IF NOT EXISTS company_id UUID",
         "ALTER TABLE maintenance_records ADD COLUMN IF NOT EXISTS company_id UUID",
-    ];
-
-    static readonly string[] Phase4CompanyIdStatements =
-    [
+        // Always create phase-4 tables here so /maintenance works even if phase4.sql is not on disk.
+        """
+        CREATE TABLE IF NOT EXISTS maintenance_work_orders (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            vehicle_id      VARCHAR(20) NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+            schedule_id     UUID REFERENCES maintenance_schedules(id) ON DELETE SET NULL,
+            title           VARCHAR(200) NOT NULL,
+            component       VARCHAR(50),
+            status          VARCHAR(30) NOT NULL DEFAULT 'OPEN',
+            priority        VARCHAR(20) NOT NULL DEFAULT 'NORMAL',
+            due_at          TIMESTAMPTZ,
+            assigned_to     VARCHAR(100),
+            notes           TEXT,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            completed_at    TIMESTAMPTZ
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_maint_work_orders_vehicle ON maintenance_work_orders(vehicle_id)",
+        "CREATE INDEX IF NOT EXISTS idx_maint_work_orders_status ON maintenance_work_orders(status)",
+        """
+        CREATE TABLE IF NOT EXISTS maintenance_prediction_snapshots (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            snapshot_date   DATE NOT NULL,
+            vehicle_id      VARCHAR(20) NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+            risk_score      INT NOT NULL,
+            risk_level      VARCHAR(10) NOT NULL,
+            factors         JSONB,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (snapshot_date, vehicle_id)
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_maint_snapshots_date ON maintenance_prediction_snapshots(snapshot_date)",
         "ALTER TABLE maintenance_work_orders ADD COLUMN IF NOT EXISTS company_id UUID",
         "ALTER TABLE maintenance_prediction_snapshots ADD COLUMN IF NOT EXISTS company_id UUID",
     ];
@@ -81,14 +109,8 @@ public static class MaintenanceSchemaMigrator
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
+        // Best-effort extra statements from phase4.sql (indexes/seeds); tables already ensured above.
         await ApplyPhase4Async(conn, ct);
-
-        foreach (var sql in Phase4CompanyIdStatements)
-        {
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.CommandTimeout = SchemaMigrationHelper.CommandTimeoutSeconds;
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
     }
 
     static async Task EnsureBaseTablesAsync(NpgsqlConnection conn, CancellationToken ct)

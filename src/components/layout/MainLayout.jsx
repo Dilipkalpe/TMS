@@ -25,7 +25,9 @@ function RouteAutoFocus() {
 
 export default function MainLayout() {
   const location = useLocation()
-  const isFillPage = /^\/(lr\/(entry|bulk|list)|operations\/(loading-slip|transit-pass|delivery\/pod|billing\/invoice|trip-expenses))\/?$/.test(location.pathname)
+  // Fill/locked chrome for entry screens only — list pages (e.g. /lr/list, /operations/loading-slip/list)
+  // use the same page scroll so grids behave consistently.
+  const isFillPage = /^\/(lr\/(entry|bulk)|operations\/(loading-slip|transit-pass|dispatch|in-transit|delivery\/pod|billing\/invoice|trip-expenses))\/?$/.test(location.pathname)
 
   return (
     <PageTitleProvider>
@@ -35,7 +37,7 @@ export default function MainLayout() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Navbar />
           <main className={`app-shell-bg flex min-h-0 flex-1 flex-col overflow-x-hidden p-1 sm:p-2 lg:p-3 ${isFillPage ? 'lr-entry-page overflow-hidden' : 'app-scroll mobile-scroll-y overflow-y-auto'}`}>
-            <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${isFillPage ? 'overflow-hidden' : ''}`}>
+            <div className={`flex min-w-0 flex-1 flex-col ${isFillPage ? 'min-h-0 overflow-hidden' : ''}`}>
               <Outlet />
             </div>
           </main>

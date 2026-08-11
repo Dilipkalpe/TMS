@@ -166,6 +166,18 @@ public static class LrOperationsService
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var todaysLr = await allLrs.CountAsync(l => l.LrDate == today, ct);
 
+        var deliveredComplete = await allLrs.CountAsync(l =>
+            l.Status == LrStatuses.DeliveryCompleted
+            || l.Status == LrStatuses.PodUploaded
+            || l.Status == LrStatuses.InvoiceGenerated
+            || l.Status == LrStatuses.ExpenseAdded
+            || l.Status == LrStatuses.ExpenseApproved
+            || l.Status == LrStatuses.Closed, ct);
+        var pendingNotDelivered = Math.Max(0, totalLr - deliveredComplete);
+        var totalAmount = await allLrs.SumAsync(l =>
+            l.Freight + l.Gst
+            + (l.Hamali ?? 0m) + (l.LoadingCharges ?? 0m) + (l.UnloadingCharges ?? 0m) + (l.Insurance ?? 0m), ct);
+
         var pendingLoading = counts.GetValueOrDefault(LrOperationStages.LoadingPending)
             + counts.GetValueOrDefault(LrOperationStages.LrCreated);
         var inTransit = counts.GetValueOrDefault(LrOperationStages.Dispatched);
@@ -191,6 +203,9 @@ public static class LrOperationsService
         {
             totalLR = totalLr,
             todaysLR = todaysLr,
+            pendingNotDelivered,
+            deliveredComplete,
+            totalAmount,
             pendingLoading,
             inTransit,
             delivered,

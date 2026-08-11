@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Clock, MapPin, Package, Search, Truck } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import { Select } from '../../components/ui/Input'
 import { portalApi } from '../../services/api'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { PortalEmptyState } from './PortalLayout'
@@ -96,15 +97,13 @@ export default function PortalDashboard() {
             className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-800"
           />
         </div>
-        <select
+        <Select
+          label={false}
+          className="min-w-[9rem]"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
-        >
-          {STATUSES.map((s) => (
-            <option key={s} value={s === 'All' ? '' : s}>{s}</option>
-          ))}
-        </select>
+          options={STATUSES.map((s) => ({ value: s === 'All' ? '' : s, label: s }))}
+        />
       </div>
 
       {loading ? (

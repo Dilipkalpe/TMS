@@ -234,6 +234,7 @@ export const freightInvoicesApi = {
   get: (id) => apiRequest(`/freight-invoices/${id}`),
   create: (data) => apiRequest('/freight-invoices', { method: 'POST', body: data }),
   cancel: (id) => apiRequest(`/freight-invoices/${id}/cancel`, { method: 'POST' }),
+  recordPayment: (id, data) => apiRequest(`/freight-invoices/${id}/payments`, { method: 'POST', body: data }),
 }
 
 export const vendorsApi = {
@@ -258,6 +259,14 @@ export const consigneesApi = {
   create: (data) => apiRequest('/consignees', { method: 'POST', body: data }),
   update: (id, data) => apiRequest(`/consignees/${id}`, { method: 'PUT', body: data }),
   remove: (id) => apiRequest(`/consignees/${id}`, { method: 'DELETE' }),
+}
+
+export const itemsApi = {
+  list: (params = {}) => apiRequest(`/items?${new URLSearchParams(params)}`),
+  get: (id) => apiRequest(`/items/${id}`),
+  create: (data) => apiRequest('/items', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/items/${id}`, { method: 'PUT', body: data }),
+  remove: (id) => apiRequest(`/items/${id}`, { method: 'DELETE' }),
 }
 
 export const expensesApi = {
@@ -316,6 +325,13 @@ export const lrProcessApi = {
   getLoadingSheet: (lrNumber) => apiRequest(lrPath(lrNumber, 'loading-sheet')),
   createTransitPass: (lrNumber, data = {}) => apiRequest(lrPath(lrNumber, 'transit-pass'), { method: 'POST', body: data }),
   getTransitPass: (lrNumber) => apiRequest(lrPath(lrNumber, 'transit-pass')),
+  markTransitPassReady: (lrNumber) => apiRequest(lrPath(lrNumber, 'transit-pass/ready'), { method: 'POST' }),
+  cancelTransitPass: (lrNumber, reason) => apiRequest(lrPath(lrNumber, 'transit-pass/cancel'), { method: 'PATCH', body: { reason } }),
+  confirmDispatch: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'dispatch/confirm'), { method: 'POST', body: data }),
+  addCheckpoint: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'checkpoints'), { method: 'POST', body: data }),
+  updateInTransitStatus: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'in-transit/status'), { method: 'PATCH', body: data }),
+  verifyPod: (lrNumber) => apiRequest(lrPath(lrNumber, 'pod/verify'), { method: 'PATCH' }),
+  rejectPod: (lrNumber, reason) => apiRequest(lrPath(lrNumber, 'pod/reject'), { method: 'PATCH', body: { reason } }),
   listDeliveryDocuments: (lrNumber) => apiRequest(lrPath(lrNumber, 'delivery-documents')),
   saveDeliveryDocument: (lrNumber, data) => apiRequest(lrPath(lrNumber, 'delivery-documents'), { method: 'POST', body: data }),
   uploadDeliveryDocument: (lrNumber, file, docType, title) => {
@@ -352,7 +368,13 @@ export const lrBusinessApi = {
 
 export const dashboardApi = {
   overview: () => apiRequest('/dashboard/overview'),
-  home: () => apiRequest('/dashboard/home'),
+  home: (params = {}) => {
+    const q = new URLSearchParams()
+    if (params.dateFrom) q.set('dateFrom', params.dateFrom)
+    if (params.dateTo) q.set('dateTo', params.dateTo)
+    const qs = q.toString()
+    return apiRequest(`/dashboard/home${qs ? `?${qs}` : ''}`)
+  },
   stats: () => apiRequest('/dashboard/stats'),
   recentBookings: () => apiRequest('/dashboard/recent-bookings'),
   recentTrips: () => apiRequest('/dashboard/recent-trips'),
@@ -472,6 +494,13 @@ export const settingsApi = {
   getCompanyDocumentFlow: () => apiRequest('/company/settings/document-flow'),
   setDocumentFlow: (documentFlow) =>
     apiRequest('/settings/document-flow', { method: 'PUT', body: { documentFlow } }),
+  /** Large demo DBs can take several minutes — allow 15 minutes. */
+  purgeData: (confirmText) =>
+    apiRequest('/settings/purge-data', {
+      method: 'POST',
+      body: { confirmText },
+      timeout: 15 * 60 * 1000,
+    }),
 }
 
 export const payrollApi = {
@@ -512,23 +541,26 @@ export const hrApi = {
   holidays: (year) => apiRequest(`/hr/holidays?${year ? `year=${year}` : ''}`),
 }
 
+const maintenanceRequest = (path, options = {}) =>
+  apiRequest(path, { timeout: 90_000, ...options })
+
 export const maintenanceApi = {
-  overview: () => apiRequest('/maintenance/overview'),
-  predictions: () => apiRequest('/maintenance/predictions'),
-  analytics: () => apiRequest('/maintenance/analytics'),
-  alerts: () => apiRequest('/maintenance/alerts'),
-  vehicleProfile: (vehicleId) => apiRequest(`/maintenance/vehicles/${vehicleId}`),
-  notifyVehicle: (vehicleId) => apiRequest(`/maintenance/vehicles/${vehicleId}/notify`, { method: 'POST' }),
-  schedules: () => apiRequest('/maintenance/schedules'),
-  addSchedule: (data) => apiRequest('/maintenance/schedules', { method: 'POST', body: data }),
-  records: () => apiRequest('/maintenance/records'),
-  addRecord: (data) => apiRequest('/maintenance/records', { method: 'POST', body: data }),
-  workOrders: (params = {}) => apiRequest(`/maintenance/work-orders?${new URLSearchParams(params)}`),
-  addWorkOrder: (data) => apiRequest('/maintenance/work-orders', { method: 'POST', body: data }),
-  updateWorkOrderStatus: (id, status) => apiRequest(`/maintenance/work-orders/${id}/status`, { method: 'PATCH', body: { status } }),
-  spareParts: () => apiRequest('/maintenance/spare-parts'),
-  addSparePart: (data) => apiRequest('/maintenance/spare-parts', { method: 'POST', body: data }),
-  updateStock: (id, stockQty) => apiRequest(`/maintenance/spare-parts/${id}/stock`, { method: 'PATCH', body: { stockQty } }),
+  overview: () => maintenanceRequest('/maintenance/overview'),
+  predictions: () => maintenanceRequest('/maintenance/predictions'),
+  analytics: () => maintenanceRequest('/maintenance/analytics'),
+  alerts: () => maintenanceRequest('/maintenance/alerts'),
+  vehicleProfile: (vehicleId) => maintenanceRequest(`/maintenance/vehicles/${vehicleId}`),
+  notifyVehicle: (vehicleId) => maintenanceRequest(`/maintenance/vehicles/${vehicleId}/notify`, { method: 'POST' }),
+  schedules: () => maintenanceRequest('/maintenance/schedules'),
+  addSchedule: (data) => maintenanceRequest('/maintenance/schedules', { method: 'POST', body: data }),
+  records: () => maintenanceRequest('/maintenance/records'),
+  addRecord: (data) => maintenanceRequest('/maintenance/records', { method: 'POST', body: data }),
+  workOrders: (params = {}) => maintenanceRequest(`/maintenance/work-orders?${new URLSearchParams(params)}`),
+  addWorkOrder: (data) => maintenanceRequest('/maintenance/work-orders', { method: 'POST', body: data }),
+  updateWorkOrderStatus: (id, status) => maintenanceRequest(`/maintenance/work-orders/${id}/status`, { method: 'PATCH', body: { status } }),
+  spareParts: () => maintenanceRequest('/maintenance/spare-parts'),
+  addSparePart: (data) => maintenanceRequest('/maintenance/spare-parts', { method: 'POST', body: data }),
+  updateStock: (id, stockQty) => maintenanceRequest(`/maintenance/spare-parts/${id}/stock`, { method: 'PATCH', body: { stockQty } }),
 }
 
 export const fuelApi = {
@@ -720,4 +752,39 @@ export const iotApi = {
 export const aiApi = {
   chat: (message, sessionId) => apiRequest('/ai/chat', { method: 'POST', body: { message, sessionId } }),
   forecasts: () => apiRequest('/ai/forecasts'),
+}
+
+/** Public health check — no auth required (login screen). */
+export async function fetchApiHealth() {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+  try {
+    const res = await fetch(`${API_BASE_URL}/health`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+    const data = await res.json().catch(() => ({}))
+    return {
+      reachable: true,
+      ok: res.ok,
+      status: data.status || (res.ok ? 'healthy' : 'unhealthy'),
+      service: data.service || 'TMS Pro API',
+      database: data.database || (res.ok ? 'connected' : 'disconnected'),
+      build: data.build || null,
+      message: data.message || null,
+    }
+  } catch {
+    return {
+      reachable: false,
+      ok: false,
+      status: 'offline',
+      service: 'TMS Pro API',
+      database: 'unreachable',
+      build: null,
+      message: null,
+    }
+  } finally {
+    clearTimeout(timer)
+  }
 }

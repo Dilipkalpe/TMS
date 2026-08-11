@@ -11,7 +11,7 @@ import { platformApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { useCompany } from '../../context/CompanyContext'
 import { useToast } from '../../context/ToastContext'
-import { Building2, ChevronLeft, ChevronRight, Pencil, Power, Search, Shield, X } from 'lucide-react'
+import { Building2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Power, Search, Shield, X } from 'lucide-react'
 
 const emptyCompanyForm = {
   code: '', name: '', legalName: '', email: '', phone: '', city: '', state: '',
@@ -208,7 +208,15 @@ export default function PlatformHub() {
                             onClick={() => toggleStatus(c)}>
                             <Power className="h-3.5 w-3.5" />
                           </button>
-                          <Button className="px-2 py-1 text-xs" onClick={() => enterTenant(c.id)}>Open</Button>
+                          <button
+                            type="button"
+                            title="Open tenant"
+                            aria-label="Open tenant"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded border border-primary/30 text-primary hover:bg-primary/10"
+                            onClick={() => enterTenant(c.id)}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

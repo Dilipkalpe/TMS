@@ -38,17 +38,20 @@ export class KeyboardNavigationService {
 
     const combo = normalizeKeyEvent(e)
 
+    if (this.gridActions?.onKeyDown?.(e)) return true
+
     if (this.tallyMode && e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const target = e.target
       if (target instanceof HTMLElement && isEditableTarget(target)) {
+        if (target.closest('[data-kbd-grid]')) return false
         if (target.tagName === 'TEXTAREA' && e.shiftKey) return false
+        // Comboboxes own Enter (open list / select highlight). Do not treat as Tab.
+        if (target.getAttribute('role') === 'combobox') return false
         e.preventDefault()
         focusNextEditable(target, e.shiftKey)
         return true
       }
     }
-
-    if (this.gridActions?.onKeyDown?.(e)) return true
 
     if (shouldBlockGlobalShortcut(e, combo)) return false
 
@@ -68,11 +71,21 @@ export class KeyboardNavigationService {
       return true
     }
     if (action === 'search:open') {
+      if (this.pageActions?.onSearch) {
+        e.preventDefault()
+        this.pageActions.onSearch()
+        return true
+      }
       e.preventDefault()
       this.handlers.onSearchOpen?.()
       return true
     }
     if (action === 'lookup:open') {
+      if (this.pageActions?.onLookup) {
+        e.preventDefault()
+        this.pageActions.onLookup()
+        return true
+      }
       e.preventDefault()
       this.lookupTrigger?.()
       this.handlers.onLookupOpen?.()
@@ -95,6 +108,11 @@ export class KeyboardNavigationService {
       return true
     }
     if (action === 'page:save' && this.pageActions?.onSave) {
+      if (combo === 'f2' && this.pageActions.onNewF2) {
+        e.preventDefault()
+        this.pageActions.onNewF2()
+        return true
+      }
       e.preventDefault()
       this.pageActions.onSave()
       return true
@@ -112,6 +130,16 @@ export class KeyboardNavigationService {
     if (action === 'page:preview' && this.pageActions?.onPreview) {
       e.preventDefault()
       this.pageActions.onPreview()
+      return true
+    }
+    if (action === 'grid:delete' && this.pageActions?.onDeleteRow) {
+      e.preventDefault()
+      this.pageActions.onDeleteRow()
+      return true
+    }
+    if (action === 'grid:insert' && this.pageActions?.onAddRow) {
+      e.preventDefault()
+      this.pageActions.onAddRow()
       return true
     }
     if (path && this.handlers.navigate) {

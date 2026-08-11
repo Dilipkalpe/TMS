@@ -1,24 +1,32 @@
-import { useCallback, useEffect, useMemo } from 'react'
-import {
-  CloudUpload, Eye, Loader2, Plus, Printer, RotateCcw, Save, Trash2, X,
-} from 'lucide-react'
-import Button from '../ui/Button'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Input, { Select, Textarea } from '../ui/Input'
+import VehicleMasterSelect from '../masters/VehicleMasterSelect'
+import DriverMasterSelect from '../masters/DriverMasterSelect'
 import PartyMasterSelect from '../masters/PartyMasterSelect'
 import { consignorsApi, consigneesApi } from '../../services/api'
 import { applyConsignorToLrForm, applyConsigneeToLrForm } from '../../utils/partyMasterLr'
 import { formatCurrency } from '../ui/ReportFilters'
 import { LR_BUSINESS_TYPES, LR_BUSINESS_TYPE_LABELS } from '../../constants/lrBusinessTypes'
 import { useGridKeyboard } from '../../hooks/useGridKeyboard'
+import LrEntryInformationSection from './entry/LrEntryInformationSection'
+import LrEntryPartiesSection from './entry/LrEntryPartiesSection'
+import LrEntryRouteSection from './entry/LrEntryRouteSection'
+import LrEntryItemsSection, { ITEM_FIELD_KEYS } from './entry/LrEntryItemsSection'
+import LrEntryChargesSection from './entry/LrEntryChargesSection'
+import LrEntryAdditionalSection from './entry/LrEntryAdditionalSection'
+import { computeLrFinancials } from '../../utils/lrEntryFinancials'
 
 const PAYMENT_TYPES = ['To Pay', 'Paid', 'TBB', 'To Be Billed']
-const SERVICE_TYPES = ['Normal', 'Express', 'ODC', 'Priority']
-const PACKAGE_TYPES = ['Box', 'Carton', 'Coil', 'Bag', 'Pallet', 'Other']
-const GST_OPTIONS = ['0%', '5%', '12%', '18%', '28%']
-const ITEM_FIELD_KEYS = ['description', 'hsn', 'packageType', 'qty', 'weight', 'invoiceNo', 'invoiceDate', 'invoiceValue']
+
+function tomorrowIsoDate() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
 
 export const emptyLrItem = () => ({
   id: crypto.randomUUID?.() ?? String(Date.now()),
+  itemId: '',
   description: '',
   hsn: '',
   packageType: 'Box',
@@ -57,7 +65,8 @@ export const emptyLrEntryForm = () => ({
   pickupAddress: '',
   pickupCity: '',
   deliveryBranch: '',
-  expectedDeliveryDate: '',
+  expectedDeliveryDate: tomorrowIsoDate(),
+  expectedDeliveryTime: '',
   from: '',
   to: '',
   vehicle: '',
@@ -82,35 +91,30 @@ export const emptyLrEntryForm = () => ({
   attachments: [],
 })
 
-function PartyBlock({ title, form, prefix, onSelect, onUpdate, sameAsConsignor, compact }) {
-  const nameKey = prefix === 'billingParty' ? 'billingParty' : prefix
-  const wrap = compact ? 'lr-entry-section lr-entry-compact min-h-0' : 'h-full p-4'
-  return (
-    <div className={wrap}>
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-primary">{title}</p>
-      <div className={compact ? 'space-y-1' : 'space-y-3'}>
-        {prefix === 'consignor' && (
-          <PartyMasterSelect label="Name *" api={consignorsApi} valueId={form.consignorId} displayValue={form.consignor} onSelect={onSelect} />
-        )}
-        {prefix === 'consignee' && (
-          <PartyMasterSelect label="Name *" api={consigneesApi} valueId={form.consigneeId} displayValue={form.consignee} onSelect={onSelect} />
-        )}
-        {prefix === 'billingParty' && (
-          <div className="flex gap-1">
-            <div className="min-w-0 flex-1">
-              <Input label="Name *" value={form.billingParty} onChange={(e) => onUpdate('billingParty', e.target.value)} placeholder="Billing party" />
-            </div>
-            <Button size="sm" variant="outline" type="button" className="mt-4 shrink-0" onClick={sameAsConsignor}>Copy</Button>
-          </div>
-        )}
-        <Textarea label="Address" rows={compact ? 1 : 2} value={form[`${nameKey}Address`] || ''} onChange={(e) => onUpdate(`${nameKey}Address`, e.target.value)} />
-        <div className="grid grid-cols-2 gap-1">
-          <Input label="GSTIN" value={form[`${nameKey}Gst`] || ''} onChange={(e) => onUpdate(`${nameKey}Gst`, e.target.value)} />
-          <Input label="Mobile" value={form[`${nameKey}Phone`] || ''} onChange={(e) => onUpdate(`${nameKey}Phone`, e.target.value)} />
-        </div>
-      </div>
-    </div>
-  )
+function applyBillingFromMode(prev, mode) {
+  if (mode === 'consignor') {
+    return {
+      ...prev,
+      billingParty: prev.consignor,
+      billingPartyAddress: prev.consignorAddress,
+      billingPartyGst: prev.consignorGst,
+      billingPartyPhone: prev.consignorPhone,
+      billingPartyId: prev.consignorId,
+      customerName: prev.consignor,
+    }
+  }
+  if (mode === 'consignee') {
+    return {
+      ...prev,
+      billingParty: prev.consignee,
+      billingPartyAddress: prev.consigneeAddress,
+      billingPartyGst: prev.consigneeGst,
+      billingPartyPhone: prev.consigneePhone,
+      billingPartyId: prev.consigneeId,
+      customerName: prev.consignee,
+    }
+  }
+  return prev
 }
 
 export default function LrEntryFormLayout({
@@ -118,15 +122,13 @@ export default function LrEntryFormLayout({
   setForm,
   update,
   ultra = false,
-  saving = false,
-  onSave,
-  onSavePrint,
-  onPreview,
-  onClear,
-  onCancel,
   bookingSlot,
-  flowBanner,
+  fieldErrors = {},
+  formActionsRef,
+  onClearFieldErrors,
 }) {
+  const [billingMode, setBillingMode] = useState('consignor')
+
   const itemTotals = useMemo(() => {
     const items = form.items || []
     return {
@@ -136,17 +138,7 @@ export default function LrEntryFormLayout({
     }
   }, [form.items])
 
-  const taxable = useMemo(() => {
-    return Number(form.freight || 0) + Number(form.loadingCharges || 0)
-      + Number(form.unloadingCharges || 0) + Number(form.otherCharges || 0) + Number(form.hamali || 0)
-  }, [form])
-
-  const gstAmount = useMemo(() => {
-    const pct = parseFloat(String(form.gstPercent || '0').replace('%', '')) || 0
-    return Math.round(taxable * pct) / 100
-  }, [taxable, form.gstPercent])
-
-  const totalAmount = taxable + gstAmount + Number(form.insurance || 0)
+  const { gstAmount } = useMemo(() => computeLrFinancials(form), [form])
 
   useEffect(() => {
     if (Math.abs(Number(form.gst) - gstAmount) > 0.01) {
@@ -155,8 +147,10 @@ export default function LrEntryFormLayout({
   }, [gstAmount]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const syncItemsToForm = useCallback((items) => {
+    const qty = items.reduce((s, i) => s + (Number(i.qty) || 0), 0)
+    const weight = items.reduce((s, i) => s + (Number(i.weight) || 0), 0)
     const desc = items.map((i) => i.description).filter(Boolean).join('; ')
-    const qtyStr = `${itemTotals.qty} pkgs / ${itemTotals.weight.toFixed(3)} kg`
+    const qtyStr = `${qty} pkgs / ${weight.toFixed(3)} kg`
     setForm((prev) => ({
       ...prev,
       items,
@@ -164,7 +158,7 @@ export default function LrEntryFormLayout({
       quantity: qtyStr,
       customerName: prev.billingParty || prev.consignor,
     }))
-  }, [itemTotals.qty, itemTotals.weight, setForm])
+  }, [setForm])
 
   const updateItem = (idx, field, value) => {
     const items = [...(form.items || [])]
@@ -172,10 +166,25 @@ export default function LrEntryFormLayout({
     syncItemsToForm(items)
   }
 
-  const addItem = () => syncItemsToForm([...(form.items || []), emptyLrItem()])
+  const patchItem = (idx, patch) => {
+    const items = [...(form.items || [])]
+    items[idx] = { ...items[idx], ...patch }
+    syncItemsToForm(items)
+  }
+
+  const addItem = useCallback(() => {
+    syncItemsToForm([...(form.items || []), emptyLrItem()])
+  }, [form.items, syncItemsToForm])
+
   const removeItem = (idx) => syncItemsToForm((form.items || []).filter((_, i) => i !== idx))
 
-  const { containerRef: gridRef, onContainerKeyDown } = useGridKeyboard({
+  useEffect(() => {
+    if (formActionsRef) {
+      formActionsRef.current = { addItem }
+    }
+  }, [formActionsRef, addItem])
+
+  const { containerRef: gridRef } = useGridKeyboard({
     rows: form.items || [],
     setRows: (items) => syncItemsToForm(items),
     createEmptyRow: emptyLrItem,
@@ -183,25 +192,24 @@ export default function LrEntryFormLayout({
     enabled: !ultra,
   })
 
-  const copyBillingFromConsignor = () => {
-    setForm((prev) => ({
-      ...prev,
-      billingParty: prev.consignor,
-      billingPartyAddress: prev.consignorAddress,
-      billingPartyGst: prev.consignorGst,
-      billingPartyPhone: prev.consignorPhone,
-      customerName: prev.consignor,
-    }))
+  const handleBillingModeChange = (mode) => {
+    setBillingMode(mode)
+    if (mode !== 'custom') {
+      setForm((prev) => applyBillingFromMode(prev, mode))
+    }
   }
 
-  return (
-    <div className="lr-entry-shell lr-entry-compact">
-      {flowBanner && <div className="shrink-0 [&>div]:rounded [&>div]:px-2 [&>div]:py-1 [&>div]:text-[10px]">{flowBanner}</div>}
+  const copyBillingFromConsignor = () => {
+    setBillingMode('consignor')
+    setForm((prev) => applyBillingFromMode(prev, 'consignor'))
+  }
 
-      {/* Header row */}
-      <div className="lr-entry-section shrink-0">
-        <div className="flex items-start gap-2">
-          <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-2 gap-y-1 sm:grid-cols-3 lg:grid-cols-6">
+  if (ultra) {
+    return (
+      <div className="lr-entry-shell lr-entry-compact">
+        <div className="lr-entry-section shrink-0">
+          <p className="lr-entry-band-title mb-1">Document</p>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1 sm:grid-cols-3 lg:grid-cols-6">
             <Input label="LR No." value={form.lrNumber || 'Auto'} readOnly />
             <Input label="LR Date *" type="date" value={form.lrDate} onChange={(e) => update('lrDate', e.target.value)} />
             <Input label="Branch" value={form.branchName} placeholder="Branch" onChange={(e) => update('branchName', e.target.value)} />
@@ -211,171 +219,186 @@ export default function LrEntryFormLayout({
               value={form.businessType}
               onChange={(e) => update('businessType', e.target.value)}
             />
-            {!ultra && (
-              <Select label="Service" options={SERVICE_TYPES} value={form.serviceType} onChange={(e) => update('serviceType', e.target.value)} />
-            )}
             {bookingSlot}
           </div>
-          {!ultra && (
-            <div className="hidden shrink-0 flex-col items-center rounded border border-dashed border-slate-300 px-2 py-1 text-center sm:flex dark:border-slate-600">
-              <div className="flex h-10 w-10 items-center justify-center bg-slate-100 text-[8px] text-slate-500 dark:bg-slate-800">QR</div>
-              <p className="text-[9px] font-semibold">{form.lrNumber || 'New'}</p>
-            </div>
-          )}
+        </div>
+        <div className="lr-entry-section shrink-0">
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1 lg:grid-cols-4 xl:grid-cols-8">
+            <PartyMasterSelect label="Consignor *" api={consignorsApi} valueId={form.consignorId} displayValue={form.consignor} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row) }))} />
+            <PartyMasterSelect label="Consignee *" api={consigneesApi} valueId={form.consigneeId} displayValue={form.consignee} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row) }))} />
+            <Input label="From *" value={form.from} onChange={(e) => update('from', e.target.value)} />
+            <Input label="To *" value={form.to} onChange={(e) => update('to', e.target.value)} />
+            <VehicleMasterSelect
+              label="Vehicle"
+              displayValue={form.vehicle}
+              placeholder="Search vehicle number…"
+              onSelect={(row) => update('vehicle', row.number ?? '')}
+            />
+            <DriverMasterSelect
+              label="Driver"
+              displayValue={form.driver}
+              placeholder="Search driver name…"
+              onSelect={(row) => update('driver', row.name ?? '')}
+            />
+            <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />
+            <Input label="Qty/Wt" value={form.quantity} onChange={(e) => update('quantity', e.target.value)} placeholder="pkgs/kg" />
+            <Input label="E-Way Bill No." value={form.ewayBillNo} onChange={(e) => update('ewayBillNo', e.target.value)} />
+            <Select label="Freight Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
+            <Input label="Freight ₹" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
+            <Input label="GST ₹" type="number" value={form.gst} onChange={(e) => update('gst', e.target.value)} />
+            <Input label="Advance ₹" type="number" value={form.advance} onChange={(e) => update('advance', e.target.value)} />
+            <Input label="Total ₹" readOnly value={formatCurrency(totalAmount)} />
+          </div>
+          <div className="mt-1">
+            <Textarea label="Remarks" rows={1} maxLength={500} value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />
+          </div>
         </div>
       </div>
+    )
+  }
 
-      {ultra ? (
-        <>
-          <div className="lr-entry-section shrink-0">
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1 lg:grid-cols-4 xl:grid-cols-8">
-              <PartyMasterSelect label="Consignor *" api={consignorsApi} valueId={form.consignorId} displayValue={form.consignor} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row) }))} />
-              <PartyMasterSelect label="Consignee *" api={consigneesApi} valueId={form.consigneeId} displayValue={form.consignee} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row) }))} />
-              <Input label="From *" value={form.from} onChange={(e) => update('from', e.target.value)} />
-              <Input label="To *" value={form.to} onChange={(e) => update('to', e.target.value)} />
-              <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />
-              <Input label="Qty/Wt" value={form.quantity} onChange={(e) => update('quantity', e.target.value)} placeholder="pkgs/kg" />
-              <Input label="E-Way Bill No." value={form.ewayBillNo} onChange={(e) => update('ewayBillNo', e.target.value)} />
-              <Select label="Freight Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
-              <Input label="Freight ₹" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
-              <Input label="GST ₹" type="number" value={form.gst} onChange={(e) => update('gst', e.target.value)} />
-              <Input label="Total ₹" readOnly value={formatCurrency(totalAmount)} />
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="lr-entry-party-grid shrink-0">
-            <PartyBlock title="Consignor" prefix="consignor" compact form={form} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row), pickupCity: row.city || prev.from }))} onUpdate={update} />
-            <PartyBlock title="Consignee" prefix="consignee" compact form={form} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row), deliveryBranch: row.city || prev.to }))} onUpdate={update} />
-            <PartyBlock title="Billing" prefix="billingParty" compact form={form} onUpdate={update} sameAsConsignor={copyBillingFromConsignor} />
-          </div>
+  return (
+    <div className="lr-entry-v2-shell">
+      <LrEntryInformationSection
+        form={form}
+        update={update}
+        bookingSlot={bookingSlot}
+        errors={fieldErrors}
+      />
 
-          <div className="lr-entry-section shrink-0">
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1 lg:grid-cols-5">
-              <Input label="Pickup Addr" value={form.pickupAddress} onChange={(e) => update('pickupAddress', e.target.value)} />
-              <Input label="Pickup City" value={form.pickupCity || form.from} onChange={(e) => update('pickupCity', e.target.value)} />
-              <Input label="Destination" value={form.to} onChange={(e) => update('to', e.target.value)} />
-              <Input label="Del. Branch" value={form.deliveryBranch} onChange={(e) => update('deliveryBranch', e.target.value)} />
-              <Input label="Exp. Delivery" type="date" value={form.expectedDeliveryDate} onChange={(e) => update('expectedDeliveryDate', e.target.value)} />
-            </div>
-          </div>
+      <LrEntryPartiesSection
+        form={form}
+        setForm={setForm}
+        update={update}
+        billingMode={billingMode}
+        onBillingModeChange={handleBillingModeChange}
+        onCopyBillingFromConsignor={copyBillingFromConsignor}
+        onClearFieldErrors={onClearFieldErrors}
+        errors={fieldErrors}
+      />
 
-          <div className="lr-entry-main">
-            <div className="lr-entry-section flex min-h-0 flex-col overflow-hidden">
-              <div className="mb-1 flex shrink-0 items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Item Details</p>
-                <Button size="sm" variant="outline" icon={Plus} type="button" onClick={addItem}>Add (F7)</Button>
-              </div>
-              <div
-                ref={gridRef}
-                className="lr-entry-items-scroll"
-                data-kbd-grid="true"
-                onKeyDown={onContainerKeyDown}
-              >
-                <table className="w-full min-w-[720px] text-[11px]">
-                  <thead className="sticky top-0 z-10 bg-slate-100 text-left dark:bg-slate-800">
-                    <tr>
-                      <th className="px-1 py-0.5">#</th>
-                      <th className="px-1 py-0.5">Description</th>
-                      <th className="px-1 py-0.5">HSN</th>
-                      <th className="px-1 py-0.5">Pkg</th>
-                      <th className="px-1 py-0.5">Qty</th>
-                      <th className="px-1 py-0.5">Kg</th>
-                      <th className="px-1 py-0.5">Inv#</th>
-                      <th className="px-1 py-0.5">Date</th>
-                      <th className="px-1 py-0.5">Value</th>
-                      <th className="px-1 py-0.5" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(form.items || []).map((item, idx) => (
-                      <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
-                        <td className="px-1 py-0.5">{idx + 1}</td>
-                        {ITEM_FIELD_KEYS.map((field, colIdx) => (
-                          <td key={field} className="px-1 py-0.5" data-grid-row={idx} data-grid-col={colIdx}>
-                            {field === 'packageType' ? (
-                              <select className="w-full rounded border px-0.5 py-0.5 dark:border-slate-700 dark:bg-slate-900" value={item.packageType} onChange={(e) => updateItem(idx, 'packageType', e.target.value)}>
-                                {PACKAGE_TYPES.map((p) => <option key={p} value={p}>{p}</option>)}
-                              </select>
-                            ) : (
-                              <input
-                                type={field === 'qty' || field === 'weight' || field === 'invoiceValue' ? 'number' : field === 'invoiceDate' ? 'date' : 'text'}
-                                step={field === 'weight' ? '0.001' : undefined}
-                                className="w-full min-w-0 rounded border px-1 py-0.5 dark:border-slate-700 dark:bg-slate-900"
-                                value={item[field] ?? ''}
-                                onChange={(e) => updateItem(idx, field, e.target.value)}
-                              />
-                            )}
-                          </td>
-                        ))}
-                        <td className="px-1 py-0.5">
-                          <button type="button" className="text-red-500" onClick={() => removeItem(idx)} aria-label="Remove"><Trash2 className="h-3 w-3" /></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="sticky bottom-0 bg-slate-50 text-[10px] font-medium dark:bg-slate-900">
-                    <tr>
-                      <td colSpan={4} className="px-1 py-0.5">Totals</td>
-                      <td className="px-1 py-0.5 text-green-700">{itemTotals.qty}</td>
-                      <td className="px-1 py-0.5 text-green-700">{itemTotals.weight.toFixed(1)}</td>
-                      <td colSpan={2} />
-                      <td className="px-1 py-0.5 text-green-700">{formatCurrency(itemTotals.invoiceValue)}</td>
-                      <td />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
+      <LrEntryRouteSection
+        form={form}
+        setForm={setForm}
+        update={update}
+        errors={fieldErrors}
+      />
 
-            <div className="lr-entry-section flex min-h-0 flex-col overflow-y-auto">
-              <p className="mb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-primary">Freight</p>
-              <div className="grid grid-cols-2 gap-1 xl:grid-cols-1">
-                <Select label="Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
-                <Input label="Freight" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
-                <Input label="Loading" type="number" value={form.loadingCharges} onChange={(e) => update('loadingCharges', e.target.value)} />
-                <Input label="Unloading" type="number" value={form.unloadingCharges} onChange={(e) => update('unloadingCharges', e.target.value)} />
-                <Input label="Other" type="number" value={form.otherCharges} onChange={(e) => update('otherCharges', e.target.value)} />
-                <Select label="GST %" options={GST_OPTIONS} value={form.gstPercent} onChange={(e) => update('gstPercent', e.target.value)} />
-              </div>
-              <div className="mt-1 shrink-0 rounded bg-green-50 px-2 py-1 dark:bg-green-950/30">
-                <p className="text-[9px] text-green-800 dark:text-green-200">Taxable {formatCurrency(taxable)} · GST {formatCurrency(gstAmount)}</p>
-                <p className="text-sm font-bold text-green-700 dark:text-green-300">{formatCurrency(totalAmount)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid shrink-0 grid-cols-1 gap-1 lg:grid-cols-[1fr_auto]">
-            <Textarea label={`Remarks (${(form.remarks || '').length}/500)`} rows={1} maxLength={500} value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />
-            <div className="lr-entry-section flex items-center gap-2">
-              <label className="inline-flex cursor-pointer items-center gap-1 text-[10px] text-primary">
-                <CloudUpload className="h-3 w-3" /> Attach
-                <input type="file" multiple className="hidden" onChange={(e) => update('attachments', [...(form.attachments || []), ...Array.from(e.target.files || [])])} />
-              </label>
-              {(form.attachments || []).slice(0, 3).map((f, i) => (
-                <span key={i} className="max-w-[5rem] truncate rounded bg-slate-100 px-1 text-[9px] dark:bg-slate-800">{f.name}</span>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      <div className="lr-entry-footer">
-        <Button size="sm" variant="outline" icon={RotateCcw} type="button" onClick={onClear}>Clear</Button>
-        <Button size="sm" icon={saving ? Loader2 : Save} type="button" onClick={onSave} disabled={saving} className="bg-green-600 hover:bg-green-700">{saving ? '…' : 'Save'}</Button>
-        <Button size="sm" icon={Printer} type="button" onClick={onSavePrint} disabled={saving}>Save & Print</Button>
-        {!ultra && <Button size="sm" variant="secondary" icon={Eye} type="button" onClick={onPreview}>Preview</Button>}
-        <Button size="sm" variant="outline" icon={X} type="button" onClick={onCancel} className="text-red-600">Cancel</Button>
+      <div className="lr-entry-v2-items-charges">
+        <LrEntryItemsSection
+          items={form.items}
+          itemTotals={itemTotals}
+          gridRef={gridRef}
+          updateItem={updateItem}
+          patchItem={patchItem}
+          addItem={addItem}
+          removeItem={removeItem}
+          errors={fieldErrors}
+        />
+        <LrEntryChargesSection form={form} update={update} />
       </div>
+
+      <LrEntryAdditionalSection form={form} update={update} />
     </div>
   )
+}
+
+export function parseLrRemarksMeta(remarks) {
+  const text = remarks || ''
+  const marker = '\n__lr_meta__:'
+  const idx = text.indexOf(marker)
+  if (idx === -1) {
+    // Also accept meta glued without leading newline (legacy / trimmed rows).
+    const alt = text.indexOf('__lr_meta__:')
+    if (alt === -1) return { remarks: text, meta: null }
+    try {
+      return {
+        remarks: text.slice(0, alt).trimEnd(),
+        meta: JSON.parse(text.slice(alt + '__lr_meta__:'.length)),
+      }
+    } catch {
+      return { remarks: text, meta: null }
+    }
+  }
+  try {
+    return {
+      remarks: text.slice(0, idx).trimEnd(),
+      meta: JSON.parse(text.slice(idx + marker.length)),
+    }
+  } catch {
+    return { remarks: text, meta: null }
+  }
+}
+
+/** Map API LR DTO (+ optional __lr_meta__ in remarks) into the shared entry form shape. */
+export function mapLrDtoToEntryForm(lr) {
+  const base = emptyLrEntryForm()
+  const { remarks, meta } = parseLrRemarksMeta(lr?.remarks)
+  const otherCharges = Number(meta?.otherCharges ?? 0)
+  const storedHamali = Number(lr?.hamali ?? 0)
+  const hamali = Math.max(0, storedHamali - otherCharges)
+
+  const itemsFromMeta = Array.isArray(meta?.items) && meta.items.length > 0
+    ? meta.items.map((item) => ({
+        ...emptyLrItem(),
+        ...item,
+        id: item.id || (crypto.randomUUID?.() ?? String(Date.now())),
+      }))
+    : null
+
+  const fallbackItem = emptyLrItem()
+  if (!itemsFromMeta && (lr?.material || lr?.quantity)) {
+    fallbackItem.description = lr.material || ''
+    const qtyMatch = String(lr.quantity || '').match(/[\d.]+/)
+    fallbackItem.qty = qtyMatch ? Number(qtyMatch[0]) : 0
+  }
+
+  return {
+    ...base,
+    bookingId: lr?.bookingId ?? '',
+    lrNumber: lr?.lrNumber ?? '',
+    lrDate: lr?.lrDate || base.lrDate,
+    businessType: lr?.businessType || base.businessType,
+    serviceType: meta?.serviceType || base.serviceType,
+    consignorId: lr?.consignorId ?? '',
+    consigneeId: lr?.consigneeId ?? '',
+    consignor: lr?.consignor ?? '',
+    consignee: lr?.consignee ?? '',
+    billingParty: meta?.billingParty || lr?.customerName || lr?.consignor || '',
+    customerName: lr?.customerName || meta?.billingParty || lr?.consignor || '',
+    pickupAddress: meta?.pickupAddress || '',
+    pickupCity: meta?.pickupCity || lr?.from || '',
+    deliveryBranch: meta?.deliveryBranch || '',
+    expectedDeliveryDate: meta?.expectedDeliveryDate || base.expectedDeliveryDate,
+    expectedDeliveryTime: meta?.expectedDeliveryTime || '',
+    from: lr?.from ?? '',
+    to: lr?.to ?? '',
+    vehicle: lr?.vehicle ?? '',
+    driver: lr?.driver ?? '',
+    material: lr?.material ?? '',
+    quantity: lr?.quantity ?? '',
+    items: itemsFromMeta || [fallbackItem],
+    freight: Number(lr?.freight ?? 0),
+    gst: Number(lr?.gst ?? 0),
+    gstPercent: meta?.gstPercent || base.gstPercent,
+    hamali,
+    loadingCharges: Number(lr?.loadingCharges ?? 0),
+    unloadingCharges: Number(lr?.unloadingCharges ?? 0),
+    otherCharges,
+    insurance: Number(lr?.insurance ?? 0),
+    advance: Number(lr?.advance ?? 0),
+    balance: Number(lr?.balance ?? 0),
+    paymentType: lr?.paymentType || base.paymentType,
+    remarks,
+    ewayBillNo: meta?.ewayBillNo || '',
+  }
 }
 
 export function buildLrApiPayload(form) {
   const meta = {
     serviceType: form.serviceType,
     expectedDeliveryDate: form.expectedDeliveryDate,
+    expectedDeliveryTime: form.expectedDeliveryTime,
     pickupAddress: form.pickupAddress,
     pickupCity: form.pickupCity,
     deliveryBranch: form.deliveryBranch,
@@ -385,10 +408,10 @@ export function buildLrApiPayload(form) {
     otherCharges: form.otherCharges,
     ewayBillNo: form.ewayBillNo,
   }
-  const baseRemarks = (form.remarks || '').split('\n__lr_meta__:')[0]
+  const baseRemarks = (form.remarks || '').split('\n__lr_meta__:')[0].split('__lr_meta__:')[0]
   const remarksExtra = `\n__lr_meta__:${JSON.stringify(meta)}`
   const {
-    attachments, items, serviceType, expectedDeliveryDate, pickupAddress,
+    attachments, items, serviceType, expectedDeliveryDate, expectedDeliveryTime, pickupAddress,
     pickupCity, deliveryBranch, billingParty, gstPercent, otherCharges,
     billingPartyId, billingPartyContact, billingPartyPhone, billingPartyGst, billingPartyAddress,
     branchName,
@@ -399,5 +422,14 @@ export function buildLrApiPayload(form) {
     customerName: form.billingParty || form.consignor,
     hamali: Number(form.hamali || 0) + Number(form.otherCharges || 0),
     remarks: baseRemarks + remarksExtra,
+  }
+}
+
+/** Map in-progress form to LR print preview shape. */
+export function formToPreviewLr(form) {
+  return {
+    ...form,
+    lrNumber: form.lrNumber || 'DRAFT',
+    customerName: form.billingParty || form.consignor,
   }
 }

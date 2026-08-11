@@ -13,12 +13,25 @@ public static class UserSchemaMigrator
             await conn.OpenAsync(ct);
 
         await SchemaMigrationHelper.EnsureBranchesPrimaryKeyAsync(conn, ct);
+        await SchemaMigrationHelper.EnsureUsersPrimaryKeyAsync(conn, ct);
         await SchemaMigrationHelper.EnsureUsersProfileColumnsAsync(conn, ct);
 
         try
         {
             var text = await LoadSqlAsync(ct);
-            await SchemaMigrationHelper.ExecuteStatementsAsync(conn, ParseSql(text), ct);
+            foreach (var stmt in SchemaMigrationHelper.ParseSqlStatements(text))
+            {
+                try
+                {
+                    await SchemaMigrationHelper.ExecuteNonQueryAsync(conn, stmt, ct);
+                }
+                catch (PostgresException ex) when (ex.SqlState is "42P01" or "42830" or "42703" or "42P07")
+                {
+                    // Partial installs — optional tables/FKs may not be ready yet.
+                }
+            }
+
+            await SchemaMigrationHelper.EnsureUserBranchesTableAsync(conn, ct);
         }
         catch (FileNotFoundException)
         {
@@ -42,26 +55,5 @@ public static class UserSchemaMigrator
         yield return Path.Combine(Directory.GetCurrentDirectory(), "database", "users", "schema.sql");
         yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "database", "users", "schema.sql"));
         yield return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "database", "users", "schema.sql"));
-    }
-
-    static IEnumerable<string> ParseSql(string text)
-    {
-        var buf = new System.Text.StringBuilder();
-        foreach (var line in text.Split('\n'))
-        {
-            if (line.TrimStart().StartsWith("--")) continue;
-            buf.AppendLine(line);
-            if (line.TrimEnd().EndsWith(';'))
-            {
-                var s = buf.ToString().Trim();
-                if (s.Length > 0) yield return s;
-                buf.Clear();
-            }
-        }
-        if (buf.Length > 0)
-        {
-            var s = buf.ToString().Trim();
-            if (s.Length > 0) yield return s;
-        }
     }
 }

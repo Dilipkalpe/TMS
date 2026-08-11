@@ -1,4 +1,5 @@
 -- Staff user email/mobile + multi-branch assignment.
+-- PK / user_branches are ensured in C# (SchemaMigrationHelper) for legacy installs.
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(200);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile VARCHAR(40);

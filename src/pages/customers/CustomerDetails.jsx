@@ -79,7 +79,7 @@ export default function CustomerDetails() {
     {
       id: 'ledger',
       label: 'Ledger',
-      content: <ERPDataTable columns={ledgerColumns} data={ledger} showActions={false} />,
+      content: <ERPDataTable columns={ledgerColumns} data={ledger} showActions={false} selectable={false} />,
     },
     {
       id: 'outstanding',

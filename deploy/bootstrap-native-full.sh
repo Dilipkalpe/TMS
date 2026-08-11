@@ -12,6 +12,10 @@ PUBLIC_HOST="${PUBLIC_HOST:-tms.144.91.98.218.nip.io}"
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tms}"
 DUMP_FILE="${DUMP_FILE:-}"
+# Common default if operator uploaded local dump to /root
+if [[ -z "$DUMP_FILE" && -f /root/tms_pro_local.dump ]]; then
+  DUMP_FILE=/root/tms_pro_local.dump
+fi
 PG_DB="${PG_DB:-tms_pro}"
 PG_APP_USER="${PG_APP_USER:-tms}"
 ENV_FILE="/etc/tms/tms-api.env"
@@ -31,14 +35,25 @@ if ! command -v node >/dev/null 2>&1 || ! node -v | grep -qE 'v(1[8-9]|2[0-9])';
 fi
 
 DOTNET_BIN=/usr/share/dotnet/dotnet
-if [[ ! -x "$DOTNET_BIN" ]] || ! "$DOTNET_BIN" --list-runtimes 2>/dev/null | grep -qi 'Microsoft.AspNetCore.App 8'; then
+# SDK required for `dotnet publish`; ASP.NET runtime required to run the app
+if [[ ! -x "$DOTNET_BIN" ]] || ! "$DOTNET_BIN" --list-sdks 2>/dev/null | grep -qE '^8\.'; then
+  log "Install .NET 8 SDK (needed for publish)"
+  curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+  bash /tmp/dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet
+  ln -sfn /usr/share/dotnet/dotnet /usr/bin/dotnet
+fi
+if ! "$DOTNET_BIN" --list-runtimes 2>/dev/null | grep -qi 'Microsoft.AspNetCore.App 8'; then
   log "Install ASP.NET Core 8 runtime"
   curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
   bash /tmp/dotnet-install.sh --channel 8.0 --runtime aspnetcore --install-dir /usr/share/dotnet
   ln -sfn /usr/share/dotnet/dotnet /usr/bin/dotnet
 fi
-DOTNET_BIN="$(command -v dotnet)"
-[[ -x /usr/share/dotnet/dotnet ]] && DOTNET_BIN=/usr/share/dotnet/dotnet
+export DOTNET_ROOT=/usr/share/dotnet
+export PATH="$DOTNET_ROOT:$PATH"
+DOTNET_BIN=/usr/share/dotnet/dotnet
+[[ -x /usr/bin/dotnet ]] || ln -sfn /usr/share/dotnet/dotnet /usr/bin/dotnet
+"$DOTNET_BIN" --list-sdks || true
+"$DOTNET_BIN" --list-runtimes || true
 
 log "Disable Docker :8080 app (keep Docker Postgres alone if present — we use native PG)"
 if command -v docker >/dev/null 2>&1; then
@@ -61,7 +76,12 @@ systemctl enable --now postgresql
 # Wait for socket
 sleep 2
 
-# App role + DB
+# App role + DB — reuse existing password on re-run so env/DB stay in sync
+if [[ -z "${PG_APP_PASSWORD:-}" && -f /etc/tms/db.credentials ]]; then
+  # shellcheck disable=SC1091
+  source /etc/tms/db.credentials
+  PG_APP_PASSWORD="${PG_APP_PASSWORD:-}"
+fi
 if [[ -z "${PG_APP_PASSWORD:-}" ]]; then
   PG_APP_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
 fi
@@ -138,7 +158,15 @@ git pull --ff-only 2>/dev/null || true
 
 id www-data >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin www-data
 mkdir -p "$API_DIR" "$WEB_DIR"
-dotnet publish backend/Tms.Api/Tms.Api.csproj -c Release -o "$API_DIR"
+"$DOTNET_BIN" publish backend/Tms.Api/Tms.Api.csproj -c Release -o "$API_DIR"
+# Schema migrators resolve database/*.sql relative to ContentRoot (publish dir)
+if [[ -d "$REPO_DIR/database" ]]; then
+  rm -rf "$API_DIR/database"
+  cp -a "$REPO_DIR/database" "$API_DIR/database"
+elif [[ -d "$REPO_DIR/backend/database" ]]; then
+  rm -rf "$API_DIR/database"
+  cp -a "$REPO_DIR/backend/database" "$API_DIR/database"
+fi
 mkdir -p "$API_DIR/wwwroot/uploads"
 export VITE_API_URL=/api
 npm ci

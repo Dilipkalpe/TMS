@@ -1,24 +1,19 @@
 import Button from '../ui/Button'
 import Badge from '../ui/Badge'
-import { History, Printer, FileText, Save } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import LrEntryActionButtons from '../lr/LrEntryActionButtons'
 
-export function OpsPageHeader({ title, breadcrumb, status, statusVariant = 'Paid', actions }) {
+export function OpsPageHeader({ title, subtitle, breadcrumb, status, statusVariant = 'Paid', actions }) {
   return (
     <div className="mb-2 flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-primary/15 pb-2">
       <div>
-        <p className="text-[10px] text-primary">{breadcrumb}</p>
-        <h1 className="text-sm font-bold uppercase tracking-wide text-slate-800 dark:text-white">{title}</h1>
+        {breadcrumb ? <p className="text-[10px] text-primary">{breadcrumb}</p> : null}
+        <h1 className="text-base font-bold uppercase tracking-wide text-primary sm:text-lg">{title}</h1>
+        {subtitle ? <p className="text-xs font-medium text-primary/70">{subtitle}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-1">
         {status && <Badge variant={statusVariant}>{status}</Badge>}
-        {actions ?? (
-          <>
-            <Button size="sm" variant="outline" icon={Save}>Save</Button>
-            <Button size="sm" variant="outline" icon={Printer}>Print</Button>
-            <Button size="sm" variant="outline" icon={FileText}>PDF</Button>
-            <Button size="sm" variant="outline" icon={History}>History</Button>
-          </>
-        )}
+        {actions}
       </div>
     </div>
   )
@@ -39,13 +34,33 @@ export function OpsSection({ title, icon: Icon, children, className = '', action
   )
 }
 
-export function OpsFooter({ onCancel, onSave, onSavePrint, saving, extra }) {
-  return (
-    <div className="lr-entry-footer shrink-0 justify-end">
+export function OpsFooter({ onBack, onCancel, onSave, onSavePrint, onPreview, onClear, onComplete, saving, extra }) {
+  const prepend = (
+    <>
+      {onBack ? (
+        <Button size="sm" variant="outline" icon={ArrowLeft} type="button" onClick={onBack}>Back</Button>
+      ) : null}
       {extra}
-      <Button size="sm" variant="outline" onClick={onCancel} className="text-red-600">Cancel</Button>
-      <Button size="sm" onClick={onSave} disabled={saving} className="bg-primary">Save</Button>
-      <Button size="sm" onClick={onSavePrint} disabled={saving} className="bg-green-600 hover:bg-green-700">Save & Print</Button>
+      {onComplete ? (
+        <Button size="sm" type="button" onClick={onComplete} disabled={saving} className="bg-green-600 hover:bg-green-700">
+          Loading Complete
+        </Button>
+      ) : null}
+    </>
+  )
+
+  return (
+    <div className="lr-entry-v2-footer shrink-0 border-t border-slate-200 bg-white px-2 py-1.5 sm:px-3 dark:border-slate-700 dark:bg-slate-900">
+      <LrEntryActionButtons
+        saving={saving}
+        onSave={onSave}
+        onCancel={onCancel}
+        onSavePrint={onSavePrint}
+        onClear={onClear}
+        onPreview={onPreview}
+        printLabel="Save & Print"
+        prependActions={prepend}
+      />
     </div>
   )
 }

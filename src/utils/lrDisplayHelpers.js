@@ -1,11 +1,19 @@
 /** Derive mockup-style status badges from LR workflow status. */
+/** Map mockup status pill colors to Badge variants. */
+export function lrStatusBadgeVariant(mockupVariant = '') {
+  if (mockupVariant === 'Paid') return 'success'
+  if (mockupVariant === 'InTransit') return 'info'
+  if (mockupVariant === 'Pending') return 'warning'
+  return 'default'
+}
+
 export function lrDeliveryStatus(status = '') {
   const s = status || 'LR Created'
   if (['Delivery Completed', 'POD Uploaded', 'Invoice Generated', 'Expense Added', 'Expense Approved', 'Closed'].includes(s)) {
     return { label: 'Delivered', variant: 'Paid' }
   }
   if (['In Transit', 'Transit Pass Generated'].includes(s)) {
-    return { label: 'In Transit', variant: 'Pending' }
+    return { label: 'In Transit', variant: 'InTransit' }
   }
   return { label: 'Pending', variant: 'Pending' }
 }

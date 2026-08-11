@@ -38,7 +38,7 @@ export function DashboardChartsRow({ lrTrend = [], lrStatusSummary = [], lrStatu
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="p-4">
-        <CardHeader title="LR Trend (Last 7 Days)" subtitle="Created · Delivered · Pending" />
+        <CardHeader title="LR Trend" subtitle="Created · Delivered · Pending (last 31 days when range is wider)" />
         <div className="mt-2 h-52">
           <AnalyticsChart
             title=""

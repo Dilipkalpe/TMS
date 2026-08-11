@@ -1,7 +1,7 @@
 import PrintCompanyHeader, { PrintFooter } from './PrintCompanyHeader'
 import { formatPrintDate } from '../../utils/printUtils'
 
-export default function TransitPassPrintFormat({ pass, lr, company, loadingItems }) {
+export default function TransitPassPrintFormat({ pass, lr, company, loadingItems, variant = 'T1' }) {
   const lrList = pass?.lrNumbers?.length > 1
     ? pass.lrNumbers
     : loadingItems?.length > 1
@@ -13,7 +13,7 @@ export default function TransitPassPrintFormat({ pass, lr, company, loadingItems
     : lrList?.map((num) => ({ lrNumber: num, customerName: null, quantityText: null }))
 
   return (
-    <div className="print-document">
+    <div className={`print-document print-variant-${variant}`}>
       <PrintCompanyHeader
         company={company}
         documentTitle="Transit Pass / Memo"

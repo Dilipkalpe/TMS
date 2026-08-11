@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { platformApi, portalApi, notificationsApi, unwrapPaginated } from './api'
+import { platformApi, portalApi, notificationsApi, lrProcessApi, unwrapPaginated } from './api'
 
 describe('unwrapPaginated', () => {
   it('returns rows from paginated object', () => {
@@ -40,5 +40,20 @@ describe('API service exports', () => {
     expect(typeof notificationsApi.templates).toBe('function')
     expect(typeof notificationsApi.outbox).toBe('function')
     expect(typeof notificationsApi.sendTest).toBe('function')
+  })
+})
+
+describe('lrProcessApi — operational workflow endpoints', () => {
+  it('exposes loading → transit → dispatch → delivery → POD flow methods', () => {
+    expect(typeof lrProcessApi.get).toBe('function')
+    expect(typeof lrProcessApi.saveLoadingSheet).toBe('function')
+    expect(typeof lrProcessApi.createTransitPass).toBe('function')
+    expect(typeof lrProcessApi.markTransitPassReady).toBe('function')
+    expect(typeof lrProcessApi.confirmDispatch).toBe('function')
+    expect(typeof lrProcessApi.addCheckpoint).toBe('function')
+    expect(typeof lrProcessApi.updateInTransitStatus).toBe('function')
+    expect(typeof lrProcessApi.saveDeliverySheet).toBe('function')
+    expect(typeof lrProcessApi.verifyPod).toBe('function')
+    expect(typeof lrProcessApi.rejectPod).toBe('function')
   })
 })

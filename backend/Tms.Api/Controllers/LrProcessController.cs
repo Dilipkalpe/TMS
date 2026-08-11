@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,28 @@ public class LrProcessController(
     async Task<LorryReceipt?> LoadLr(string lrNumber) =>
         await LrProcessService.FindLrAsync(db, tenants, branches, lrNumber);
 
+    ActionResult? GuardStatus(LorryReceipt lr, params string[] allowedPriorStatuses)
+    {
+        try
+        {
+            LrProcessService.EnsureStatusAtLeast(lr, allowedPriorStatuses);
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+    }
+
+    static bool IsStatusDowngrade(string currentStatus, string newStatus)
+    {
+        var order = LrStatuses.All.ToList();
+        var cur = order.IndexOf(currentStatus);
+        var next = order.IndexOf(newStatus);
+        if (cur < 0 || next < 0) return false;
+        return next < cur;
+    }
+
     [HttpGet("{lrNumber}/process")]
     public async Task<ActionResult<object>> GetProcess(string lrNumber)
     {
@@ -51,11 +74,11 @@ public class LrProcessController(
             .OrderByDescending(d => d.CreatedAt)
             .Select(d => new { d.Id, d.DocType, d.Title, d.FileUrl, createdAt = d.CreatedAt })
             .ToListAsync();
-        var expenses = await db.LrExpenses.AsNoTracking()
+        var expenseRows = await db.LrExpenses.AsNoTracking()
             .Where(e => e.LrNumber == lr.LrNumber && e.CompanyId == lr.CompanyId)
             .OrderByDescending(e => e.CreatedAt)
-            .Select(e => MapExpense(e))
             .ToListAsync();
+        var expenses = expenseRows.Select(MapExpense).ToList();
         var statusHistory = await db.LrStatusHistories.AsNoTracking()
             .Where(h => h.LrNumber == lr.LrNumber && h.CompanyId == lr.CompanyId)
             .OrderByDescending(h => h.ChangedAt)
@@ -116,7 +139,8 @@ public class LrProcessController(
     {
         var anchor = await LoadLr(lrNumber);
         if (anchor == null) return NotFound();
-        LrProcessService.EnsureStatusAtLeast(anchor, LrStatuses.LRCreated, LrStatuses.Draft);
+        var loadGuard = GuardStatus(anchor, LrStatuses.LRCreated, LrStatuses.Draft);
+        if (loadGuard != null) return loadGuard;
 
         var location = ApiParseHelper.BodyString(body, "loadingLocation");
         if (string.IsNullOrWhiteSpace(location))
@@ -204,7 +228,9 @@ public class LrProcessController(
         existing.SupervisorName = ApiParseHelper.BodyString(body, "supervisorName") ?? existing.SupervisorName;
         existing.SealNumber = ApiParseHelper.BodyString(body, "sealNumber") ?? existing.SealNumber;
         existing.TripNo = ApiParseHelper.BodyString(body, "tripNo") ?? existing.TripNo;
-        existing.ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? existing.ExtendedDataJson;
+        var incomingLoadingExt = ApiParseHelper.BodyJsonRaw(body, "extendedData");
+        if (incomingLoadingExt != null)
+            existing.ExtendedDataJson = MergeExtendedJson(existing.ExtendedDataJson, incomingLoadingExt);
         existing.UpdatedAt = DateTime.UtcNow;
 
         var oldItems = await db.LrLoadingSheetItems.Where(i => i.LoadingSheetId == existing.Id).ToListAsync();
@@ -298,9 +324,12 @@ public class LrProcessController(
     {
         var lr = await LoadLr(lrNumber);
         if (lr == null) return NotFound();
-        LrProcessService.EnsureStatusAtLeast(lr, LrStatuses.LoadingCompleted);
+        var tpGuard = GuardStatus(lr, LrStatuses.LoadingCompleted);
+        if (tpGuard != null) return tpGuard;
 
-        var hasLoading = await db.LrLoadingSheetItems.AsNoTracking()
+        var hasLoading = await db.LrLoadingSheets.AsNoTracking()
+            .AnyAsync(s => s.CompanyId == lr.CompanyId && s.LrNumber == lr.LrNumber && s.LoadingStatus == "Completed")
+            || await db.LrLoadingSheetItems.AsNoTracking()
             .Where(i => i.LrNumber == lr.LrNumber)
             .Join(db.LrLoadingSheets.AsNoTracking(),
                 i => i.LoadingSheetId,
@@ -320,8 +349,13 @@ public class LrProcessController(
             .OrderByDescending(s => s.UpdatedAt)
             .FirstOrDefaultAsync();
 
+        var linkedLrs = loadingSheet?.Items.Select(i => i.LrNumber).ToList() ?? [lr.LrNumber];
+
         if (existing != null)
         {
+            var passExtUpdate = ParseExt(existing.ExtendedDataJson);
+            var wasCancelled = passExtUpdate["passStatus"]?.GetValue<string>() == "Cancelled";
+
             existing.ViaPoints = ApiParseHelper.BodyString(body, "viaPoints") ?? existing.ViaPoints;
             existing.SealNumber = ApiParseHelper.BodyString(body, "sealNumber") ?? existing.SealNumber;
             existing.SealCondition = ApiParseHelper.BodyString(body, "sealCondition") ?? existing.SealCondition;
@@ -330,8 +364,28 @@ public class LrProcessController(
                 ? ApiParseHelper.BodyDate(body, "expectedDelivery", existing.ExpectedDelivery ?? DateOnly.FromDateTime(DateTime.UtcNow))
                 : existing.ExpectedDelivery;
             existing.Remarks = ApiParseHelper.BodyString(body, "remarks") ?? existing.Remarks;
-            existing.ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? existing.ExtendedDataJson;
+            var incomingPassExt = ApiParseHelper.BodyJsonRaw(body, "extendedData");
+            if (incomingPassExt != null)
+                existing.ExtendedDataJson = MergeExtendedJson(existing.ExtendedDataJson, incomingPassExt);
             existing.UpdatedAt = DateTime.UtcNow;
+
+            if (wasCancelled)
+            {
+                passExtUpdate = ParseExt(existing.ExtendedDataJson);
+                passExtUpdate["passStatus"] = "Draft";
+                passExtUpdate.Remove("cancelledAt");
+                passExtUpdate.Remove("cancelledBy");
+                passExtUpdate.Remove("cancelReason");
+                existing.ExtendedDataJson = passExtUpdate.ToJsonString();
+
+                foreach (var num in linkedLrs.Distinct())
+                {
+                    var row = await db.LorryReceipts.FirstOrDefaultAsync(l => l.LrNumber == num && l.CompanyId == lr.CompanyId);
+                    if (row == null) continue;
+                    RecordStatusChange(db, row, LrStatuses.TransitPassGenerated, CurrentUser(), "Transit pass re-issued");
+                }
+            }
+
             await db.SaveChangesAsync();
             return Ok(MapTransit(existing, loadingSheet?.Items));
         }
@@ -377,17 +431,324 @@ public class LrProcessController(
         };
         db.LrTransitPasses.Add(pass);
 
-        var linkedLrs = loadingSheet?.Items.Select(i => i.LrNumber).ToList() ?? [lr.LrNumber];
         foreach (var num in linkedLrs.Distinct())
         {
             var row = await db.LorryReceipts.FirstOrDefaultAsync(l => l.LrNumber == num && l.CompanyId == lr.CompanyId);
             if (row == null) continue;
-            row.Status = LrStatuses.TransitPassGenerated;
-            row.UpdatedAt = DateTime.UtcNow;
+            RecordStatusChange(db, row, LrStatuses.TransitPassGenerated, CurrentUser(), "Transit pass generated");
         }
+
+        var passExt = ParseExt(pass.ExtendedDataJson);
+        if (passExt["passStatus"] == null)
+            passExt["passStatus"] = "Draft";
+        pass.ExtendedDataJson = passExt.ToJsonString();
 
         await db.SaveChangesAsync();
         return Ok(MapTransit(pass, loadingSheet?.Items));
+    }
+
+    [HttpPost("{lrNumber}/transit-pass/ready")]
+    public async Task<ActionResult<object>> MarkTransitPassReady(string lrNumber)
+    {
+        var lr = await LoadLr(lrNumber);
+        if (lr == null) return NotFound();
+
+        var pass = await db.LrTransitPasses
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (pass == null) return BadRequest(new ApiError("Transit pass not found."));
+
+        var ext = ParseExt(pass.ExtendedDataJson);
+        if (ext["passStatus"]?.GetValue<string>() == "Cancelled")
+            return BadRequest(new ApiError("Transit pass is cancelled."));
+
+        ext["passStatus"] = "Ready for Dispatch";
+        ext["readyAt"] = DateTime.UtcNow.ToString("O");
+        ext["readyBy"] = CurrentUser();
+        pass.ExtendedDataJson = ext.ToJsonString();
+        pass.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var items = pass.LoadingSheetId.HasValue
+            ? await db.LrLoadingSheetItems.AsNoTracking()
+                .Where(i => i.LoadingSheetId == pass.LoadingSheetId.Value)
+                .OrderBy(i => i.SortOrder)
+                .ToListAsync()
+            : null;
+        return Ok(MapTransit(pass, items));
+    }
+
+    [HttpPatch("{lrNumber}/transit-pass/cancel")]
+    public async Task<ActionResult<object>> CancelTransitPass(string lrNumber, [FromBody] Dictionary<string, object?> body)
+    {
+        var lr = await LoadLr(lrNumber);
+        if (lr == null) return NotFound();
+
+        if (lr.Status != LrStatuses.TransitPassGenerated)
+            return BadRequest(new ApiError("Cannot cancel transit pass after dispatch or delivery."));
+
+        var pass = await db.LrTransitPasses
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (pass == null) return NotFound();
+
+        var delivery = await db.LrDeliverySheets
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (delivery != null && delivery.ShipmentStatus == "In Transit")
+            return BadRequest(new ApiError("Cannot cancel — vehicle already dispatched."));
+
+        var ext = ParseExt(pass.ExtendedDataJson);
+        ext["passStatus"] = "Cancelled";
+        ext["cancelledAt"] = DateTime.UtcNow.ToString("O");
+        ext["cancelledBy"] = CurrentUser();
+        ext["cancelReason"] = ApiParseHelper.BodyString(body, "reason");
+        pass.ExtendedDataJson = ext.ToJsonString();
+        pass.UpdatedAt = DateTime.UtcNow;
+
+        RecordStatusChange(db, lr, LrStatuses.LoadingCompleted, CurrentUser(),
+            ApiParseHelper.BodyString(body, "reason") ?? "Transit pass cancelled");
+
+        await db.SaveChangesAsync();
+        return Ok(MapTransit(pass, null));
+    }
+
+    [HttpPost("{lrNumber}/dispatch/confirm")]
+    public async Task<ActionResult<object>> ConfirmDispatch(string lrNumber, [FromBody] Dictionary<string, object?> body)
+    {
+        var lr = await LoadLr(lrNumber);
+        if (lr == null) return NotFound();
+        var dispatchGuard = GuardStatus(lr, LrStatuses.TransitPassGenerated);
+        if (dispatchGuard != null) return dispatchGuard;
+
+        if (lr.Status == LrStatuses.InTransit)
+        {
+            var already = await db.LrDeliverySheets
+                .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+            if (already != null && already.ShipmentStatus == "In Transit")
+                return Ok(MapDelivery(already));
+        }
+
+        if (lr.Status != LrStatuses.TransitPassGenerated)
+            return BadRequest(new ApiError($"Cannot dispatch — LR status is {lr.Status}."));
+
+        var pass = await db.LrTransitPasses
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (pass == null) return BadRequest(new ApiError("Transit pass is required before dispatch."));
+
+        var passExt = ParseExt(pass.ExtendedDataJson);
+        if (passExt["passStatus"]?.GetValue<string>() == "Cancelled")
+            return BadRequest(new ApiError("Transit pass is cancelled."));
+
+        var startingKm = ApiParseHelper.BodyDecimal(body, "startingKm");
+        if (startingKm < 0)
+            return BadRequest(new ApiError("Starting KM must be zero or greater."));
+
+        var existing = await db.LrDeliverySheets
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+
+        Guid branchId;
+        string sheetNumber;
+        string dispatchNo;
+        try
+        {
+            branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, lr.BranchId);
+            sheetNumber = existing?.SheetNumber ?? await documentNumbers.NextAsync(
+                DocumentNumberTypes.DeliverySheet, lr.CompanyId, branchId,
+                DateOnly.FromDateTime(DateTime.UtcNow));
+            dispatchNo = await documentNumbers.NextAsync(
+                DocumentNumberTypes.Trip, lr.CompanyId, branchId,
+                DateOnly.FromDateTime(DateTime.UtcNow));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
+        if (existing == null)
+        {
+            existing = new LrDeliverySheet
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = lr.CompanyId,
+                LrNumber = lr.LrNumber,
+                SheetNumber = sheetNumber,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = CurrentUser(),
+            };
+            db.LrDeliverySheets.Add(existing);
+        }
+
+        var dispatchDate = ApiParseHelper.BodyDate(body, "dispatchDate", DateOnly.FromDateTime(DateTime.UtcNow));
+        var dispatchTime = ApiParseHelper.BodyTime(body, "dispatchTime") ?? TimeOnly.FromDateTime(DateTime.UtcNow);
+
+        var delExt = ParseExt(existing.ExtendedDataJson);
+        delExt["dispatch"] = new JsonObject
+        {
+            ["dispatchNo"] = dispatchNo,
+            ["dispatchDate"] = dispatchDate.ToString("yyyy-MM-dd"),
+            ["dispatchTime"] = dispatchTime.ToString("HH:mm"),
+            ["startingKm"] = startingKm,
+            ["fuelLevel"] = ApiParseHelper.BodyString(body, "fuelLevel"),
+            ["odometerReading"] = ApiParseHelper.BodyDecimal(body, "odometerReading"),
+            ["confirmedAt"] = DateTime.UtcNow.ToString("O"),
+            ["confirmedBy"] = CurrentUser(),
+            ["remarks"] = ApiParseHelper.BodyString(body, "remarks"),
+            ["latitude"] = ApiParseHelper.BodyString(body, "latitude"),
+            ["longitude"] = ApiParseHelper.BodyString(body, "longitude"),
+        };
+        delExt["inTransitStatus"] = "Dispatched";
+        delExt["checkpoints"] = delExt["checkpoints"] ?? new JsonArray();
+
+        existing.ShipmentStatus = "In Transit";
+        existing.TripNo = dispatchNo;
+        existing.DeliveryLocation = lr.ToCity;
+        existing.ReceiverName = lr.Consignee;
+        existing.Remarks = ApiParseHelper.BodyString(body, "remarks") ?? existing.Remarks;
+        existing.ExtendedDataJson = delExt.ToJsonString();
+        existing.UpdatedAt = DateTime.UtcNow;
+
+        passExt["passStatus"] = "Dispatched";
+        pass.ExtendedDataJson = passExt.ToJsonString();
+        pass.UpdatedAt = DateTime.UtcNow;
+
+        RecordStatusChange(db, lr, LrStatuses.InTransit, CurrentUser(), $"Dispatch {dispatchNo} confirmed");
+
+        if (!string.IsNullOrEmpty(lr.BookingId))
+        {
+            var booking = await db.Bookings.FindAsync(lr.BookingId);
+            if (booking != null)
+            {
+                booking.Status = "In Transit";
+                booking.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        await db.SaveChangesAsync();
+        return Ok(MapDelivery(existing));
+    }
+
+    [HttpPost("{lrNumber}/checkpoints")]
+    public async Task<ActionResult<object>> AddCheckpoint(string lrNumber, [FromBody] Dictionary<string, object?> body)
+    {
+        var lr = await LoadLr(lrNumber);
+        if (lr == null) return NotFound();
+        var cpGuard = GuardStatus(lr, LrStatuses.InTransit);
+        if (cpGuard != null) return cpGuard;
+
+        var location = ApiParseHelper.BodyString(body, "location");
+        if (string.IsNullOrWhiteSpace(location))
+            return BadRequest(new ApiError("Checkpoint location is required."));
+
+        var sheet = await db.LrDeliverySheets
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (sheet == null) return BadRequest(new ApiError("Dispatch record not found. Confirm dispatch first."));
+
+        var ext = ParseExt(sheet.ExtendedDataJson);
+        var checkpoints = ext["checkpoints"] as JsonArray ?? new JsonArray();
+        checkpoints.Add(new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["location"] = location,
+            ["date"] = ApiParseHelper.BodyDate(body, "date", DateOnly.FromDateTime(DateTime.UtcNow)).ToString("yyyy-MM-dd"),
+            ["time"] = (ApiParseHelper.BodyTime(body, "time") ?? TimeOnly.FromDateTime(DateTime.UtcNow)).ToString("HH:mm"),
+            ["km"] = ApiParseHelper.BodyDecimal(body, "km"),
+            ["status"] = ApiParseHelper.BodyString(body, "status") ?? "Passed",
+            ["remarks"] = ApiParseHelper.BodyString(body, "remarks"),
+            ["createdAt"] = DateTime.UtcNow.ToString("O"),
+            ["createdBy"] = CurrentUser(),
+        });
+        ext["checkpoints"] = checkpoints;
+        ext["inTransitStatus"] = ApiParseHelper.BodyString(body, "inTransitStatus") ?? "At Checkpoint";
+        ext["currentLocation"] = location;
+        ext["lastUpdate"] = DateTime.UtcNow.ToString("O");
+        sheet.ExtendedDataJson = ext.ToJsonString();
+        sheet.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(MapDelivery(sheet));
+    }
+
+    [HttpPatch("{lrNumber}/in-transit/status")]
+    public async Task<ActionResult<object>> UpdateInTransitStatus(string lrNumber, [FromBody] Dictionary<string, object?> body)
+    {
+        var lr = await LoadLr(lrNumber);
+        if (lr == null) return NotFound();
+        if (lr.Status != LrStatuses.InTransit)
+            return BadRequest(new ApiError("LR is not in transit."));
+
+        var status = ApiParseHelper.BodyString(body, "status");
+        var valid = new[] { "Dispatched", "In Transit", "Delayed", "At Checkpoint", "Reached Destination" };
+        if (string.IsNullOrWhiteSpace(status) || !valid.Contains(status))
+            return BadRequest(new ApiError("Invalid in-transit status."));
+
+        var sheet = await db.LrDeliverySheets
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (sheet == null) return NotFound();
+
+        var ext = ParseExt(sheet.ExtendedDataJson);
+        ext["inTransitStatus"] = status;
+        ext["lastUpdate"] = DateTime.UtcNow.ToString("O");
+        if (body.ContainsKey("currentLocation"))
+            ext["currentLocation"] = ApiParseHelper.BodyString(body, "currentLocation");
+        if (status == "Reached Destination")
+            ext["reachedDestinationAt"] = DateTime.UtcNow.ToString("O");
+        sheet.ExtendedDataJson = ext.ToJsonString();
+        sheet.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(MapDelivery(sheet));
+    }
+
+    [HttpPatch("{lrNumber}/pod/verify")]
+    public async Task<ActionResult<object>> VerifyPod(string lrNumber)
+    {
+        var lr = await LoadLr(lrNumber);
+        if (lr == null) return NotFound();
+        if (lr.Status != LrStatuses.DeliveryCompleted && lr.Status != LrStatuses.PodUploaded)
+            return BadRequest(new ApiError("Complete delivery before verifying POD."));
+
+        var sheet = await db.LrDeliverySheets
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (sheet == null) return NotFound();
+
+        var ext = ParseExt(sheet.ExtendedDataJson);
+        ext["podVerification"] = new JsonObject
+        {
+            ["status"] = "Verified",
+            ["verifiedAt"] = DateTime.UtcNow.ToString("O"),
+            ["verifiedBy"] = CurrentUser(),
+        };
+        sheet.ExtendedDataJson = ext.ToJsonString();
+        sheet.ShipmentStatus = "POD Received";
+        sheet.UpdatedAt = DateTime.UtcNow;
+
+        RecordStatusChange(db, lr, LrStatuses.PodUploaded, CurrentUser(), "POD verified");
+        await db.SaveChangesAsync();
+        return Ok(MapDelivery(sheet));
+    }
+
+    [HttpPatch("{lrNumber}/pod/reject")]
+    public async Task<ActionResult<object>> RejectPod(string lrNumber, [FromBody] Dictionary<string, object?> body)
+    {
+        var lr = await LoadLr(lrNumber);
+        if (lr == null) return NotFound();
+
+        var reason = ApiParseHelper.BodyString(body, "reason");
+        if (string.IsNullOrWhiteSpace(reason))
+            return BadRequest(new ApiError("Rejection reason is required."));
+
+        var sheet = await db.LrDeliverySheets
+            .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
+        if (sheet == null) return NotFound();
+
+        var ext = ParseExt(sheet.ExtendedDataJson);
+        ext["podVerification"] = new JsonObject
+        {
+            ["status"] = "Rejected",
+            ["rejectedAt"] = DateTime.UtcNow.ToString("O"),
+            ["rejectedBy"] = CurrentUser(),
+            ["reason"] = reason,
+        };
+        sheet.ExtendedDataJson = ext.ToJsonString();
+        sheet.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(MapDelivery(sheet));
     }
 
     [HttpGet("{lrNumber}/transit-pass")]
@@ -429,7 +790,8 @@ public class LrProcessController(
     {
         var lr = await LoadLr(lrNumber);
         if (lr == null) return NotFound();
-        LrProcessService.EnsureStatusAtLeast(lr, LrStatuses.TransitPassGenerated);
+        var docGuard = GuardStatus(lr, LrStatuses.TransitPassGenerated);
+        if (docGuard != null) return docGuard;
 
         var docType = ApiParseHelper.BodyString(body, "docType");
         var title = ApiParseHelper.BodyString(body, "title");
@@ -497,12 +859,23 @@ public class LrProcessController(
     {
         var lr = await LoadLr(lrNumber);
         if (lr == null) return NotFound();
-        LrProcessService.EnsureStatusAtLeast(lr, LrStatuses.TransitPassGenerated);
+        var sheetGuard = GuardStatus(lr, LrStatuses.TransitPassGenerated);
+        if (sheetGuard != null) return sheetGuard;
 
         var shipmentStatus = ApiParseHelper.BodyString(body, "shipmentStatus") ?? "In Transit";
         var validStatuses = new[] { "In Transit", "Delivered", "POD Received", "Closed" };
         if (!validStatuses.Contains(shipmentStatus))
             return BadRequest(new ApiError("Invalid shipment status."));
+
+        var newLrStatus = shipmentStatus switch
+        {
+            "Delivered" => LrStatuses.DeliveryCompleted,
+            "POD Received" => LrStatuses.PodUploaded,
+            "In Transit" => LrStatuses.InTransit,
+            _ => lr.Status,
+        };
+        if (newLrStatus != lr.Status && IsStatusDowngrade(lr.Status, newLrStatus))
+            return BadRequest(new ApiError($"Cannot change shipment status to {shipmentStatus} from current LR status {lr.Status}."));
 
         var existing = await db.LrDeliverySheets
             .FirstOrDefaultAsync(x => x.LrNumber == lr.LrNumber && x.CompanyId == lr.CompanyId);
@@ -557,18 +930,15 @@ public class LrProcessController(
         existing.ReceiverMobile = ApiParseHelper.BodyString(body, "receiverMobile") ?? existing.ReceiverMobile;
         existing.PodNo = ApiParseHelper.BodyString(body, "podNo") ?? existing.PodNo;
         existing.DeliveryNoteNo = ApiParseHelper.BodyString(body, "deliveryNoteNo") ?? existing.DeliveryNoteNo;
-        existing.Remarks = ApiParseHelper.BodyString(body, "remarks");
-        existing.ExtendedDataJson = ApiParseHelper.BodyJsonRaw(body, "extendedData") ?? existing.ExtendedDataJson;
+        if (body.ContainsKey("remarks"))
+            existing.Remarks = ApiParseHelper.BodyString(body, "remarks");
+        var incomingExt = ApiParseHelper.BodyJsonRaw(body, "extendedData");
+        if (incomingExt != null)
+            existing.ExtendedDataJson = MergeExtendedJson(existing.ExtendedDataJson, incomingExt);
         existing.UpdatedAt = DateTime.UtcNow;
 
-        lr.Status = shipmentStatus switch
-        {
-            "Delivered" => LrStatuses.DeliveryCompleted,
-            "POD Received" => LrStatuses.PodUploaded,
-            "In Transit" => LrStatuses.InTransit,
-            _ => lr.Status,
-        };
-        lr.UpdatedAt = DateTime.UtcNow;
+        if (newLrStatus != lr.Status)
+            RecordStatusChange(db, lr, newLrStatus, CurrentUser(), $"Delivery sheet: {shipmentStatus}");
 
         if (!string.IsNullOrEmpty(lr.BookingId))
         {
@@ -675,9 +1045,8 @@ public class LrProcessController(
         var rows = await db.LrExpenses.AsNoTracking()
             .Where(e => e.LrNumber == lr.LrNumber && e.CompanyId == lr.CompanyId)
             .OrderByDescending(e => e.CreatedAt)
-            .Select(e => MapExpense(e))
             .ToListAsync();
-        return Ok(rows);
+        return Ok(rows.Select(MapExpense));
     }
 
     [HttpGet("expenses/pending")]
@@ -685,9 +1054,8 @@ public class LrProcessController(
     {
         var q = tenants.Filter(db.LrExpenses.AsNoTracking().Where(e => e.Status == "Pending"));
         var rows = await q.OrderBy(e => e.ExpenseDate).ThenBy(e => e.CreatedAt)
-            .Select(e => MapExpense(e))
             .ToListAsync();
-        return Ok(rows);
+        return Ok(rows.Select(MapExpense));
     }
 
     [HttpPatch("{lrNumber}/expenses/{expenseId:guid}/approve")]
@@ -744,7 +1112,8 @@ public class LrProcessController(
     {
         var lr = await LoadLr(lrNumber);
         if (lr == null) return NotFound();
-        LrProcessService.EnsureStatusAtLeast(lr, LrStatuses.DeliveryCompleted, LrStatuses.PodUploaded);
+        var invGuard = GuardStatus(lr, LrStatuses.DeliveryCompleted, LrStatuses.PodUploaded);
+        if (invGuard != null) return invGuard;
 
         var billType = (ApiParseHelper.BodyString(body, "billType") ?? "FC").ToUpperInvariant();
         if (billType is not ("RCM" or "FC" or "STANDARD"))
@@ -906,10 +1275,57 @@ public class LrProcessController(
         catch { return null; }
     }
 
+    static JsonObject ParseExt(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "{}") return new JsonObject();
+        try { return JsonNode.Parse(json)?.AsObject() ?? new JsonObject(); }
+        catch { return new JsonObject(); }
+    }
+
+    static string MergeExtendedJson(string? existingJson, string incomingJson)
+    {
+        var existing = ParseExt(existingJson);
+        var incoming = ParseExt(incomingJson);
+        foreach (var prop in incoming)
+        {
+            if (prop.Value is JsonObject incomingObj &&
+                existing[prop.Key] is JsonObject existingObj)
+            {
+                foreach (var nested in incomingObj)
+                    existingObj[nested.Key] = nested.Value?.DeepClone();
+                existing[prop.Key] = existingObj;
+            }
+            else
+            {
+                existing[prop.Key] = prop.Value?.DeepClone();
+            }
+        }
+        return existing.ToJsonString();
+    }
+
+    static void RecordStatusChange(
+        TmsDbContext db, LorryReceipt lr, string newStatus, string? changedBy, string? remarks)
+    {
+        if (lr.Status == newStatus) return;
+        var oldStatus = lr.Status;
+        lr.Status = newStatus;
+        lr.UpdatedAt = DateTime.UtcNow;
+        db.LrStatusHistories.Add(new LrStatusHistory
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lr.CompanyId,
+            LrNumber = lr.LrNumber,
+            OldStatus = oldStatus,
+            NewStatus = newStatus,
+            ChangedBy = changedBy,
+            ChangedAt = DateTime.UtcNow,
+            Remarks = remarks,
+        });
+    }
+
     static object MapLoading(LrLoadingSheet s) => new
     {
         s.Id,
-        s.SheetNumber,
         sheetNumber = s.SheetNumber,
         s.BusinessType,
         s.VehicleId,
@@ -938,52 +1354,72 @@ public class LrProcessController(
         }).ToList(),
     };
 
-    static object MapTransit(LrTransitPass p, IEnumerable<LrLoadingSheetItem>? items = null) => new
+    static object MapTransit(LrTransitPass p, IEnumerable<LrLoadingSheetItem>? items = null)
     {
-        p.Id,
-        p.PassNumber,
-        passNumber = p.PassNumber,
-        p.VehicleNumber,
-        p.DriverName,
-        routeFrom = p.RouteFrom,
-        routeTo = p.RouteTo,
-        p.ViaPoints,
-        sealNumber = p.SealNumber,
-        sealCondition = p.SealCondition,
-        transitType = p.TransitType,
-        expectedDelivery = p.ExpectedDelivery?.ToString("yyyy-MM-dd"),
-        issueDate = p.IssueDate.ToString("yyyy-MM-dd"),
-        p.Remarks,
-        p.CreatedBy,
-        p.LoadingSheetId,
-        extendedData = ParseExtendedJson(p.ExtendedDataJson),
-        lrNumbers = items?.Select(i => i.LrNumber).ToList() ?? [p.LrNumber],
-    };
+        var ext = ParseExt(p.ExtendedDataJson);
+        var passStatus = ext["passStatus"]?.GetValue<string>() ?? "Draft";
+        return new
+        {
+            p.Id,
+            passNumber = p.PassNumber,
+            p.VehicleNumber,
+            p.DriverName,
+            routeFrom = p.RouteFrom,
+            routeTo = p.RouteTo,
+            p.ViaPoints,
+            sealNumber = p.SealNumber,
+            sealCondition = p.SealCondition,
+            transitType = p.TransitType,
+            expectedDelivery = p.ExpectedDelivery?.ToString("yyyy-MM-dd"),
+            issueDate = p.IssueDate.ToString("yyyy-MM-dd"),
+            p.Remarks,
+            p.CreatedBy,
+            p.LoadingSheetId,
+            passStatus,
+            extendedData = ParseExtendedJson(p.ExtendedDataJson),
+            lrNumbers = items?.Select(i => i.LrNumber).ToList() ?? [p.LrNumber],
+        };
+    }
 
-    static object MapDelivery(LrDeliverySheet s) => new
+    static object MapDelivery(LrDeliverySheet s)
     {
-        s.Id,
-        s.SheetNumber,
-        s.ShipmentStatus,
-        deliveryDate = s.DeliveryDate?.ToString("yyyy-MM-dd"),
-        s.DeliveryLocation,
-        s.ReceiverName,
-        tripNo = s.TripNo,
-        deliveryTime = s.DeliveryTime?.ToString("HH:mm"),
-        packagesTotal = s.PackagesTotal,
-        packagesReceived = s.PackagesReceived,
-        packagesDamaged = s.PackagesDamaged,
-        actualWeight = s.ActualWeight,
-        chargedWeight = s.ChargedWeight,
-        condition = s.Condition,
-        receiverDesignation = s.ReceiverDesignation,
-        receiverMobile = s.ReceiverMobile,
-        podNo = s.PodNo,
-        deliveryNoteNo = s.DeliveryNoteNo,
-        s.Remarks,
-        extendedData = ParseExtendedJson(s.ExtendedDataJson),
-        s.CreatedBy,
-    };
+        var ext = ParseExt(s.ExtendedDataJson);
+        var dispatch = ext["dispatch"];
+        var dispatchNo = dispatch?["dispatchNo"]?.GetValue<string>() ?? s.TripNo;
+        var inTransitStatus = ext["inTransitStatus"]?.GetValue<string>();
+        var podVerification = ext["podVerification"]?["status"]?.GetValue<string>();
+        return new
+        {
+            s.Id,
+            sheetNumber = s.SheetNumber,
+            s.ShipmentStatus,
+            deliveryDate = s.DeliveryDate?.ToString("yyyy-MM-dd"),
+            s.DeliveryLocation,
+            s.ReceiverName,
+            tripNo = s.TripNo,
+            dispatchNo,
+            deliveryTime = s.DeliveryTime?.ToString("HH:mm"),
+            packagesTotal = s.PackagesTotal,
+            packagesReceived = s.PackagesReceived,
+            packagesDamaged = s.PackagesDamaged,
+            actualWeight = s.ActualWeight,
+            chargedWeight = s.ChargedWeight,
+            condition = s.Condition,
+            receiverDesignation = s.ReceiverDesignation,
+            receiverMobile = s.ReceiverMobile,
+            podNo = s.PodNo,
+            deliveryNoteNo = s.DeliveryNoteNo,
+            s.Remarks,
+            inTransitStatus,
+            podVerificationStatus = podVerification,
+            currentLocation = ext["currentLocation"]?.GetValue<string>(),
+            lastUpdate = ext["lastUpdate"]?.GetValue<string>(),
+            checkpoints = ext["checkpoints"],
+            dispatch,
+            extendedData = ParseExtendedJson(s.ExtendedDataJson),
+            s.CreatedBy,
+        };
+    }
 
     static object MapExpense(LrExpense e) => new
     {

@@ -44,11 +44,13 @@ export const SHORTCUT_REGISTRY = [
   // Navigation — Alt shortcuts
   { id: 'nav-lr', label: 'LR Entry', description: 'Open LR Entry', keys: ['alt+l'], scope: 'navigation', path: '/lr/entry' },
   { id: 'nav-trips', label: 'Trips', description: 'Open Trip Management', keys: ['alt+t'], scope: 'navigation', path: '/trips' },
-  { id: 'nav-billing', label: 'Billing', description: 'Open Billing', keys: ['alt+b'], scope: 'navigation', path: '/accounting' },
-  { id: 'nav-pod', label: 'POD', description: 'Open Delivery / POD', keys: ['alt+p'], scope: 'navigation', path: '/lr?status=delivered' },
+  { id: 'nav-billing', label: 'Billing', description: 'Open Billing invoice entry', keys: ['alt+b'], scope: 'navigation', path: '/operations/billing/invoice' },
+  { id: 'nav-pod', label: 'POD', description: 'Open POD entry', keys: ['alt+p'], scope: 'navigation', path: '/operations/delivery/pod' },
+  { id: 'nav-operations', label: 'Operations', description: 'Operations Hub', keys: ['alt+o'], scope: 'navigation', path: '/operations' },
   { id: 'nav-customers', label: 'Customers', description: 'Customer Master', keys: ['alt+c'], scope: 'navigation', path: '/customers' },
   { id: 'nav-vehicles', label: 'Vehicles', description: 'Vehicle Master', keys: ['alt+v'], scope: 'navigation', path: '/vehicles' },
-  { id: 'nav-drivers', label: 'Drivers', description: 'Driver Master', keys: ['alt+d'], scope: 'navigation', path: '/masters/drivers' },
+  { id: 'nav-drivers', label: 'Drivers', description: 'Driver Master', keys: ['alt+d'], scope: 'navigation', path: '/hr/employees' },
+  { id: 'nav-masters', label: 'Masters', description: 'Masters Hub', keys: ['alt+m'], scope: 'navigation', path: '/masters' },
   { id: 'nav-invoice', label: 'Invoice', description: 'Freight Invoices', keys: ['alt+i'], scope: 'navigation', path: '/accounting/freight-invoices' },
   { id: 'nav-reports', label: 'Reports', description: 'Reports Hub', keys: ['alt+r', 'f11'], scope: 'navigation', path: '/reports' },
   { id: 'nav-settings', label: 'Settings', description: 'Application Settings', keys: ['alt+s'], scope: 'navigation', path: '/settings' },
@@ -56,8 +58,8 @@ export const SHORTCUT_REGISTRY = [
 
   // Legacy F-keys (backward compatible)
   { id: 'legacy-booking', label: 'New Booking', description: 'Create booking', keys: ['f6'], scope: 'navigation', path: '/bookings/new' },
-  { id: 'legacy-loading', label: 'Loading Slip', description: 'Loading pending queue', keys: ['f10'], scope: 'navigation', path: '/lr?status=loading-pending' },
-  { id: 'legacy-delivery', label: 'Delivery', description: 'Delivery queue', keys: ['f12'], scope: 'navigation', path: '/lr?status=delivered' },
+  { id: 'legacy-loading', label: 'Loading Slip', description: 'Open loading slip entry', keys: ['f10'], scope: 'navigation', path: '/operations/loading-slip' },
+  { id: 'legacy-delivery', label: 'Delivery', description: 'Open delivery complete entry', keys: ['f12'], scope: 'navigation', path: '/operations/delivery-complete' },
   { id: 'legacy-vehicles', label: 'Vehicles', description: 'Vehicle list', keys: ['f9'], scope: 'navigation', path: '/vehicles' },
 
   // Tab navigation

@@ -63,8 +63,7 @@ export default function OpsModuleListPage({
     color: k.color,
   })), [kpiDefs, summary])
 
-  const columns = useMemo(() => [
-    ...columnDefs.map((col) => ({
+  const columns = useMemo(() => columnDefs.map((col) => ({
       key: col.key,
       label: col.label,
       render: (r) => {
@@ -81,17 +80,7 @@ export default function OpsModuleListPage({
         if (typeof val === 'string' && val.includes('T') && val.length > 10) return val.slice(0, 16).replace('T', ' ')
         return val ?? '—'
       },
-    })),
-    {
-      key: 'actions',
-      label: 'Action',
-      render: (r) => (
-        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); (onRowOpen ?? ((row) => navigate(addPath + `?lr=${encodeURIComponent(row[lrLinkKey])}`)))(r) }}>
-          Open
-        </Button>
-      ),
-    },
-  ], [columnDefs, lrLinkKey, addPath, navigate, onRowOpen])
+    })), [columnDefs, lrLinkKey, addPath, navigate, onRowOpen])
 
   const filterRow = (
     <div className="space-y-2">
@@ -133,6 +122,7 @@ export default function OpsModuleListPage({
         error={paged.error}
         onRefreshExternal={() => { paged.refresh(); reloadSummary() }}
         onRowClick={(r) => (onRowOpen ?? ((row) => navigate(addPath + `?lr=${encodeURIComponent(row[lrLinkKey])}`)))(r)}
+        onView={(r) => (onRowOpen ?? ((row) => navigate(addPath + `?lr=${encodeURIComponent(row[lrLinkKey])}`)))(r)}
         exportFilename={`${moduleKey}-list`}
         serverMode
         serverTotal={paged.total}

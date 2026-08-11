@@ -3,17 +3,14 @@ import { createContext, useContext, useState } from 'react'
 const SidebarContext = createContext(null)
 
 export function SidebarProvider({ children }) {
-  const [collapsed, setCollapsed] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  /** false = icon-only rail; true = full menu with labels */
+  const [menuExpanded, setMenuExpanded] = useState(false)
 
-  const toggleCollapsed = () => setCollapsed((c) => !c)
-  const toggleMobile = () => setMobileOpen((o) => !o)
-  const closeMobile = () => setMobileOpen(false)
+  const toggleMenu = () => setMenuExpanded((o) => !o)
+  const collapseMenu = () => setMenuExpanded(false)
 
   return (
-    <SidebarContext.Provider
-      value={{ collapsed, mobileOpen, toggleCollapsed, toggleMobile, closeMobile }}
-    >
+    <SidebarContext.Provider value={{ menuExpanded, toggleMenu, collapseMenu }}>
       {children}
     </SidebarContext.Provider>
   )

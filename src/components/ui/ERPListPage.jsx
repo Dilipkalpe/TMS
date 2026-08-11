@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import ERPPageTitle from './ERPPageTitle'
 import StatusSummaryCards from './StatusSummaryCards'
 import ERPListToolbar from './ERPListToolbar'
 import ERPDataTable from './ERPDataTable'
 import TablePagination from './TablePagination'
 import Modal from './Modal'
+import SlideDrawer from './SlideDrawer'
 import Button from './Button'
 import ImportModal from './ImportModal'
 import { exportToCsv } from '../../utils/export'
@@ -12,6 +13,7 @@ import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
 import TablePrintFormat from '../print/TablePrintFormat'
 import { formatPrintDate } from '../../utils/printUtils'
+import { printModuleList } from '../../services/printService'
 
 export default function ERPListPage({
   module,
@@ -33,10 +35,20 @@ export default function ERPListPage({
   sortKey,
   defaultSortDir = 'desc',
   onRowClick,
+  onView,
   onPrint,
   onEdit,
   onDelete,
+  rowActions,
+  canView,
+  canEdit,
+  canDelete,
+  canPrint,
   showActions = true,
+  selectable = true,
+  selectedKeys: controlledSelectedKeys,
+  onSelectionChange,
+  getRowKey,
   rowPrintTitle = 'Print',
   showSerial = true,
   filterRow,
@@ -59,7 +71,12 @@ export default function ERPListPage({
   searchValue: externalSearch,
   printable = true,
   printSubtitle,
+  printModuleCode = null,
   addPosition = 'start',
+  hideToolbar = false,
+  openColumnsSignal = 0,
+  tableToolbar = null,
+  listVariant = 'default',
 }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState(filterOptions[0])
@@ -68,13 +85,29 @@ export default function ERPListPage({
   const [columnsOpen, setColumnsOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [hiddenColumns, setHiddenColumns] = useState([])
+  const [internalSelected, setInternalSelected] = useState(() => new Set())
   const { toast } = useToast()
   const { company, print } = usePrint()
+
+  useEffect(() => {
+    if (openColumnsSignal > 0) setColumnsOpen(true)
+  }, [openColumnsSignal])
 
   const visibleColumns = useMemo(
     () => columns.filter((c) => !hiddenColumns.includes(c.key)),
     [columns, hiddenColumns],
   )
+
+  const manageableColumns = useMemo(
+    () => columns.filter((c) => !c.key.startsWith('__') && c.key !== 'actions'),
+    [columns],
+  )
+
+  const selectedKeys = controlledSelectedKeys ?? internalSelected
+  const handleSelectionChange = onSelectionChange ?? setInternalSelected
+  const resolvedGetRowKey = getRowKey ?? ((row) => row.id ?? row.lrNumber ?? row.username ?? row.code)
+
+  const getColumnLabel = (col) => (typeof col.label === 'string' ? col.label : col.key)
 
   const activePage = serverMode ? (serverPage ?? 1) : page
   const activePageSize = serverMode ? (serverPageSize ?? pageSize) : pageSize
@@ -166,9 +199,23 @@ export default function ERPListPage({
     }
   }
 
-  const handlePrintList = () => {
+  const handlePrintList = async () => {
     if (!filtered.length) {
       toast({ title: 'Nothing to print', message: 'No records match current filters', type: 'warning' })
+      return
+    }
+    if (printModuleCode) {
+      await printModuleList({
+        moduleCode: printModuleCode,
+        company,
+        print,
+        toast,
+        columns: visibleColumns,
+        rows: filtered,
+        documentTitle: title,
+        documentSubtitle: printSubtitle ?? `${module ?? 'Report'} · Printed ${formatPrintDate(new Date())}`,
+        summary: `${filtered.length.toLocaleString('en-IN')} record(s)`,
+      })
       return
     }
     print(
@@ -184,6 +231,7 @@ export default function ERPListPage({
   }
 
   const handleRowPrint = onPrint ?? undefined
+  const resolvedOnView = onView ?? onRowClick
 
   const toggleColumn = (key) => {
     setHiddenColumns((prev) =>
@@ -195,18 +243,23 @@ export default function ERPListPage({
     <div className="erp-list-page min-h-0 h-auto lg:h-full">
       {title ? <ERPPageTitle module={module} title={title} /> : null}
 
-      <div className="erp-list-card flex min-h-0 flex-1 flex-col overflow-visible rounded-lg border border-primary/20 bg-white shadow-sm lg:overflow-hidden dark:bg-slate-900">
+      <div className={`erp-list-card flex min-h-0 flex-1 flex-col overflow-visible rounded-lg border bg-white shadow-sm lg:overflow-hidden dark:bg-slate-900 ${
+        listVariant === 'lr' ? 'border-slate-200 dark:border-slate-700' : 'border-primary/20'
+      }`}>
         {headerBanner ? (
-          <div className="shrink-0 border-x border-primary/20 p-2 sm:p-3">
+          <div className="erp-list-kpi-wrap shrink-0 border-x border-primary/20 px-2 py-1.5 sm:px-3 sm:py-2">
             {headerBanner}
           </div>
         ) : statusCards.length > 0 ? (
-          <div className="shrink-0 border-x border-primary/20 p-2 sm:p-3">
+          <div className="erp-list-kpi-wrap shrink-0 border-x border-primary/20 px-2 py-1.5 sm:px-3 sm:py-2">
             <StatusSummaryCards cards={statusCards} />
           </div>
         ) : null}
 
         <div className="shrink-0">
+        {hideToolbar ? (
+          filterRow ? <div className="border-x border-primary/20 bg-white px-2 py-2 sm:px-3 dark:bg-slate-900">{filterRow}</div> : null
+        ) : (
         <ERPListToolbar
           addLabel={addLabel}
           onAdd={onAdd}
@@ -228,6 +281,7 @@ export default function ERPListPage({
           extra={filterRow}
           addPosition={addPosition}
         />
+        )}
         </div>
 
         {error && (
@@ -235,6 +289,8 @@ export default function ERPListPage({
             {error}
           </div>
         )}
+
+        {tableToolbar ? <div className="shrink-0">{tableToolbar}</div> : null}
 
         <div className="erp-list-table-region relative flex min-h-0 flex-1 flex-col overflow-visible border-x border-primary/20 lg:overflow-hidden">
           {loading && (
@@ -250,10 +306,20 @@ export default function ERPListPage({
             pageSize={serverMode ? filtered.length || activePageSize : pageSize}
             showSerial={showSerial}
             showActions={showActions}
+            selectable={selectable}
+            selectedKeys={selectedKeys}
+            onSelectionChange={handleSelectionChange}
+            getRowKey={resolvedGetRowKey}
             onRowClick={onRowClick}
+            onView={resolvedOnView}
             onPrint={handleRowPrint}
             onEdit={onEdit}
             onDelete={onDelete}
+            rowActions={rowActions}
+            canView={canView}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            canPrint={canPrint}
             printTitle={rowPrintTitle}
             sortKey={sortKey}
             sortDir={defaultSortDir}
@@ -269,9 +335,36 @@ export default function ERPListPage({
           totalIsApproximate={totalIsApproximate}
           onPageChange={handlePageChange}
           onPageSizeChange={handlePageSize}
+          showingFrom={serverMode ? ((safePage - 1) * activePageSize) + (filtered.length ? 1 : 0) : undefined}
+          showingTo={serverMode ? ((safePage - 1) * activePageSize) + filtered.length : undefined}
+          hidePageSizeSelector={Boolean(tableToolbar)}
         />
       </div>
 
+      {listVariant === 'lr' ? (
+        <SlideDrawer open={columnsOpen} onClose={() => setColumnsOpen(false)} title="Manage Columns" width="sm">
+          <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+            Toggle column visibility for the LR list grid.
+          </p>
+          <div className="space-y-2">
+            {manageableColumns.map((col) => (
+              <label key={col.key} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={!hiddenColumns.includes(col.key)}
+                  onChange={() => toggleColumn(col.key)}
+                  className="h-4 w-4 rounded text-primary"
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{getColumnLabel(col)}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <Button variant="outline" size="sm" onClick={() => setHiddenColumns([])}>Show all</Button>
+            <Button size="sm" onClick={() => setColumnsOpen(false)}>Done</Button>
+          </div>
+        </SlideDrawer>
+      ) : (
       <Modal
         open={columnsOpen}
         onClose={() => setColumnsOpen(false)}
@@ -285,7 +378,7 @@ export default function ERPListPage({
       >
         <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">Toggle column visibility for this list view.</p>
         <div className="space-y-2">
-          {columns.map((col) => (
+          {manageableColumns.map((col) => (
             <label key={col.key} className="flex cursor-pointer items-center space-x-3 rounded-lg border border-slate-200 p-2.5 dark:border-slate-700">
               <input
                 type="checkbox"
@@ -293,11 +386,12 @@ export default function ERPListPage({
                 onChange={() => toggleColumn(col.key)}
                 className="h-4 w-4 rounded text-primary"
               />
-              <span className="text-sm text-slate-700 dark:text-slate-200">{col.label}</span>
+              <span className="text-sm text-slate-700 dark:text-slate-200">{getColumnLabel(col)}</span>
             </label>
           ))}
         </div>
       </Modal>
+      )}
 
       {importTemplate && (
         <ImportModal

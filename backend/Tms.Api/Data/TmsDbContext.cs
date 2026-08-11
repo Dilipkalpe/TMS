@@ -13,6 +13,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Consignor> Consignors => Set<Consignor>();
     public DbSet<Consignee> Consignees => Set<Consignee>();
+    public DbSet<ItemMaster> Items => Set<ItemMaster>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<Driver> Drivers => Set<Driver>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
@@ -67,6 +68,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<VoucherLine> VoucherLines => Set<VoucherLine>();
     public DbSet<AccountingReportJob> AccountingReportJobs => Set<AccountingReportJob>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
+    public DbSet<PrintTemplateConfiguration> PrintTemplateConfigurations => Set<PrintTemplateConfiguration>();
     public DbSet<Broker> Brokers => Set<Broker>();
     public DbSet<BookingBrokerCharge> BookingBrokerCharges => Set<BookingBrokerCharge>();
     public DbSet<BookingExpense> BookingExpenses => Set<BookingExpense>();
@@ -205,6 +207,24 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.State).HasColumnName("state");
             e.Property(x => x.Pincode).HasColumnName("pincode");
             e.Property(x => x.DefaultToLocation).HasColumnName("default_to_location");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+        });
+
+        modelBuilder.Entity<ItemMaster>(e =>
+        {
+            e.ToTable("items");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.Hsn).HasColumnName("hsn");
+            e.Property(x => x.DefaultPackageType).HasColumnName("default_package_type");
+            e.Property(x => x.Unit).HasColumnName("unit");
+            e.Property(x => x.Remarks).HasColumnName("remarks");
             e.Property(x => x.Status).HasColumnName("status");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -486,6 +506,22 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.FleetSize).HasColumnName("fleet_size");
             e.Property(x => x.DocumentFlow).HasColumnName("document_flow").HasMaxLength(40);
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<PrintTemplateConfiguration>(e =>
+        {
+            e.ToTable("print_template_configurations");
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.ModuleCode).HasColumnName("module_code").HasMaxLength(40);
+            e.Property(x => x.TemplateCode).HasColumnName("template_code").HasMaxLength(10);
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(120);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.ModifiedBy).HasColumnName("modified_by").HasMaxLength(120);
+            e.Property(x => x.ModifiedAt).HasColumnName("modified_at");
+            e.HasIndex(x => new { x.CompanyId, x.UserId, x.ModuleCode });
         });
     }
 

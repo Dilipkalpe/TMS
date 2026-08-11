@@ -57,19 +57,53 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
         return null;
     }
 
-    public async Task<List<MaintenancePredictionDto>> ComputePredictionsAsync(CancellationToken ct = default)
+    public async Task<List<MaintenancePredictionDto>> ComputePredictionsAsync(
+        CancellationToken ct = default,
+        bool syncKm = false,
+        bool includeExternalSignals = false,
+        int maxVehicles = 300)
     {
-        await SyncKmBasedSchedulesAsync(ct);
+        // KM sync is expensive — only when explicitly requested.
+        if (syncKm)
+            await SyncKmBasedSchedulesAsync(ct);
 
-        var vehicles = await TenantScope.Vehicles(db, tenants)
+        // Prefer vehicles that actually have maintenance schedules / status; hard-cap for large fleets.
+        var scheduledVehicleIds = await TenantScope.MaintenanceSchedules(db, tenants)
             .AsNoTracking()
+            .Where(s => s.IsActive)
+            .Select(s => s.VehicleId)
+            .Distinct()
+            .Take(maxVehicles)
+            .ToListAsync(ct);
+
+        IQueryable<Vehicle> vehicleQ = TenantScope.Vehicles(db, tenants).AsNoTracking();
+        if (scheduledVehicleIds.Count > 0)
+        {
+            vehicleQ = vehicleQ.Where(v =>
+                scheduledVehicleIds.Contains(v.Id)
+                || (v.Status != null && v.Status.ToLower() == "maintenance"));
+        }
+        else
+        {
+            vehicleQ = vehicleQ.OrderByDescending(v => v.UpdatedAt).Take(maxVehicles);
+        }
+
+        var vehicles = await vehicleQ
             .Include(v => v.MaintenanceSchedules.Where(s => s.IsActive))
+            .Take(maxVehicles)
             .ToListAsync(ct);
 
-        var recentRecords = await TenantScope.MaintenanceRecords(db, tenants)
-            .AsNoTracking()
-            .OrderByDescending(r => r.RecordDate)
-            .ToListAsync(ct);
+        var vehicleIds = vehicles.Select(v => v.Id).ToList();
+        List<MaintenanceRecord> recentRecords = [];
+        if (vehicleIds.Count > 0)
+        {
+            recentRecords = await TenantScope.MaintenanceRecords(db, tenants)
+                .AsNoTracking()
+                .Where(r => vehicleIds.Contains(r.VehicleId))
+                .OrderByDescending(r => r.RecordDate)
+                .Take(1500)
+                .ToListAsync(ct);
+        }
 
         var recordsByVehicle = recentRecords
             .GroupBy(r => r.VehicleId)
@@ -77,18 +111,37 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
                 g => g.Key,
                 g => g.OrderByDescending(MaintenanceRecordHelpers.PerformedAtUtc).Take(5).ToList());
 
-        var suspiciousFuel = await TenantScope.FuelEntries(db, tenants)
-            .Where(e => e.IsSuspicious && e.FilledAt >= DateTime.UtcNow.AddDays(-60))
-            .GroupBy(e => e.VehicleId)
-            .Select(g => g.Key)
-            .ToListAsync(ct);
-        var suspiciousSet = suspiciousFuel.ToHashSet();
+        HashSet<string> suspiciousSet = [];
+        Dictionary<string, decimal> expenseByVehicle = new(StringComparer.OrdinalIgnoreCase);
+        if (includeExternalSignals && vehicleIds.Count > 0)
+        {
+            try
+            {
+                var suspiciousFuel = await TenantScope.FuelEntries(db, tenants)
+                    .Where(e => e.IsSuspicious
+                        && e.FilledAt >= DateTime.UtcNow.AddDays(-60)
+                        && vehicleIds.Contains(e.VehicleId))
+                    .Select(e => e.VehicleId)
+                    .Distinct()
+                    .ToListAsync(ct);
+                suspiciousSet = suspiciousFuel.Where(id => !string.IsNullOrEmpty(id)).ToHashSet();
+            }
+            catch { /* fuel optional */ }
 
-        var expenseByVehicle = await tenants.Filter(db.Expenses.AsQueryable())
-            .Where(e => e.Category == "Maintenance" && e.ExpenseDate >= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-90)))
-            .GroupBy(e => e.VehicleId)
-            .Select(g => new { VehicleId = g.Key, Total = g.Sum(e => e.Amount) })
-            .ToDictionaryAsync(x => x.VehicleId ?? "", x => x.Total, ct);
+            try
+            {
+                var expenseRows = await tenants.Filter(db.Expenses.AsQueryable())
+                    .Where(e => e.Category == "Maintenance"
+                        && e.VehicleId != null
+                        && vehicleIds.Contains(e.VehicleId)
+                        && e.ExpenseDate >= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-90)))
+                    .GroupBy(e => e.VehicleId!)
+                    .Select(g => new { VehicleId = g.Key, Total = g.Sum(e => e.Amount) })
+                    .ToListAsync(ct);
+                expenseByVehicle = expenseRows.ToDictionary(x => x.VehicleId, x => x.Total, StringComparer.OrdinalIgnoreCase);
+            }
+            catch { /* expenses optional */ }
+        }
 
         var now = DateTime.UtcNow;
         var today = DateOnly.FromDateTime(now);
@@ -224,24 +277,36 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
         var schedules = await TenantScope.MaintenanceSchedules(db, tenants)
             .Include(s => s.Vehicle)
             .Where(s => s.IsActive && s.IntervalKm != null && s.IntervalKm > 0)
+            .Take(500)
             .ToListAsync(ct);
+        if (schedules.Count == 0) return;
+
+        var vehicleIds = schedules.Select(s => s.VehicleId).Distinct().ToList();
+        var recent = await TenantScope.MaintenanceRecords(db, tenants)
+            .AsNoTracking()
+            .Where(r => vehicleIds.Contains(r.VehicleId))
+            .OrderByDescending(r => r.RecordDate)
+            .Take(2000)
+            .ToListAsync(ct);
+        var byVehicle = recent.GroupBy(r => r.VehicleId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var changed = false;
+        var today = DateTime.UtcNow.Date;
         foreach (var sch in schedules)
         {
             if (sch.Vehicle == null || sch.Vehicle.Odometer <= 0) continue;
 
-            var lastRecord = await TenantScope.MaintenanceRecords(db, tenants)
-                .Where(r => r.VehicleId == sch.VehicleId &&
-                    (r.Description != null && r.Description.Contains(sch.ServiceType) || r.RecordType == "SCHEDULED"))
-                .OrderByDescending(r => r.RecordDate)
-                .FirstOrDefaultAsync(ct);
+            var lastRecord = byVehicle.GetValueOrDefault(sch.VehicleId)?
+                .FirstOrDefault(r =>
+                    (r.Description != null && r.Description.Contains(sch.ServiceType, StringComparison.OrdinalIgnoreCase))
+                    || r.RecordType == "SCHEDULED");
 
             var sinceKm = lastRecord?.Odometer != null
                 ? sch.Vehicle.Odometer - lastRecord.Odometer.Value
                 : sch.Vehicle.Odometer;
             var remaining = sch.IntervalKm!.Value - sinceKm;
-            if (remaining <= 0 && sch.NextDueAt?.Date > DateTime.UtcNow.Date)
+            if (remaining <= 0 && sch.NextDueAt?.Date > today)
             {
                 sch.NextDueAt = DateTime.UtcNow;
                 sch.UpdatedAt = DateTime.UtcNow;
@@ -255,11 +320,11 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
     public async Task SaveDailySnapshotsAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (await db.MaintenancePredictionSnapshots.AnyAsync(s => s.SnapshotDate == today, ct))
+        if (await db.MaintenancePredictionSnapshots.AsNoTracking().AnyAsync(s => s.SnapshotDate == today, ct))
             return;
 
-        var predictions = await ComputePredictionsAsync(ct);
-        foreach (var p in predictions)
+        var predictions = await ComputePredictionsAsync(ct, syncKm: false);
+        foreach (var p in predictions.Take(500))
         {
             db.MaintenancePredictionSnapshots.Add(new MaintenancePredictionSnapshot
             {
@@ -268,27 +333,29 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
                 VehicleId = p.VehicleId,
                 RiskScore = p.RiskScore,
                 RiskLevel = p.RiskLevel,
-                Factors = JsonSerializer.Serialize(p.Factors),
+                Factors = JsonSerializer.Serialize(p.Factors.Take(5)),
                 CreatedAt = DateTime.UtcNow,
             });
         }
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<MaintenanceAnalyticsDto> GetAnalyticsAsync(CancellationToken ct = default)
+    public async Task<MaintenanceAnalyticsDto> GetAnalyticsAsync(CancellationToken ct = default, IReadOnlyList<MaintenancePredictionDto>? predictions = null)
     {
         var since = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-6));
-        var records = await TenantScope.MaintenanceRecords(db, tenants)
+        var costRows = await TenantScope.MaintenanceRecords(db, tenants)
+            .AsNoTracking()
             .Where(r => r.RecordDate >= since)
+            .Select(r => new { r.RecordDate, r.Cost })
             .ToListAsync(ct);
 
-        var costByMonth = records
+        var costByMonth = costRows
             .GroupBy(r => r.RecordDate.ToString("yyyy-MM"))
             .OrderBy(g => g.Key)
-            .Select(g => new MonthlyCostDto(g.Key, g.Sum(r => r.Cost)))
+            .Select(g => new MonthlyCostDto(g.Key, g.Sum(x => x.Cost)))
             .ToList();
 
-        var predictions = await ComputePredictionsAsync(ct);
+        predictions ??= await ComputePredictionsAsync(ct, syncKm: false);
         var riskDistribution = new[]
         {
             new RiskBucketDto("HIGH", predictions.Count(p => p.RiskLevel == "HIGH")),
@@ -302,8 +369,9 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
             return new ComponentSummaryDto(rule.Component, alerts.Count, alerts.Count(a => a.Severity == "HIGH"));
         }).Where(c => c.AlertCount > 0).ToList();
 
+        var since90 = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-90));
         return new MaintenanceAnalyticsDto(
-            records.Where(r => r.RecordDate >= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-90))).Sum(r => r.Cost),
+            costRows.Where(r => r.RecordDate >= since90).Sum(r => r.Cost),
             costByMonth,
             riskDistribution,
             componentSummary);

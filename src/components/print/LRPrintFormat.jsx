@@ -10,12 +10,12 @@ function Cell({ label, value, wide }) {
   )
 }
 
-export default function LRPrintFormat({ lr, company }) {
+export default function LRPrintFormat({ lr, company, variant = 'T1' }) {
   const total = lrTotalCharges(lr)
   const balance = lr.balance != null ? Number(lr.balance) : total - Number(lr.advance || 0)
 
   return (
-    <div className="print-document">
+    <div className={`print-document print-variant-${variant}`}>
       <PrintCompanyHeader
         company={company}
         documentTitle="Lorry Receipt / Consignment Note"

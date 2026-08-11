@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Wrench, AlertTriangle, Calendar, Package, RefreshCw, TrendingUp,
+  AlertTriangle, Calendar, Package, RefreshCw, TrendingUp,
   ShieldAlert, ClipboardList, Settings2,
 } from 'lucide-react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
@@ -10,6 +10,7 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import VehicleLookupSelect from '../../components/ui/VehicleLookupSelect'
 import LookupSelect from '../../components/ui/LookupSelect'
+import { Select } from '../../components/ui/Input'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { maintenanceApi, vehiclesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
@@ -27,6 +28,12 @@ const TABS = [
   ['add-record', '+ Service'],
 ]
 
+function asList(value) {
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.items)) return value.items
+  return []
+}
+
 export default function MaintenancePage() {
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
@@ -41,6 +48,7 @@ export default function MaintenancePage() {
   const [workOrders, setWorkOrders] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   const [schedForm, setSchedForm] = useState({ vehicleId: '', serviceType: 'Engine Oil Change', intervalKm: '10000', intervalDays: '180' })
   const [recForm, setRecForm] = useState({ vehicleId: '', type: 'SCHEDULED', description: '', cost: '', odometer: '', vendor: '' })
@@ -49,37 +57,63 @@ export default function MaintenancePage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError('')
+
+    // Phase 1: cheap lists — show page immediately even if overview is slow.
+    const light = await Promise.allSettled([
+      maintenanceApi.schedules(),
+      maintenanceApi.records(),
+      maintenanceApi.spareParts(),
+      maintenanceApi.workOrders(),
+      vehiclesApi.list({ pageSize: 200 }),
+    ])
+    const lightVal = (i) => (light[i].status === 'fulfilled' ? light[i].value : null)
+    setSchedules(asList(lightVal(0)))
+    setRecords(asList(lightVal(1)))
+    setParts(asList(lightVal(2)))
+    setWorkOrders(asList(lightVal(3)))
+    setVehicles(asList(lightVal(4)?.items ?? lightVal(4)))
+    setLoading(false)
+
+    // Phase 2: overview in background (does not block tabs / forms).
     try {
-      const [o, p, s, r, pts, a, an, wo, vRes] = await Promise.all([
-        maintenanceApi.overview(),
-        maintenanceApi.predictions(),
-        maintenanceApi.schedules(),
-        maintenanceApi.records(),
-        maintenanceApi.spareParts(),
-        maintenanceApi.alerts(),
-        maintenanceApi.analytics(),
-        maintenanceApi.workOrders(),
-        vehiclesApi.list({ pageSize: 200 }),
-      ])
-      setOverview(o)
-      setPredictions(p)
-      setSchedules(s)
-      setRecords(r)
-      setParts(pts)
-      setAlerts(a)
-      setAnalytics(an)
-      setWorkOrders(wo)
-      setVehicles(vRes.items ?? vRes ?? [])
-    } catch (err) {
-      toast({
-        title: 'Failed to load maintenance data',
-        message: err.status === 500
-          ? 'Database tables missing — restart the API (it auto-creates them) or run: npm run maintenance:install'
-          : err.message,
-        type: 'error',
+      const o = await maintenanceApi.overview()
+      setOverview(o || {
+        activeSchedules: asList(lightVal(0)).length,
+        highRiskVehicles: 0,
+        openWorkOrders: asList(lightVal(3)).length,
+        cost90Days: 0,
+        totalMaintenanceCost: 0,
       })
-    } finally {
-      setLoading(false)
+      setPredictions(asList(o?.predictions))
+      setAlerts(o?.alerts ?? null)
+      setAnalytics(o?.analytics ?? {
+        totalCost90Days: o?.cost90Days,
+        costByMonth: [],
+        riskDistribution: o?.riskDistribution ?? [],
+        componentSummary: o?.componentSummary ?? [],
+      })
+      setLoadError('')
+    } catch (err) {
+      // Keep lists usable; show a soft overview fallback instead of a blank page.
+      setOverview((prev) => prev || {
+        activeSchedules: asList(lightVal(0)).length,
+        highRiskVehicles: 0,
+        openWorkOrders: asList(lightVal(3)).length,
+        cost90Days: 0,
+        totalMaintenanceCost: 0,
+        riskDistribution: [],
+      })
+      const msg = err?.message || 'Overview is slow or unavailable'
+      setLoadError(msg)
+      toast({ title: 'Overview still loading / timed out', message: `${msg}. Schedules and other tabs are available.`, type: 'warning' })
+    }
+
+    const lightFailed = light.filter((r) => r.status === 'rejected')
+    if (lightFailed.length === light.length) {
+      const msg = lightFailed[0].reason?.message || 'API unreachable'
+      setLoadError(msg)
+      toast({ title: 'Failed to load maintenance data', message: msg, type: 'error' })
     }
   }, [toast])
 
@@ -214,10 +248,22 @@ export default function MaintenancePage() {
           ))}
         </div>
 
+        {loadError ? (
+          <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+            <p className="font-medium">Could not load all maintenance data</p>
+            <p className="mt-1">{loadError}</p>
+            <Button size="sm" variant="outline" className="mt-3" onClick={load}>Retry</Button>
+          </Card>
+        ) : null}
+
         {tab === 'overview' && (
           loading ? (
             <p className="text-sm text-slate-500">Loading…</p>
-          ) : overview && (
+          ) : !overview ? (
+            <Card className="p-6 text-sm text-slate-500">
+              Overview is unavailable. Use Retry above, or restart the API so maintenance tables are created.
+            </Card>
+          ) : (
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
@@ -336,9 +382,13 @@ export default function MaintenancePage() {
                       onVehiclesRefresh={refreshVehicles}
                     />
                     <input required placeholder="Title" value={woForm.title} onChange={(e) => setWoForm({ ...woForm, title: e.target.value })} className={inputClass} />
-                    <select value={woForm.component} onChange={(e) => setWoForm({ ...woForm, component: e.target.value })} className={inputClass}>
-                      {['Engine', 'Tyre', 'Brake', 'Transmission', 'Electrical', 'General'].map((c) => <option key={c}>{c}</option>)}
-                    </select>
+                    <Select
+                      label={false}
+                      value={woForm.component}
+                      onChange={(e) => setWoForm({ ...woForm, component: e.target.value })}
+                      options={['Engine', 'Tyre', 'Brake', 'Transmission', 'Electrical', 'General']}
+                      placeholder="Component"
+                    />
                     <Button type="submit" size="sm">Create work order</Button>
                   </form>
                 </Card>
@@ -377,7 +427,12 @@ export default function MaintenancePage() {
           )
         )}
 
-        {tab === 'analytics' && analytics && (
+        {tab === 'analytics' && (
+          loading ? (
+            <p className="text-sm text-slate-500">Loading…</p>
+          ) : !analytics ? (
+            <Card className="p-6 text-sm text-slate-500">Analytics unavailable. Retry or restart the API.</Card>
+          ) : (
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-3">
               <Card className="p-4"><p className="text-sm text-slate-500">90-day cost</p><p className="text-xl font-bold">{formatCurrency(analytics.totalCost90Days)}</p></Card>
@@ -392,7 +447,7 @@ export default function MaintenancePage() {
               <h2 className="mb-4 font-semibold">Maintenance cost by month</h2>
               <div className="flex items-end gap-2 h-40">
                 {(analytics.costByMonth ?? []).map((m) => {
-                  const max = Math.max(...analytics.costByMonth.map((x) => x.cost), 1)
+                  const max = Math.max(...(analytics.costByMonth ?? []).map((x) => x.cost), 1)
                   return (
                     <div key={m.month} className="flex flex-1 flex-col items-center gap-1">
                       <div className="w-full rounded-t bg-primary/80" style={{ height: `${(m.cost / max) * 100}%`, minHeight: m.cost > 0 ? 4 : 0 }} title={formatCurrency(m.cost)} />
@@ -400,9 +455,13 @@ export default function MaintenancePage() {
                     </div>
                   )
                 })}
+                {!(analytics.costByMonth ?? []).length && (
+                  <p className="text-sm text-slate-500">No cost history yet</p>
+                )}
               </div>
             </Card>
           </div>
+          )
         )}
 
         {tab === 'work-orders' && (
@@ -569,12 +628,18 @@ export default function MaintenancePage() {
                 onVehicleIdChange={(id) => setRecForm({ ...recForm, vehicleId: id })}
                 onVehiclesRefresh={refreshVehicles}
               />
-              <select value={recForm.type} onChange={(e) => setRecForm({ ...recForm, type: e.target.value })} className={inputClass}>
-                <option value="SCHEDULED">Scheduled Service</option>
-                <option value="BREAKDOWN">Breakdown</option>
-                <option value="INSPECTION">Inspection</option>
-                <option value="REPAIR">Repair</option>
-              </select>
+              <Select
+                label={false}
+                value={recForm.type}
+                onChange={(e) => setRecForm({ ...recForm, type: e.target.value })}
+                options={[
+                  { value: 'SCHEDULED', label: 'Scheduled Service' },
+                  { value: 'BREAKDOWN', label: 'Breakdown' },
+                  { value: 'INSPECTION', label: 'Inspection' },
+                  { value: 'REPAIR', label: 'Repair' },
+                ]}
+                placeholder="Record type"
+              />
               <input required value={recForm.description} onChange={(e) => setRecForm({ ...recForm, description: e.target.value })} className={inputClass} placeholder="Description" />
               <LookupSelect
                 label="Vendor (optional)"

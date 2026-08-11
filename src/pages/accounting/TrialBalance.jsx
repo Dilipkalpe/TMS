@@ -45,7 +45,7 @@ export default function TrialBalance() {
         <StatusSummaryCards cards={statusCards} />
         <Card padding={false}>
           {loading ? <p className="p-4 text-sm text-slate-500">Loading…</p> : (
-            <ERPDataTable columns={columns} data={data} showActions={false} />
+            <ERPDataTable columns={columns} data={data} showActions={false} selectable={false} />
           )}
         </Card>
       </div>

@@ -63,6 +63,11 @@ public static class EntityMappers
         c.BranchId, c.Branch?.Name,
         c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt);
 
+    public static ItemMasterDto ToDto(ItemMaster i) => new(
+        i.Id, i.Name, i.Hsn, i.DefaultPackageType, i.Unit, i.Remarks, i.Status,
+        i.BranchId, i.Branch?.Name,
+        i.CreatedBy, i.CreatedAt, i.UpdatedBy, i.UpdatedAt);
+
     public static ExpenseDto ToDto(Expense e) => new(
         e.Id,
         e.ExpenseDate.ToString("yyyy-MM-dd"),
@@ -199,6 +204,12 @@ public static class IdGenerator
     {
         var count = await db.Consignees.CountAsync();
         return $"CE-{(count + 1):D3}";
+    }
+
+    public static async Task<string> NextItemId(Data.TmsDbContext db)
+    {
+        var count = await db.Items.CountAsync();
+        return $"IT-{(count + 1):D4}";
     }
 
     public static async Task<string> NextQuoteNo(Data.TmsDbContext db)

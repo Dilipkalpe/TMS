@@ -86,7 +86,7 @@ export default function HrTmsNorms() {
       </div>
       <div className="mt-4 flex gap-3">
         <Link to="/payroll/settings" className="text-sm font-medium text-primary hover:underline">Payroll Settings →</Link>
-        <Link to="/settings" className="text-sm font-medium text-primary hover:underline">Company Logo & Profile →</Link>
+        <Link to="/settings/general" className="text-sm font-medium text-primary hover:underline">Company Logo & Profile →</Link>
       </div>
     </ERPContentPage>
   )

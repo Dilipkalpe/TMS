@@ -124,6 +124,24 @@ public class Consignee : IBranchScoped, IAuditable
     public string? UpdatedBy { get; set; }
 }
 
+public class ItemMaster : IBranchScoped, IAuditable
+{
+    public string Id { get; set; } = "";
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
+    public string Name { get; set; } = "";
+    public string? Hsn { get; set; }
+    public string? DefaultPackageType { get; set; } = "Box";
+    public string? Unit { get; set; } = "Kg";
+    public string? Remarks { get; set; }
+    public string Status { get; set; } = "Active";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
 public class Driver : IBranchScoped, IAuditable
 {
     public string Id { get; set; } = "";
@@ -385,4 +403,18 @@ public class CompanySettings : ITenantScoped
     /// <summary>FirstLRThenBooking | FirstBookingThenLR</summary>
     public string DocumentFlow { get; set; } = "FirstBookingThenLR";
     public DateTime UpdatedAt { get; set; }
+}
+
+public class PrintTemplateConfiguration : ITenantScoped
+{
+    public int Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid? UserId { get; set; }
+    public string ModuleCode { get; set; } = "";
+    public string TemplateCode { get; set; } = "T1";
+    public bool IsActive { get; set; } = true;
+    public string? CreatedBy { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? ModifiedBy { get; set; }
+    public DateTime? ModifiedAt { get; set; }
 }

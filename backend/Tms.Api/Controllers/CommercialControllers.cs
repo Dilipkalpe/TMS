@@ -681,4 +681,93 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
         await db.SaveChangesAsync();
         return Ok(Map(inv));
     }
+
+    /// <summary>Record customer payment against a freight invoice (works for LR-linked bills too).</summary>
+    [HttpPost("{id:guid}/payments")]
+    public async Task<ActionResult<object>> RecordPayment(Guid id, [FromBody] Dictionary<string, object?> body)
+    {
+        var inv = await db.FreightInvoices.FindAsync(id);
+        if (inv == null || !TenantAccess.CanAccess(tenants, inv)) return NotFound();
+        if (inv.Status == "Cancelled")
+            return BadRequest(new ApiError("Cannot pay a cancelled invoice."));
+        if (inv.Balance <= 0)
+            return BadRequest(new ApiError("Invoice is already fully paid."));
+
+        var amount = ApiParseHelper.BodyDecimal(body, "amount");
+        if (amount <= 0)
+            return BadRequest(new ApiError("Payment amount must be greater than zero."));
+        if (amount > inv.Balance)
+            return BadRequest(new ApiError($"Payment exceeds invoice balance ({inv.Balance:N2})."));
+
+        var paymentDate = ApiParseHelper.BodyDate(body, "paymentDate", DateOnly.FromDateTime(DateTime.UtcNow));
+        string receiptNo;
+        try
+        {
+            var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, inv.BranchId);
+            receiptNo = await documentNumbers.NextAsync(
+                DocumentNumberTypes.Receipt, inv.CompanyId, branchId, paymentDate);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
+        // BookingId is required on BookingPayment — use linked booking, else a stable LR/invoice key.
+        var bookingKey = !string.IsNullOrWhiteSpace(inv.BookingId)
+            ? inv.BookingId
+            : !string.IsNullOrWhiteSpace(inv.LrNumber)
+                ? $"LR:{inv.LrNumber}"
+                : $"INV:{inv.InvoiceNo}";
+
+        var payment = new BookingPayment
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = inv.CompanyId,
+            BookingId = bookingKey,
+            FreightInvoiceId = inv.Id,
+            ReceiptNo = receiptNo,
+            PaymentDate = paymentDate,
+            Amount = amount,
+            PaymentMode = ApiParseHelper.BodyString(body, "paymentMode") ?? "Cash",
+            ReferenceNo = ApiParseHelper.BodyString(body, "referenceNo"),
+            Remarks = ApiParseHelper.BodyString(body, "remarks"),
+            CreatedAt = DateTime.UtcNow,
+        };
+        db.BookingPayments.Add(payment);
+
+        await BookingFinanceService.RecalculateFreightInvoiceStatusAsync(db, inv);
+
+        if (!string.IsNullOrWhiteSpace(inv.BookingId) && !inv.BookingId.StartsWith("LR:", StringComparison.Ordinal))
+        {
+            var booking = await TenantScope.FindBookingAsync(db, tenants, branches, inv.BookingId);
+            if (booking != null)
+            {
+                await BookingFinanceService.RecalculateBookingPaymentStatusAsync(db, booking);
+                await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(inv.CustomerId))
+        {
+            await BookingFinanceService.SyncCustomerOutstandingAsync(db, inv.CompanyId, inv.CustomerId);
+        }
+
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Payment recorded.",
+            receiptNo,
+            payment = new
+            {
+                id = payment.Id,
+                paymentDate = payment.PaymentDate.ToString("yyyy-MM-dd"),
+                amount = payment.Amount,
+                paymentMode = payment.PaymentMode,
+                referenceNo = payment.ReferenceNo,
+                remarks = payment.Remarks,
+                receiptNo = payment.ReceiptNo,
+            },
+            invoice = Map(inv),
+        });
+    }
 }

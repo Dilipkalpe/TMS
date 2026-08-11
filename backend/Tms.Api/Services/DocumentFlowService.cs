@@ -115,19 +115,10 @@ public class DocumentFlowService(TmsDbContext db, ITenantContext tenants, IBranc
     }
 
     /// <summary>
-    /// FirstBookingThenLR: LR must reference a booking.
-    /// FirstLRThenBooking: LR may be created independently (booking comes later).
+    /// Booking link is optional. Document flow preference is advisory for dashboards only.
     /// </summary>
-    public async Task EnsureCanCreateLrAsync(string? bookingId, CancellationToken ct = default)
-    {
-        var flow = await GetFlowAsync(ct);
-        if (flow == DocumentFlow.FirstBookingThenLR
-            && string.IsNullOrWhiteSpace(bookingId))
-        {
-            throw new InvalidOperationException(
-                "Company Document Flow is set to First Booking → Next LR. Create a Booking first, then generate the LR linked to that Booking.");
-        }
-    }
+    public Task EnsureCanCreateLrAsync(string? bookingId, CancellationToken ct = default) =>
+        Task.CompletedTask;
 
     /// <summary>
     /// FirstLRThenBooking: Booking must reference an existing unlinked LR.
@@ -156,15 +147,8 @@ public class DocumentFlowService(TmsDbContext db, ITenantContext tenants, IBranc
         }
     }
 
-    public async Task EnsureCanClearLrBookingLinkAsync(CancellationToken ct = default)
-    {
-        var flow = await GetFlowAsync(ct);
-        if (flow == DocumentFlow.FirstBookingThenLR)
-        {
-            throw new InvalidOperationException(
-                "Company Document Flow requires every LR to stay linked to a Booking. Clearing the booking link is not allowed.");
-        }
-    }
+    public Task EnsureCanClearLrBookingLinkAsync(CancellationToken ct = default) =>
+        Task.CompletedTask;
 
     /// <summary>
     /// Pending count for dashboards/reports:

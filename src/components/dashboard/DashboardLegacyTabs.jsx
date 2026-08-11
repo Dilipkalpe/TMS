@@ -116,7 +116,7 @@ export default function DashboardLegacyTabs({ refreshSeed = 0 }) {
       label: 'Branch Wise',
       content: (
         <div className="space-y-4 p-3">
-          <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} />
+          <ERPDataTable columns={branchColumns} data={overview.branchSummary} showActions={false} selectable={false} />
         </div>
       ),
     },
@@ -147,12 +147,12 @@ export default function DashboardLegacyTabs({ refreshSeed = 0 }) {
     {
       id: 'bookings',
       label: 'Recent Bookings',
-      content: <div className="p-3"><ERPDataTable columns={bookingColumns} data={overview.recentBookings} showActions={false} /></div>,
+      content: <div className="p-3"><ERPDataTable columns={bookingColumns} data={overview.recentBookings} showActions={false} selectable={false} /></div>,
     },
     {
       id: 'trips',
       label: 'Recent Trips',
-      content: <div className="p-3"><ERPDataTable columns={tripColumns} data={recentTrips} showActions={false} /></div>,
+      content: <div className="p-3"><ERPDataTable columns={tripColumns} data={recentTrips} showActions={false} selectable={false} /></div>,
     },
   ]
 

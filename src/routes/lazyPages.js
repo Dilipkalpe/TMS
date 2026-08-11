@@ -1,7 +1,7 @@
 import { lazy } from 'react'
 
-// Core TMS — code-split so login and shell load fast
-export const Dashboard = lazy(() => import('../pages/Dashboard'))
+// Dashboard loads eagerly (not lazy) for faster first paint after login
+export { default as Dashboard } from '../pages/Dashboard'
 export const BookingList = lazy(() => import('../pages/booking/BookingList'))
 export const NewBooking = lazy(() => import('../pages/booking/NewBooking'))
 export const BookingDetails = lazy(() => import('../pages/booking/BookingDetails'))
@@ -42,13 +42,23 @@ export const NewConsignor = lazy(() => import('../pages/consignors/NewConsignor'
 export const ConsigneeList = lazy(() => import('../pages/consignees/ConsigneeList'))
 export const ConsigneeDetails = lazy(() => import('../pages/consignees/ConsigneeDetails'))
 export const NewConsignee = lazy(() => import('../pages/consignees/NewConsignee'))
+export const ItemList = lazy(() => import('../pages/items/ItemList'))
+export const ItemDetails = lazy(() => import('../pages/items/ItemDetails'))
+export const NewItem = lazy(() => import('../pages/items/NewItem'))
+export const ExpensesHub = lazy(() => import('../pages/expenses/ExpensesHub'))
 export const ExpenseList = lazy(() => import('../pages/expenses/ExpenseList'))
 export const NewExpense = lazy(() => import('../pages/expenses/NewExpense'))
+export const SettingsHub = lazy(() => import('../pages/settings/SettingsHub'))
 export const Settings = lazy(() => import('../pages/settings/Settings'))
+export const DataCleanupPage = lazy(() => import('../pages/settings/DataCleanupPage'))
+export const MastersHub = lazy(() => import('../pages/masters/MastersHub'))
+export const ShipmentManagementHub = lazy(() => import('../pages/shipment/ShipmentManagementHub'))
+export const DeliveryManagementHub = lazy(() => import('../pages/delivery/DeliveryManagementHub'))
 export const BranchesPage = lazy(() => import('../pages/settings/BranchesPage'))
 export const PortalUsersPage = lazy(() => import('../pages/settings/PortalUsersPage'))
 export const UsersPage = lazy(() => import('../pages/settings/UsersPage'))
 export const DocumentNumberingPage = lazy(() => import('../pages/settings/DocumentNumberingPage'))
+export const PrintTemplateSettingsPage = lazy(() => import('../pages/settings/PrintTemplateSettingsPage'))
 export const NotificationSettings = lazy(() => import('../pages/settings/NotificationSettings'))
 
 // Portal
@@ -61,7 +71,6 @@ export const PortalInvoiceView = lazy(() => import('../pages/portal/PortalInvoic
 export const PortalPublicTrack = lazy(() => import('../pages/portal/PortalPublicTrack'))
 
 // Heavy modules — code-split to reduce initial bundle on low-resource VPS clients
-export const AdminHub = lazy(() => import('../pages/admin/AdminHub'))
 export const AccountingHub = lazy(() => import('../pages/accounting/AccountingHub'))
 export const ChartOfAccounts = lazy(() => import('../pages/accounting/ChartOfAccounts'))
 export const LedgerMaster = lazy(() => import('../pages/accounting/LedgerMaster'))
@@ -128,9 +137,18 @@ export const GeofenceAlertsPage = lazy(() => import('../pages/gps/GeofenceAlerts
 export const OperationsHub = lazy(() => import('../pages/operations/OperationsHub'))
 
 export const FuelPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.FuelPage })))
+export const DeliveryCompleteListPage = lazy(() => import('../pages/operations/DeliveryCompleteListPage'))
+export const TransitPassListPage = lazy(() => import('../pages/operations/TransitPassListPage'))
+export const LoadingSlipListPage = lazy(() => import('../pages/operations/LoadingSlipListPage'))
 export const LoadingSlipPage = lazy(() => import('../pages/operations/LoadingSlipPage'))
 export const TransitPassCreatePage = lazy(() => import('../pages/operations/TransitPassCreatePage'))
+export const DispatchListPage = lazy(() => import('../pages/operations/DispatchListPage'))
+export const DispatchPage = lazy(() => import('../pages/operations/DispatchPage'))
+export const InTransitListPage = lazy(() => import('../pages/operations/InTransitListPage'))
+export const InTransitPage = lazy(() => import('../pages/operations/InTransitPage'))
+export const PodListPage = lazy(() => import('../pages/operations/PodListPage'))
 export const PodEntryPage = lazy(() => import('../pages/operations/PodEntryPage'))
+export const BillingListPage = lazy(() => import('../pages/operations/BillingListPage'))
 export const CreateInvoicePage = lazy(() => import('../pages/operations/CreateInvoicePage'))
 export const TripExpensesEntryPage = lazy(() => import('../pages/operations/TripExpensesEntryPage'))
 export const DeliveryCompletePage = lazy(() => import('../pages/operations/DeliveryCompletePage'))

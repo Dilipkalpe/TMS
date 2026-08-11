@@ -1,10 +1,6 @@
-import ERPContentPage from '../../components/ui/ERPContentPage'
 import LrListPageContent from '../../components/lr/LrListPageContent'
 
+/** LR List — mockup layout with KPIs, filters, and workflow table. */
 export default function LrListPage() {
-  return (
-    <ERPContentPage module="LR" title="LR List" fillViewport>
-      <LrListPageContent />
-    </ERPContentPage>
-  )
+  return <LrListPageContent />
 }

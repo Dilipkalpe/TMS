@@ -1,65 +1,68 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import ERPContentPage from '../../components/ui/ERPContentPage'
-import Card, { CardHeader } from '../../components/ui/Card'
+import ERPPageTitle from '../../components/ui/ERPPageTitle'
 import Button from '../../components/ui/Button'
-import Input, { Select, Textarea } from '../../components/ui/Input'
-import LookupSelect from '../../components/ui/LookupSelect'
-import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
-import { lrApi, consignorsApi, consigneesApi } from '../../services/api'
-import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
-import { applyConsignorToLrForm, applyConsigneeToLrForm } from '../../utils/partyMasterLr'
-import { LR_BUSINESS_TYPES, LR_BUSINESS_TYPE_LABELS } from '../../constants/lrBusinessTypes'
-import { fromDocPath } from '../../utils/docPath'
-import { useToast } from '../../context/ToastContext'
-import { Save, ArrowLeft, Printer, Loader2, Workflow } from 'lucide-react'
-import { usePrint } from '../../context/PrintContext'
-import LRPrintFormat from '../../components/print/LRPrintFormat'
+import Card from '../../components/ui/Card'
+import LrEntryFormLayout, {
+  buildLrApiPayload,
+  emptyLrEntryForm,
+  formToPreviewLr,
+  mapLrDtoToEntryForm,
+} from '../../components/lr/LrEntryFormLayout'
+import LrEntryActionButtons from '../../components/lr/LrEntryActionButtons'
+import LrEntryFinancialSummary from '../../components/lr/entry/LrEntryFinancialSummary'
+import { computeLrFinancials } from '../../utils/lrEntryFinancials'
 import LrStatusFlow from '../../components/lr/LrStatusFlow'
-import { lrProcessPath } from '../../utils/docPath'
+import { consignorsApi, consigneesApi, lrApi } from '../../services/api'
+import { useToast } from '../../context/ToastContext'
+import { usePrint } from '../../context/PrintContext'
+import { printModuleDocument } from '../../services/printService'
+import { PRINT_MODULE_CODES } from '../../config/printModules'
+import { fromDocPath, lrProcessPath } from '../../utils/docPath'
+import FormValidationPopup from '../../components/ui/FormValidationPopup'
+import { scrollToFirstFieldError, focusFirstFieldError } from '../../utils/formValidationFocus'
+import { syncLrRouteFields } from '../../utils/partyMasterLr'
+import { useKeyboardPageActions, useAutoFocus } from '../../hooks/useKeyboardPageActions'
+import { ArrowLeft, Loader2, Workflow } from 'lucide-react'
 
-const PAYMENT_TYPES = ['To Pay', 'Paid', 'TBB', 'To Be Billed']
-
-function mapLrToForm(lr) {
-  return {
-    lrNumber: lr.lrNumber,
-    lrDate: lr.lrDate,
-    consignorId: lr.consignorId ?? '',
-    consigneeId: lr.consigneeId ?? '',
-    consignor: lr.consignor ?? '',
-    consignee: lr.consignee ?? '',
-    consignorContact: '',
-    consignorPhone: '',
-    consignorGst: '',
-    consignorAddress: '',
-    consigneeContact: '',
-    consigneePhone: '',
-    consigneeGst: '',
-    consigneeAddress: '',
-    from: lr.from ?? '',
-    to: lr.to ?? '',
-    vehicle: lr.vehicle ?? '',
-    driver: lr.driver ?? '',
-    material: lr.material ?? '',
-    quantity: lr.quantity ?? '',
-    freight: lr.freight ?? 0,
-    gst: lr.gst ?? 0,
-    hamali: lr.hamali ?? 0,
-    loadingCharges: lr.loadingCharges ?? 0,
-    unloadingCharges: lr.unloadingCharges ?? 0,
-    insurance: lr.insurance ?? 0,
-    advance: lr.advance ?? 0,
-    balance: lr.balance ?? 0,
-    paymentType: lr.paymentType ?? 'To Pay',
-    businessType: lr.businessType ?? 'FTL',
-    remarks: lr.remarks ?? '',
-  }
+function buildFieldErrors(form) {
+  const errors = {}
+  if (!form.lrDate?.trim()) errors.lrDate = 'LR Date is required.'
+  if (!form.consignorId && !form.consignor?.trim()) errors.consignor = 'Please select Consignor.'
+  if (!form.consigneeId && !form.consignee?.trim()) errors.consignee = 'Please select Consignee.'
+  if (!form.from?.trim() && !form.pickupCity?.trim()) errors.from = 'Pickup city is required.'
+  if (!form.to?.trim()) errors.to = 'Delivery city is required.'
+  return errors
 }
 
-function calcBalance(next) {
-  const total = Number(next.freight) + Number(next.gst) + Number(next.hamali)
-    + Number(next.loadingCharges) + Number(next.unloadingCharges) + Number(next.insurance)
-  return total - Number(next.advance)
+async function hydratePartyContacts(form) {
+  const next = { ...form }
+  if (form.consignorId) {
+    try {
+      const c = await consignorsApi.get(form.consignorId)
+      Object.assign(next, {
+        consignorContact: c.contact ?? next.consignorContact ?? '',
+        consignorPhone: c.phone ?? next.consignorPhone ?? '',
+        consignorGst: c.gst ?? next.consignorGst ?? '',
+        consignorAddress: c.address ?? next.consignorAddress ?? '',
+      })
+    } catch { /* legacy LR without master row */ }
+  }
+  if (form.consigneeId) {
+    try {
+      const c = await consigneesApi.get(form.consigneeId)
+      Object.assign(next, {
+        consigneeContact: c.contact ?? next.consigneeContact ?? '',
+        consigneePhone: c.phone ?? next.consigneePhone ?? '',
+        consigneeGst: c.gst ?? next.consigneeGst ?? '',
+        consigneeAddress: c.address ?? next.consigneeAddress ?? '',
+      })
+    } catch { /* legacy */ }
+  }
+  if (!next.billingParty) {
+    next.billingParty = next.customerName || next.consignor || ''
+  }
+  return next
 }
 
 export default function EditLR() {
@@ -68,177 +71,246 @@ export default function EditLR() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { company, print } = usePrint()
+
   const [form, setForm] = useState(null)
+  const [snapshot, setSnapshot] = useState(null)
   const [lrStatus, setLrStatus] = useState('LR Created')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [validationOpen, setValidationOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const formActionsRef = useRef(null)
+  const formRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setLoadError(null)
+    setForm(null)
+    setSnapshot(null)
+
     lrApi.get(lrNumber)
       .then(async (lr) => {
         if (cancelled) return
-        const base = mapLrToForm(lr)
-        if (lr.consignorId) {
-          try {
-            const c = await consignorsApi.get(lr.consignorId)
-            Object.assign(base, {
-              consignorContact: c.contact ?? '',
-              consignorPhone: c.phone ?? '',
-              consignorGst: c.gst ?? '',
-              consignorAddress: c.address ?? '',
-            })
-          } catch { /* legacy LR without master row */ }
-        }
-        if (lr.consigneeId) {
-          try {
-            const c = await consigneesApi.get(lr.consigneeId)
-            Object.assign(base, {
-              consigneeContact: c.contact ?? '',
-              consigneePhone: c.phone ?? '',
-              consigneeGst: c.gst ?? '',
-              consigneeAddress: c.address ?? '',
-            })
-          } catch { /* legacy */ }
-        }
-        setForm(base)
+        const mapped = await hydratePartyContacts(mapLrDtoToEntryForm(lr))
+        setForm(mapped)
+        setSnapshot(mapped)
         setLrStatus(lr.status || 'LR Created')
       })
       .catch((err) => {
-        if (!cancelled) toast({ title: 'Load failed', message: err.message, type: 'error' })
+        if (!cancelled) {
+          setLoadError(err.message || 'Failed to load LR')
+          toast({ title: 'Load failed', message: err.message, type: 'error' })
+        }
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
     return () => { cancelled = true }
   }, [lrNumber, toast])
 
-  const update = (field, value) => {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value }
-      next.balance = calcBalance(next)
+  useEffect(() => {
+    if (validationOpen && Object.keys(fieldErrors).length === 0) {
+      setValidationOpen(false)
+    }
+  }, [fieldErrors, validationOpen])
+
+  const clearFieldErrors = useCallback((keys) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      keys.forEach((key) => { delete next[key] })
       return next
     })
-  }
+  }, [])
 
-  const handleSave = async () => {
-    if (!form.consignorId && !form.consignor?.trim()) {
-      toast({ title: 'Validation', message: 'Consignor is required.', type: 'warning' })
-      return
+  const update = useCallback((field, value) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      if (field === 'from' || field === 'pickupCity') delete next.from
+      else if (field === 'to') delete next.to
+      else if (prev[field]) delete next[field]
+      return next
+    })
+    setForm((prev) => {
+      if (!prev) return prev
+      let next = { ...prev, [field]: value }
+      if (field === 'from' || field === 'pickupCity') {
+        next = { ...next, from: value, pickupCity: value }
+      }
+      const total = Number(next.freight) + Number(next.gst) + Number(next.hamali)
+        + Number(next.loadingCharges) + Number(next.unloadingCharges) + Number(next.insurance)
+        + Number(next.otherCharges || 0)
+      next.balance = total - Number(next.advance)
+      return next
+    })
+  }, [])
+
+  const validate = useCallback(() => {
+    const synced = syncLrRouteFields(form)
+    if (synced.from !== form.from || synced.pickupCity !== form.pickupCity || synced.to !== form.to) {
+      setForm(synced)
     }
-    if (!form.consigneeId && !form.consignee?.trim()) {
-      toast({ title: 'Validation', message: 'Consignee is required.', type: 'warning' })
-      return
+    const errors = buildFieldErrors(synced)
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      scrollToFirstFieldError(errors)
+      setValidationOpen(true)
+      return { ok: false, synced }
     }
-    if (!form.from?.trim() || !form.to?.trim()) {
-      toast({ title: 'Validation', message: 'From and To locations are required.', type: 'warning' })
-      return
-    }
+    setValidationOpen(false)
+    return { ok: true, synced }
+  }, [form])
+
+  const handleSave = useCallback(async (andPrint = false) => {
+    const { ok, synced } = validate()
+    if (!ok) return
     setSaving(true)
     try {
-      await lrApi.update(lrNumber, form)
+      await lrApi.update(lrNumber, buildLrApiPayload(synced))
       toast({ title: 'LR updated', message: `${lrNumber} saved successfully.`, type: 'success' })
-      navigate('/lr')
+      if (andPrint) {
+        const lr = await lrApi.get(lrNumber)
+        await printModuleDocument({
+          moduleCode: PRINT_MODULE_CODES.LR_LIST,
+          company,
+          print,
+          documentData: { lr },
+        })
+      }
+      navigate('/lr/list')
     } catch (err) {
+      setValidationOpen(false)
       toast({ title: 'Update failed', message: err.message, type: 'error' })
     } finally {
       setSaving(false)
     }
-  }
+  }, [validate, lrNumber, company, navigate, print, toast])
 
-  const handlePrint = () => {
-    print(<LRPrintFormat lr={form} company={company} />)
-  }
+  const handlePreview = useCallback(() => {
+    if (!form) return
+    printModuleDocument({
+      moduleCode: PRINT_MODULE_CODES.LR_LIST,
+      company,
+      print,
+      documentData: { lr: formToPreviewLr(form) },
+    })
+  }, [form, company, print])
 
-  if (loading || !form) {
+  const handleClear = useCallback(() => {
+    if (snapshot) {
+      setForm({
+        ...snapshot,
+        items: (snapshot.items?.length ? snapshot.items : emptyLrEntryForm().items).map((item) => ({ ...item })),
+      })
+    }
+    setFieldErrors({})
+    setValidationOpen(false)
+  }, [snapshot])
+
+  const handleCancel = useCallback(() => navigate('/lr/list'), [navigate])
+
+  useAutoFocus(formRef)
+  useKeyboardPageActions({
+    onSave: () => handleSave(false),
+    onPrint: () => handleSave(true),
+    onCancel: handleCancel,
+    onNew: handleClear,
+    onAddRow: () => formActionsRef.current?.addItem?.(),
+    onSearch: () => {
+      document.getElementById('lr-section-parties')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    },
+  }, [handleSave, handleCancel, handleClear])
+
+  const financials = useMemo(() => (form ? computeLrFinancials(form) : null), [form])
+
+  if (loading) {
     return (
-      <ERPContentPage module="LR Management" title="Edit LR">
-        <p className="text-sm text-slate-500">Loading LR…</p>
-      </ERPContentPage>
+      <div className="lr-entry-page flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4">
+        <ERPPageTitle module="LR" title={`Edit LR ${lrNumber}`} />
+        <p className="flex items-center gap-2 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading LR…
+        </p>
+      </div>
+    )
+  }
+
+  if (loadError || !form) {
+    return (
+      <div className="lr-entry-page flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4">
+        <ERPPageTitle module="LR" title={`Edit LR ${lrNumber}`} />
+        <p className="mb-3 text-sm text-red-600">{loadError || 'LR not found.'}</p>
+        <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/lr/list')}>
+          Back to LR list
+        </Button>
+      </div>
     )
   }
 
   return (
-    <ERPContentPage module="LR Management" title={`Edit LR ${lrNumber}`}>
-      <Card className="mb-4 p-4">
-        <LrStatusFlow currentStatus={lrStatus} layout="horizontal" />
-        <div className="mt-3 flex justify-end">
-          <Button variant="outline" icon={Workflow} onClick={() => navigate(lrProcessPath(lrNumber))}>
-            Open full process flow
-          </Button>
-        </div>
-      </Card>
-      <Card className="mb-4">
-        <CardHeader title="Consignor (From)" />
-        <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
-          <PartyMasterSelect
-            label="Consignor"
-            api={consignorsApi}
-            valueId={form.consignorId}
-            displayValue={form.consignor}
-            onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row), balance: calcBalance({ ...prev, ...applyConsignorToLrForm(row) }) }))}
+    <div className="lr-entry-page flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <ERPPageTitle
+        module="LR"
+        title={`Edit LR ${lrNumber}`}
+        breadcrumb={[
+          { label: 'Home', path: '/' },
+          { label: 'LR', path: '/lr/list' },
+          { label: lrNumber },
+          { label: 'Edit' },
+        ]}
+      />
+
+      <div ref={formRef} data-kbd-form-root className="lr-entry-v2-page flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="lr-entry-v2-scroll min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
+          <Card className="mb-3 p-3">
+            <LrStatusFlow currentStatus={lrStatus} layout="horizontal" />
+            <div className="mt-2 flex justify-end">
+              <Button variant="outline" size="sm" icon={Workflow} onClick={() => navigate(lrProcessPath(lrNumber))}>
+                Open full process flow
+              </Button>
+            </div>
+          </Card>
+
+          <LrEntryFormLayout
+            form={form}
+            setForm={setForm}
+            update={update}
+            fieldErrors={fieldErrors}
+            formActionsRef={formActionsRef}
+            onClearFieldErrors={clearFieldErrors}
           />
-          <Input label="Contact Person" value={form.consignorContact} onChange={(e) => update('consignorContact', e.target.value)} />
-          <Input label="Mobile" value={form.consignorPhone} onChange={(e) => update('consignorPhone', e.target.value)} />
-          <Input label="GST No." value={form.consignorGst} onChange={(e) => update('consignorGst', e.target.value)} />
-          <Input label="From Location" value={form.from} onChange={(e) => update('from', e.target.value)} />
-          <div className="sm:col-span-2 lg:col-span-3">
-            <Input label="Address" value={form.consignorAddress} onChange={(e) => update('consignorAddress', e.target.value)} />
-          </div>
         </div>
-      </Card>
-      <Card className="mb-4">
-        <CardHeader title="Consignee (To)" />
-        <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
-          <PartyMasterSelect
-            label="Consignee"
-            api={consigneesApi}
-            valueId={form.consigneeId}
-            displayValue={form.consignee}
-            onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row), balance: calcBalance({ ...prev, ...applyConsigneeToLrForm(row) }) }))}
+
+        <footer className="lr-entry-v2-footer shrink-0 border-t border-slate-200 bg-white px-2 py-1.5 sm:px-3 dark:border-slate-700 dark:bg-slate-900">
+          <LrEntryActionButtons
+            saving={saving}
+            onClear={handleClear}
+            onCancel={handleCancel}
+            onPreview={handlePreview}
+            onSave={() => handleSave(false)}
+            onSavePrint={() => handleSave(true)}
+            financialSummary={financials ? (
+              <LrEntryFinancialSummary
+                subTotal={financials.subTotal}
+                taxable={financials.taxable}
+                gstAmount={financials.gstAmount}
+                totalAmount={financials.totalAmount}
+                balance={financials.balance}
+              />
+            ) : null}
           />
-          <Input label="Contact Person" value={form.consigneeContact} onChange={(e) => update('consigneeContact', e.target.value)} />
-          <Input label="Mobile" value={form.consigneePhone} onChange={(e) => update('consigneePhone', e.target.value)} />
-          <Input label="GST No." value={form.consigneeGst} onChange={(e) => update('consigneeGst', e.target.value)} />
-          <Input label="To Location" value={form.to} onChange={(e) => update('to', e.target.value)} />
-          <div className="sm:col-span-2 lg:col-span-3">
-            <Input label="Address" value={form.consigneeAddress} onChange={(e) => update('consigneeAddress', e.target.value)} />
-          </div>
-        </div>
-      </Card>
-      <Card>
-        <CardHeader title="LR Details" subtitle="Shipment, charges, and payment" />
-        <div className="grid gap-4 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
-          <Input label="LR Number" value={form.lrNumber} readOnly />
-          <Input label="LR Date" type="date" value={form.lrDate} onChange={(e) => update('lrDate', e.target.value)} />
-          <LookupSelect label="Vehicle" type="vehicles" value={form.vehicle} onChange={(v) => update('vehicle', v)} placeholder="Search vehicle…" />
-          <DriverLookupSelect label="Driver" value={form.driver} onChange={(v) => update('driver', v)} />
-          <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />
-          <Input label="Quantity" value={form.quantity} onChange={(e) => update('quantity', e.target.value)} />
-          <Input label="Freight (₹)" type="number" value={form.freight} onChange={(e) => update('freight', e.target.value)} />
-          <Input label="GST (₹)" type="number" value={form.gst} onChange={(e) => update('gst', e.target.value)} />
-          <Input label="Hamali (₹)" type="number" value={form.hamali} onChange={(e) => update('hamali', e.target.value)} />
-          <Input label="Loading Charges (₹)" type="number" value={form.loadingCharges} onChange={(e) => update('loadingCharges', e.target.value)} />
-          <Input label="Unloading Charges (₹)" type="number" value={form.unloadingCharges} onChange={(e) => update('unloadingCharges', e.target.value)} />
-          <Input label="Insurance (₹)" type="number" value={form.insurance} onChange={(e) => update('insurance', e.target.value)} />
-          <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => update('advance', e.target.value)} />
-          <Input label="Balance (₹)" type="number" value={form.balance} readOnly />
-          <Select label="Payment Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
-          <Select
-            label="Business Type"
-            options={LR_BUSINESS_TYPES.map((t) => ({ value: t, label: LR_BUSINESS_TYPE_LABELS[t] }))}
-            value={form.businessType}
-            onChange={(e) => update('businessType', e.target.value)}
-          />
-          <div className="sm:col-span-2 lg:col-span-3">
-            <Textarea label="Remarks" value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />
-          </div>
-        </div>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <Button icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Update LR'}</Button>
-          <Button variant="outline" icon={Workflow} onClick={() => navigate(lrProcessPath(lrNumber))}>Process Flow</Button>
-          <Button variant="outline" icon={Printer} onClick={handlePrint}>Print LR</Button>
-          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/lr')}>Cancel</Button>
-        </div>
-      </Card>
-    </ERPContentPage>
+        </footer>
+      </div>
+
+      <FormValidationPopup
+        open={validationOpen}
+        errors={fieldErrors}
+        onClose={() => {
+          setValidationOpen(false)
+          focusFirstFieldError(fieldErrors)
+        }}
+      />
+    </div>
   )
 }

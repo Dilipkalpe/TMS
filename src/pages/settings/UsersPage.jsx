@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input, { Select } from '../../components/ui/Input'
 import Badge, { statusVariant } from '../../components/ui/Badge'
+import ERPDataTable from '../../components/ui/ERPDataTable'
 import { branchesApi, usersApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
-import { Pencil, Trash2, UserPlus } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
 
 const ROLES = ['Admin', 'Branch Manager', 'Accountant', 'Operator']
 
@@ -131,6 +132,23 @@ export default function UsersPage() {
     }
   }
 
+  const columns = useMemo(() => [
+    { key: 'username', label: 'User' },
+    { key: 'fullName', label: 'Display Name', maxWidth: 'max-w-[10rem]' },
+    { key: 'role', label: 'Role' },
+    {
+      key: 'branches',
+      label: 'Branches',
+      maxWidth: 'max-w-[12rem]',
+      render: (u) => (u.branchNames || []).join(', ') || '—',
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (u) => <Badge variant={statusVariant(u.isActive ? 'Active' : 'Cancelled')}>{u.isActive ? 'Active' : 'Inactive'}</Badge>,
+    },
+  ], [])
+
   return (
     <ERPContentPage module="Settings" title="User Management">
       <p className="mb-4 text-sm text-slate-500">
@@ -189,40 +207,15 @@ export default function UsersPage() {
           {loading ? (
             <p className="p-4 text-sm text-slate-500">Loading…</p>
           ) : (
-            <table className="w-max min-w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900">
-                <tr>
-                  <th className="whitespace-nowrap px-3 py-2 text-left">User</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-left">Display Name</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-left">Role</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-left">Branches</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-left">Status</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((u) => (
-                  <tr key={u.id} className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="whitespace-nowrap px-3 py-2">{u.username}</td>
-                    <td className="max-w-[10rem] truncate px-3 py-2" title={u.fullName}>{u.fullName}</td>
-                    <td className="whitespace-nowrap px-3 py-2">{u.role}</td>
-                    <td className="max-w-[12rem] truncate px-3 py-2" title={(u.branchNames || []).join(', ')}>
-                      {(u.branchNames || []).join(', ') || '—'}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      <Badge variant={statusVariant(u.isActive ? 'Active' : 'Cancelled')}>{u.isActive ? 'Active' : 'Inactive'}</Badge>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right">
-                      <button type="button" className="mr-2 text-primary" onClick={() => edit(u)} title="Edit"><Pencil className="inline h-4 w-4" /></button>
-                      <button type="button" className="text-red-500" onClick={() => remove(u.id)} title="Delete"><Trash2 className="inline h-4 w-4" /></button>
-                    </td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">No users yet</td></tr>
-                )}
-              </tbody>
-            </table>
+            <ERPDataTable
+              columns={columns}
+              data={rows}
+              selectable
+              onEdit={edit}
+              onDelete={(u) => remove(u.id)}
+              getRowKey={(row) => row.id}
+              emptyMessage="No users yet"
+            />
           )}
         </Card>
       </div>

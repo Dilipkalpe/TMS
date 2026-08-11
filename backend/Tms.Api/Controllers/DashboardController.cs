@@ -24,7 +24,7 @@ public class DashboardController(
 {
     Guid CompanyId => TenantScope.ResolveCompanyId(tenants);
     Guid? BranchId => branches.EffectiveBranchId;
-    static readonly TimeSpan DashboardCacheTtl = TimeSpan.FromSeconds(45);
+    static readonly TimeSpan DashboardCacheTtl = TimeSpan.FromSeconds(120);
 
     [HttpGet("overview")]
     public async Task<ActionResult<DashboardOverviewDto>> Overview(CancellationToken ct)
@@ -35,11 +35,53 @@ public class DashboardController(
     }
 
     [HttpGet("home")]
-    public async Task<ActionResult<DashboardHomeDto>> Home(CancellationToken ct)
+    public async Task<ActionResult<DashboardHomeDto>> Home(
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
+        [FromQuery] bool allTime = false,
+        CancellationToken ct = default)
     {
-        var key = TenantCacheService.DashboardKey("home", CompanyId, BranchId);
-        var data = await cache.GetOrCreateAsync(key, () => homeService.BuildAsync(ct), DashboardCacheTtl);
-        return Ok(data);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Default to last 30 days — full-history scans block the UI for large tenants.
+        DateOnly from = dateFrom ?? today.AddDays(-29);
+        DateOnly to = dateTo ?? today;
+
+        if (allTime && !dateFrom.HasValue && !dateTo.HasValue)
+        {
+            // Resolve earliest LR inside the cache factory so cold scans are not repeated every request.
+            var keyAll = TenantCacheService.DashboardKey("home-all", CompanyId, BranchId);
+            try
+            {
+                var allData = await cache.GetOrCreateAsync(keyAll, async () =>
+                {
+                    var minLrDate = await TenantScope.LorryReceipts(db, tenants, branches)
+                        .MinAsync(l => (DateOnly?)l.LrDate, ct);
+                    var rangeFrom = minLrDate ?? today.AddYears(-1);
+                    return await homeService.BuildAsync(rangeFrom, today, ct);
+                }, DashboardCacheTtl);
+                return Ok(allData);
+            }
+            catch (Exception ex)
+            {
+                var message = ex.InnerException?.Message ?? ex.Message;
+                return StatusCode(500, new ApiError($"Dashboard load failed: {message}"));
+            }
+        }
+
+        if (from > to)
+            return BadRequest(new ApiError("dateFrom must be on or before dateTo."));
+
+        try
+        {
+            var key = TenantCacheService.DashboardKey("home", CompanyId, BranchId, from, to);
+            var data = await cache.GetOrCreateAsync(key, () => homeService.BuildAsync(from, to, ct), DashboardCacheTtl);
+            return Ok(data);
+        }
+        catch (Exception ex)
+        {
+            var message = ex.InnerException?.Message ?? ex.Message;
+            return StatusCode(500, new ApiError($"Dashboard load failed: {message}"));
+        }
     }
 
     [HttpGet("stats")]
@@ -118,10 +160,15 @@ public class DashboardController(
             l.FromCity, l.ToCity, $"₹{l.Freight:N0}")));
     }
 
-    async Task<ActionResult<object>> CachedChart(string chart, Func<Task<object>> loader)
+    async Task<ActionResult<object>> CachedChart(string chart, Func<Task<object>> efLoader)
     {
         var key = TenantCacheService.DashboardKey($"chart:{chart}", CompanyId, BranchId);
-        return Ok(await cache.GetOrCreateAsync(key, loader, DashboardCacheTtl));
+        var data = await cache.GetOrCreateAsync(key, async () =>
+        {
+            var fromSp = await dashboardRead.TryGetChartAsync(CompanyId, BranchId, chart);
+            return fromSp ?? await efLoader();
+        }, DashboardCacheTtl);
+        return Ok(data);
     }
 
     [HttpGet("charts/monthly-revenue")]
@@ -365,20 +412,7 @@ public class DashboardController(
             });
         }
 
-        var predictions = await maintenance.ComputePredictionsAsync();
-        foreach (var p in predictions.Where(p => p.RiskLevel == "HIGH").Take(5))
-        {
-            alerts.Add(new
-            {
-                id = $"risk-{p.VehicleId}",
-                type = "error",
-                title = "High breakdown risk",
-                message = $"{p.RegistrationNo} · risk score {p.RiskScore}",
-                path = "/maintenance?tab=overview",
-                time = DateTime.UtcNow.ToString("yyyy-MM-dd"),
-            });
-        }
-
+        // Skip ComputePredictionsAsync here — it is expensive and delayed the whole alerts payload.
         var lowStockParts = await tenants.Filter(db.SpareParts.AsQueryable())
             .Where(p => p.StockQty <= p.MinStock).OrderBy(p => p.StockQty).Take(5).ToListAsync();
         foreach (var p in lowStockParts)

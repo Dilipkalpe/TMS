@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS branches (
     is_head_office  BOOLEAN NOT NULL DEFAULT FALSE,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by      VARCHAR(200),
+    updated_by      VARCHAR(200)
 );
 
 -- Upgrade legacy/partial branches tables
@@ -25,6 +27,8 @@ ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_head_office BOOLEAN NOT NULL DE
 ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE branches ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS created_by VARCHAR(200);
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_by VARCHAR(200);
 
 -- Legacy installs: branches may exist without PRIMARY KEY on id (blocks REFERENCES branches(id))
 ALTER TABLE branches ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid();

@@ -459,6 +459,84 @@ public class ConsigneesController(TmsDbContext db, ITenantContext tenants, IBran
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+public class ItemsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
+{
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<ItemMasterDto>>> GetAll(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
+    {
+        var q = tenants.Filter(branches.Filter(db.Items.AsNoTracking().Include(i => i.Branch)));
+        if (!string.IsNullOrWhiteSpace(status) && !string.Equals(status, "(All)", StringComparison.OrdinalIgnoreCase))
+            q = q.Where(i => i.Status == status);
+        q = SearchHelper.Filter(q, search);
+        q = q.OrderBy(i => i.Name);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        return Ok(new PagedResult<ItemMasterDto>(
+            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+    }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<ItemMasterDto>> Get(string id)
+    {
+        var item = await db.Items.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
+        if (item == null || !TenantScope.CanAccessBranchEntity(tenants, branches, item)) return NotFound();
+        return Ok(EntityMappers.ToDto(item));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<ItemMasterDto>> Create([FromBody] Dictionary<string, object?> body)
+    {
+        var name = ApiParseHelper.BodyString(body, "name");
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest(new ApiError("Item name is required."));
+
+        var id = await IdGenerator.NextItemId(db);
+        var item = new ItemMaster
+        {
+            Id = id,
+            Name = name,
+            Status = ApiParseHelper.BodyString(body, "status") ?? "Active",
+            CompanyId = TenantScope.ResolveCompanyId(tenants),
+            BranchId = branches.AssignBranchId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        ItemMasterHelper.ApplyBody(item, body);
+        db.Items.Add(item);
+        await db.SaveChangesAsync();
+        return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(item));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<ActionResult<ItemMasterDto>> Update(string id, [FromBody] Dictionary<string, object?> body)
+    {
+        var item = await db.Items.FindAsync(id);
+        if (item == null || !TenantScope.CanAccessBranchEntity(tenants, branches, item)) return NotFound();
+        ItemMasterHelper.ApplyBody(item, body);
+        item.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(EntityMappers.ToDto(item));
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var item = await db.Items.FindAsync(id);
+        if (item == null || !TenantScope.CanAccessBranchEntity(tenants, branches, item)) return NotFound();
+        db.Items.Remove(item);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+}
+
+[Authorize]
+[ApiController]
+[Route("api/[controller]")]
 public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
 {
     [HttpGet]
@@ -865,14 +943,6 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             : consigneeText!.Trim();
 
         var bookingId = ApiParseHelper.BodyString(body, "bookingId");
-        try
-        {
-            await documentFlow.EnsureCanCreateLrAsync(bookingId);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ApiError(ex.Message));
-        }
 
         Booking? booking = null;
         if (!string.IsNullOrEmpty(bookingId))
@@ -974,14 +1044,6 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             var newBookingId = ApiParseHelper.BodyString(body, "bookingId");
             if (string.IsNullOrEmpty(newBookingId))
             {
-                try
-                {
-                    await documentFlow.EnsureCanClearLrBookingLinkAsync();
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return BadRequest(new ApiError(ex.Message));
-                }
                 lr.BookingId = null;
             }
             else

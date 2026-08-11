@@ -9,6 +9,7 @@ import {
   Upload,
 } from 'lucide-react'
 import Button from './Button'
+import { Select } from './Input'
 
 export default function ERPListToolbar({
   addLabel = 'Add New Record',
@@ -44,9 +45,9 @@ export default function ERPListToolbar({
   ) : null
 
   return (
-    <div className="shrink-0 space-y-2 border-x border-primary/20 bg-white px-2 py-2 sm:px-3 sm:py-3 dark:bg-slate-900">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+    <div className="erp-list-toolbar shrink-0 space-y-1.5 border-x border-primary/20 bg-white px-2 py-1.5 sm:px-3 sm:py-2 dark:bg-slate-900">
+      <div className="flex flex-col gap-1.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-1.5">
           {addPosition === 'start' && addButton}
           {addPosition === 'start' && secondaryAddButton}
           <div className="relative min-w-0 flex-1 sm:max-w-xs">
@@ -56,20 +57,18 @@ export default function ERPListToolbar({
               value={searchValue}
               onChange={(e) => onSearchChange?.(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full rounded-lg border border-primary/30 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-lg border border-primary/30 bg-white py-1.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
           {filterOptions.length > 0 && (
             <div className="w-full min-w-[120px] sm:w-36">
-              <select
+              <Select
+                label={false}
+                options={filterOptions}
                 value={filterValue ?? filterOptions[0]}
                 onChange={(e) => onFilterChange?.(e.target.value)}
-                className="w-full rounded-lg border border-primary/30 bg-white px-3 py-2 text-sm outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              >
-                {filterOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
+                placeholder="Filter…"
+              />
             </div>
           )}
         </div>

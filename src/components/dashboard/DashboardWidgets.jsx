@@ -74,12 +74,12 @@ export function DashboardQuickActions() {
   const actions = [
     { label: 'New LR', shortcut: 'F2', path: '/lr/entry', icon: 'FilePlus', color: 'bg-blue-600 hover:bg-blue-700' },
     { label: 'New Booking', shortcut: 'F6', path: '/bookings/new', icon: 'CalendarPlus', color: 'bg-violet-600 hover:bg-violet-700' },
-    { label: 'Loading Slip', shortcut: 'F7', path: '/lr?status=loading-pending', icon: 'ClipboardList', color: 'bg-amber-600 hover:bg-amber-700' },
-    { label: 'Delivery / POD', shortcut: 'F8', path: '/lr?status=delivered', icon: 'PackageCheck', color: 'bg-emerald-600 hover:bg-emerald-700' },
-    { label: 'Trip Expenses', shortcut: 'F10', path: '/lr?status=expense-pending', icon: 'Wallet', color: 'bg-orange-600 hover:bg-orange-700' },
+    { label: 'Loading Slip', shortcut: 'F7', path: '/operations/loading-slip', icon: 'ClipboardList', color: 'bg-amber-600 hover:bg-amber-700' },
+    { label: 'Delivery', shortcut: 'F8', path: '/operations/delivery-complete', icon: 'PackageCheck', color: 'bg-emerald-600 hover:bg-emerald-700' },
+    { label: 'POD', shortcut: '', path: '/operations/delivery/pod', icon: 'Upload', color: 'bg-cyan-600 hover:bg-cyan-700' },
+    { label: 'Billing', shortcut: 'F10', path: '/operations/billing/invoice', icon: 'Receipt', color: 'bg-orange-600 hover:bg-orange-700' },
     { label: 'Reports', shortcut: 'F11', path: '/reports', icon: 'BarChart3', color: 'bg-indigo-600 hover:bg-indigo-700' },
-    { label: 'Vehicle Master', shortcut: 'F12', path: '/vehicles', icon: 'Truck', color: 'bg-slate-700 hover:bg-slate-800' },
-    { label: 'Customer Master', shortcut: '', path: '/customers', icon: 'Users', color: 'bg-teal-600 hover:bg-teal-700' },
+    { label: 'Customers', shortcut: 'F12', path: '/customers', icon: 'Users', color: 'bg-teal-600 hover:bg-teal-700' },
   ]
 
   return (

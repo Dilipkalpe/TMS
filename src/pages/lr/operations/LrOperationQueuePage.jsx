@@ -24,6 +24,28 @@ export default function LrOperationQueuePage({ stage }) {
   )
 
   const columns = useMemo(() => [
+    {
+      key: 'action',
+      label: 'Next action',
+      render: (r) => (
+        <Button
+          size="sm"
+          icon={ArrowRight}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (stage === 'lr-management' && r.status === 'Draft') {
+              navigate(lrEditPath(r.lrNumber))
+            } else if (r.processStep) {
+              navigate(lrProcessPath(r.lrNumber, r.processStep))
+            } else {
+              navigate(lrEditPath(r.lrNumber))
+            }
+          }}
+        >
+          {r.nextAction || menu?.description || 'Continue'}
+        </Button>
+      ),
+    },
     { key: 'lrNumber', label: 'LR No.' },
     { key: 'lrDate', label: 'Date' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
@@ -48,28 +70,6 @@ export default function LrOperationQueuePage({ stage }) {
       },
     },
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
-    {
-      key: 'action',
-      label: 'Next action',
-      render: (r) => (
-        <Button
-          size="sm"
-          icon={ArrowRight}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (stage === 'lr-management' && r.status === 'Draft') {
-              navigate(lrEditPath(r.lrNumber))
-            } else if (r.processStep) {
-              navigate(lrProcessPath(r.lrNumber, r.processStep))
-            } else {
-              navigate(lrEditPath(r.lrNumber))
-            }
-          }}
-        >
-          {r.nextAction || menu?.description || 'Continue'}
-        </Button>
-      ),
-    },
   ], [navigate, stage, menu])
 
   const toolbarExtra = stage === 'lr-management' ? (

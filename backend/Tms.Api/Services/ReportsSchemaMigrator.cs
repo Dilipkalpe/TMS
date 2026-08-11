@@ -11,6 +11,8 @@ public static class ReportsSchemaMigrator
     [
         "database/reports/report_indexes.sql",
         "database/reports/sp_dashboard_stats.sql",
+        "database/reports/sp_dashboard_home.sql",
+        "database/reports/sp_dashboard_charts.sql",
         "database/reports/sp_accounting_customer_ledger.sql",
         "database/reports/sp_accounting_ledger_report.sql",
         "database/reports/sp_accounting_registers.sql",

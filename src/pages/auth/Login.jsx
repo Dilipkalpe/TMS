@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import LoginBackground from '../../components/auth/LoginBackground'
+import ApiStatusIndicator from '../../components/auth/ApiStatusIndicator'
 import Button from '../../components/ui/Button'
 
 export default function Login() {
@@ -157,7 +158,11 @@ export default function Login() {
                 </Button>
               </form>
 
-              <div className="mt-5 rounded-xl bg-slate-50 px-3 py-2.5 text-center text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+              <div className="mt-4">
+                <ApiStatusIndicator />
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-center text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
                 Demo login — <strong className="text-slate-700 dark:text-slate-200">admin</strong> /{' '}
                 <strong className="text-slate-700 dark:text-slate-200">admin123</strong>
               </div>

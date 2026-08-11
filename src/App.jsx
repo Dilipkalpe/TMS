@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { Navigate, Routes, Route } from 'react-router-dom'
+import { Navigate, Routes, Route, useLocation } from 'react-router-dom'
 import MainLayout from './components/layout/MainLayout'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import TenantGuard from './components/auth/TenantGuard'
@@ -8,7 +8,7 @@ import PageFallback from './components/ui/PageFallback'
 import {
   Dashboard, NewBooking, BookingDetails, EditBooking,
   GenerateLR, EditLR, LRProcessPage, LrExpenseApprovalPage,
-  LrManagementPage, LrDetailPage, LrListPage, LrEntryPage, UltraLrEntryPage,
+  LrDetailPage, LrListPage, LrEntryPage, UltraLrEntryPage,
   BookingManagementLayout, BookingQuotationsTab, BookingPendingTab, BookingConfirmedTab, BookingCancelledTab,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
   CustomerList, CustomerDetails, NewCustomer,
@@ -17,11 +17,12 @@ import {
   VendorList, VendorDetails, NewVendor,
   ConsignorList, ConsignorDetails, NewConsignor,
   ConsigneeList, ConsigneeDetails, NewConsignee,
-  ExpenseList, NewExpense,
-  Settings, BranchesPage, PortalUsersPage, UsersPage, DocumentNumberingPage, NotificationSettings,
+  ItemList, ItemDetails, NewItem,
+  ExpensesHub, ExpenseList, NewExpense,
+  SettingsHub, Settings, DataCleanupPage, MastersHub, ShipmentManagementHub, DeliveryManagementHub,
+  BranchesPage, PortalUsersPage, UsersPage, DocumentNumberingPage, NotificationSettings, PrintTemplateSettingsPage,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
-  AdminHub,
   AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry,
   LedgerReport, CustomerLedgerReport, VendorLedgerReport, DriverLedgerReport,
   VehicleLedgerReport, CashBook, BankBook, DayBook, JournalRegister,
@@ -39,13 +40,20 @@ import {
   MaintenancePage, OperationsHub, FleetMapPage, RouteOptimizerPage,
   VehicleHistoryPage, GeofenceManagerPage, GeofenceAlertsPage,
   FuelPage, EpodPage, PodPage, CustomerPortalPage, TripsPage, ShipmentsPage,
-  LoadingSlipPage, TransitPassCreatePage, PodEntryPage, CreateInvoicePage, TripExpensesEntryPage,
-  DeliveryCompletePage, TmsModuleListRoute,
+  LoadingSlipListPage, LoadingSlipPage, TransitPassListPage, TransitPassCreatePage,
+  DispatchListPage, DispatchPage, InTransitListPage, InTransitPage,
+  DeliveryCompleteListPage, DeliveryCompletePage, PodListPage, PodEntryPage, BillingListPage, CreateInvoicePage, TripExpensesEntryPage,
+  TmsModuleListRoute,
   FinanceModulePage, DocumentsPage, NotificationsPage, AnalyticsPage,
   MarketplacePage, WarehousePage, IotPage, AiPage, PlatformHub,
 } from './routes/lazyPages'
 import { PortalAuthProvider } from './context/PortalAuthContext'
 import PortalProtectedRoute from './components/portal/PortalProtectedRoute'
+
+function LrRootRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/lr/list${search}`} replace />
+}
 
 export default function App() {
   return (
@@ -70,6 +78,8 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="shipment-management" element={<ShipmentManagementHub />} />
+        <Route path="delivery-management" element={<DeliveryManagementHub />} />
         <Route path="bookings" element={<BookingManagementLayout />}>
           <Route index element={<Navigate to="/bookings/pending" replace />} />
           <Route path="quotations" element={<BookingQuotationsTab />} />
@@ -80,7 +90,7 @@ export default function App() {
         <Route path="bookings/new" element={<NewBooking />} />
         <Route path="bookings/:id/edit" element={<EditBooking />} />
         <Route path="bookings/:id" element={<BookingDetails />} />
-        <Route path="lr" element={<LrManagementPage />} />
+        <Route path="lr" element={<LrRootRedirect />} />
         <Route path="lr/loading-pending" element={<Navigate to="/lr?status=loading-pending" replace />} />
         <Route path="lr/loading-sheet" element={<Navigate to="/lr?status=loading-pending" replace />} />
         <Route path="lr/transit-pass" element={<Navigate to="/lr?status=transit-pass-generated" replace />} />
@@ -106,19 +116,23 @@ export default function App() {
         <Route path="vehicles/:id" element={<VehicleDetails />} />
         <Route path="maintenance" element={<MaintenancePage />} />
         <Route path="operations" element={<OperationsHub />} />
-        <Route path="operations/loading-slip/list" element={<TmsModuleListRoute module="loading-slip" />} />
+        <Route path="operations/loading-slip/list" element={<LoadingSlipListPage />} />
         <Route path="operations/loading-slip" element={<LoadingSlipPage />} />
-        <Route path="operations/transit-pass/list" element={<TmsModuleListRoute module="transit-pass" />} />
+        <Route path="operations/transit-pass/list" element={<TransitPassListPage />} />
         <Route path="operations/transit-pass" element={<TransitPassCreatePage />} />
-        <Route path="operations/delivery-complete/list" element={<TmsModuleListRoute module="delivery-complete" />} />
+        <Route path="operations/dispatch/list" element={<DispatchListPage />} />
+        <Route path="operations/dispatch" element={<DispatchPage />} />
+        <Route path="operations/in-transit/list" element={<InTransitListPage />} />
+        <Route path="operations/in-transit" element={<InTransitPage />} />
+        <Route path="operations/delivery-complete/list" element={<DeliveryCompleteListPage />} />
         <Route path="operations/delivery-complete" element={<DeliveryCompletePage />} />
-        <Route path="operations/delivery/pod/list" element={<TmsModuleListRoute module="pod" />} />
+        <Route path="operations/delivery/pod/list" element={<PodListPage />} />
         <Route path="operations/delivery/pod" element={<PodEntryPage />} />
-        <Route path="operations/billing/list" element={<TmsModuleListRoute module="billing" />} />
+        <Route path="operations/billing/list" element={<BillingListPage />} />
         <Route path="operations/billing/invoice" element={<CreateInvoicePage />} />
         <Route path="operations/trip-expenses/list" element={<TmsModuleListRoute module="trip-expenses" />} />
         <Route path="operations/trip-expenses" element={<TripExpensesEntryPage />} />
-        <Route path="operations/lr-management" element={<Navigate to="/lr" replace />} />
+        <Route path="operations/lr-management" element={<Navigate to="/lr/list" replace />} />
         <Route path="operations/loading" element={<Navigate to="/operations/loading-slip" replace />} />
         <Route path="operations/delivery" element={<Navigate to="/operations/delivery/pod" replace />} />
         <Route path="operations/invoice" element={<Navigate to="/operations/billing/invoice" replace />} />
@@ -165,7 +179,11 @@ export default function App() {
         <Route path="consignees" element={<ConsigneeList />} />
         <Route path="consignees/new" element={<NewConsignee />} />
         <Route path="consignees/:id" element={<ConsigneeDetails />} />
-        <Route path="expenses" element={<ExpenseList />} />
+        <Route path="items" element={<ItemList />} />
+        <Route path="items/new" element={<NewItem />} />
+        <Route path="items/:id" element={<ItemDetails />} />
+        <Route path="expenses" element={<ExpensesHub />} />
+        <Route path="expenses/management" element={<ExpenseList />} />
         <Route path="expenses/new" element={<NewExpense />} />
         <Route path="payroll" element={<PayrollHub />} />
         <Route path="payroll/runs" element={<PayrollList />} />
@@ -184,7 +202,7 @@ export default function App() {
         <Route path="hr/leaves" element={<LeaveManagement />} />
         <Route path="hr/holidays" element={<HolidaysPage />} />
         <Route path="hr/tms-norms" element={<HrTmsNorms />} />
-        <Route path="admin" element={<AdminHub />} />
+        <Route path="admin" element={<Navigate to="/masters" replace />} />
         <Route path="accounting" element={<AccountingHub />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/ledger-master" element={<LedgerMaster />} />
@@ -224,12 +242,16 @@ export default function App() {
         <Route path="reports/vendors" element={<VendorReport />} />
         <Route path="reports/cash-flow" element={<CashFlowReport />} />
         <Route path="platform" element={<PlatformHub />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="masters" element={<MastersHub />} />
+        <Route path="settings" element={<SettingsHub />} />
+        <Route path="settings/general" element={<Settings />} />
+        <Route path="settings/data-cleanup" element={<DataCleanupPage />} />
         <Route path="settings/branches" element={<BranchesPage />} />
         <Route path="settings/users" element={<UsersPage />} />
         <Route path="settings/document-numbering" element={<DocumentNumberingPage />} />
         <Route path="settings/portal-users" element={<PortalUsersPage />} />
         <Route path="settings/notifications" element={<NotificationSettings />} />
+        <Route path="settings/print-templates" element={<PrintTemplateSettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

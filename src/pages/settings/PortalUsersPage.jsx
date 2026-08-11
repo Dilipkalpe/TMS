@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { KeyRound, Shield, UserCircle } from 'lucide-react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import ERPDataTable from '../../components/ui/ERPDataTable'
 import TablePagination from '../../components/ui/TablePagination'
 import { customersApi } from '../../services/api'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
@@ -59,6 +60,44 @@ export default function PortalUsersPage() {
   const enabledOnPage = paged.items.filter((r) => r.portalEnabled).length
   const totalPages = Math.max(1, Math.ceil(Math.max(paged.total, 1) / paged.pageSize))
   const displayPages = paged.hasMore ? Math.max(totalPages, paged.page + 1) : totalPages
+
+  const columns = useMemo(() => [
+    {
+      key: 'name',
+      label: 'Customer',
+      render: (r) => (
+        <div>
+          <p className="font-medium">{r.name}</p>
+          <p className="text-xs text-slate-500">{r.id}</p>
+        </div>
+      ),
+    },
+    { key: 'branch', label: 'Branch', render: (r) => (r.branchName ? `${r.branchCode} — ${r.branchName}` : '—') },
+    { key: 'portalPhone', label: 'Portal phone', render: (r) => r.portalPhone ?? '—' },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (r) => (
+        r.portalEnabled ? (
+          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800 dark:bg-green-950 dark:text-green-300">
+            {r.hasPin ? 'Active' : 'No PIN'}
+          </span>
+        ) : (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Disabled</span>
+        )
+      ),
+    },
+  ], [])
+
+  const rowActions = useMemo(() => [
+    {
+      id: 'provision',
+      icon: KeyRound,
+      label: 'Provision portal access',
+      onClick: openEdit,
+      variant: 'primary',
+    },
+  ], [])
 
   return (
     <ERPContentPage module="Settings" title="Portal User Access">
@@ -119,43 +158,16 @@ export default function PortalUsersPage() {
           <p className="p-4 text-sm text-red-600">{paged.error}</p>
         ) : (
           <>
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900">
-                <tr>
-                  <th className="px-4 py-2 text-left">Customer</th>
-                  <th className="px-4 py-2 text-left">Branch</th>
-                  <th className="px-4 py-2 text-left">Portal phone</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.items.map((r) => (
-                  <tr key={r.id} className="border-t">
-                    <td className="px-4 py-2">
-                      <p className="font-medium">{r.name}</p>
-                      <p className="text-xs text-slate-500">{r.id}</p>
-                    </td>
-                    <td className="px-4 py-2">{r.branchName ? `${r.branchCode} — ${r.branchName}` : '—'}</td>
-                    <td className="px-4 py-2">{r.portalPhone ?? '—'}</td>
-                    <td className="px-4 py-2">
-                      {r.portalEnabled ? (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800 dark:bg-green-950 dark:text-green-300">
-                          {r.hasPin ? 'Active' : 'No PIN'}
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Disabled</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <button type="button" onClick={() => openEdit(r)} className="inline-flex items-center gap-1 text-primary hover:underline">
-                        <KeyRound className="h-3.5 w-3.5" /> Provision
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ERPDataTable
+              columns={columns}
+              data={paged.items}
+              page={1}
+              pageSize={paged.items.length || paged.pageSize}
+              selectable
+              rowActions={rowActions}
+              getRowKey={(row) => row.id}
+              emptyMessage="No customers found."
+            />
             <TablePagination
               page={paged.page}
               totalPages={displayPages}

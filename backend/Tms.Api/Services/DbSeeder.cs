@@ -8,6 +8,8 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(TmsDbContext db, IConfiguration config, IHostEnvironment env)
     {
+        await EnsureDocumentCodesAsync(db);
+
         var demo = AppOptions.IsDemoDataEnabled(config, env);
 
         if (!await db.Users.AnyAsync())
@@ -37,9 +39,9 @@ public static class DbSeeder
 
         if (!await db.Branches.AnyAsync(b => b.CompanyId == defaultCompanyId))
         {
-            ho = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "HO-MUM", Name = "Head Office — Mumbai", City = "Mumbai", State = "Maharashtra", IsHeadOffice = true, IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
-            pune = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "PUN", Name = "Pune Branch", City = "Pune", State = "Maharashtra", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
-            delhi = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "DEL", Name = "Delhi Branch", City = "Delhi", State = "Delhi", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+            ho = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "01", Name = "Head Office — Mumbai", City = "Mumbai", State = "Maharashtra", IsHeadOffice = true, IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+            pune = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "02", Name = "Pune Branch", City = "Pune", State = "Maharashtra", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+            delhi = new Branch { Id = Guid.NewGuid(), CompanyId = defaultCompanyId, Code = "03", Name = "Delhi Branch", City = "Delhi", State = "Delhi", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
             db.Branches.AddRange(ho, pune, delhi);
             await db.SaveChangesAsync();
         }
@@ -47,8 +49,10 @@ public static class DbSeeder
         {
             ho = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.IsHeadOffice)
                 ?? await db.Branches.Where(b => b.CompanyId == defaultCompanyId).OrderBy(b => b.Code).FirstOrDefaultAsync();
-            pune = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "PUN");
-            delhi = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "DEL");
+            pune = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "02")
+                ?? await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "PUN");
+            delhi = await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "03")
+                ?? await db.Branches.FirstOrDefaultAsync(b => b.CompanyId == defaultCompanyId && b.Code == "DEL");
         }
 
         if (ho != null)
@@ -181,5 +185,71 @@ public static class DbSeeder
         if (string.IsNullOrWhiteSpace(admin.Role))
             admin.Role = "Super Admin";
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>Fix legacy company/branch codes (e.g. DEFAULT, HO-MUM) for document numbering.</summary>
+    static async Task EnsureDocumentCodesAsync(TmsDbContext db)
+    {
+        var demoId = TenantContext.DefaultCompanyId;
+        if (!await db.Companies.AnyAsync(c => c.Id == demoId))
+        {
+            db.Companies.Add(new Company
+            {
+                Id = demoId,
+                Code = "01",
+                Name = "Demo Company",
+                LegalName = "Demo Company Pvt Ltd",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var companies = await db.Companies.ToListAsync();
+        var companiesChanged = false;
+        foreach (var company in companies)
+        {
+            if (DocumentCodeRules.IsValid(company.Code)) continue;
+            var next = ResolveTwoCharCode(company.Code, company.Id, companies.Where(c => c.Id != company.Id).Select(c => c.Code));
+            company.Code = next;
+            company.UpdatedAt = DateTime.UtcNow;
+            companiesChanged = true;
+        }
+        if (companiesChanged) await db.SaveChangesAsync();
+
+        var branches = await db.Branches.ToListAsync();
+        var branchesChanged = false;
+        foreach (var branch in branches)
+        {
+            if (DocumentCodeRules.IsValid(branch.Code)) continue;
+            var peers = branches.Where(b => b.Id != branch.Id && b.CompanyId == branch.CompanyId).Select(b => b.Code);
+            var next = ResolveTwoCharCode(branch.Code, branch.Id, peers);
+            branch.Code = next;
+            branch.UpdatedAt = DateTime.UtcNow;
+            branchesChanged = true;
+        }
+        if (branchesChanged) await db.SaveChangesAsync();
+    }
+
+    static string ResolveTwoCharCode(string? current, Guid id, IEnumerable<string> usedCodes)
+    {
+        var used = new HashSet<string>(usedCodes.Select(DocumentCodeRules.Normalize), StringComparer.OrdinalIgnoreCase);
+        var normalized = DocumentCodeRules.Normalize(current);
+        if (normalized is "DEFAULT" or "DEMO" or "TMS")
+            normalized = "01";
+
+        var candidate = normalized.Length >= 2 ? normalized[..2] : "01";
+        if (DocumentCodeRules.IsValid(candidate) && !used.Contains(candidate))
+            return candidate;
+
+        candidate = $"{Math.Abs(id.GetHashCode()) % 100:00}";
+        var attempt = 0;
+        while (used.Contains(candidate) && attempt < 100)
+        {
+            candidate = $"{Math.Abs(HashCode.Combine(id, attempt)) % 100:00}";
+            attempt++;
+        }
+        return candidate;
     }
 }

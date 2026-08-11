@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { lookupsApi } from '../../services/api'
-import { lookupEntityLabel, resolveQuickCreatePayload } from '../../config/lookupLabels'
+import { getLookupMasterConfig, resolveLookupMasterKey } from '../../config/lookupMasterConfig'
+import { lookupEntityLabel } from '../../config/lookupLabels'
 import { invalidateSearchIndex } from '../../utils/searchIndex'
 import { LOOKUP_CREATED_EVENT, lookupEventMatches, notifyLookupCreated } from '../../utils/lookupEvents'
-import Modal from './Modal'
-import Button from './Button'
-import { useToast } from '../../context/ToastContext'
-import { usePopupKeyboard } from '../../hooks/usePopupKeyboard'
+import { buildLookupCountText } from '../../utils/lookupDropdownUtils'
+import LookupMasterAddModal from '../lookup/LookupMasterAddModal'
+import LookupNotFoundOption from '../lookup/LookupNotFoundOption'
+import OutlinedField, { OUTLINED_CONTROL_CLASS } from './OutlinedField'
+import SearchableDropdownPanel from './SearchableDropdownPanel'
+import { useSearchableDropdownKeyboard } from '../../hooks/useSearchableDropdownKeyboard'
 import { useKeyboardShortcutsOptional } from '../../context/KeyboardShortcutContext'
+import { focusNextEditable } from '../../keyboard/keyUtils'
 
 const FETCHERS = {
   vehicles: lookupsApi.vehicles,
@@ -15,6 +19,8 @@ const FETCHERS = {
   customers: lookupsApi.customers,
   vendors: lookupsApi.vendors,
 }
+
+const LOOKUP_LIMIT = 25
 
 async function fetchDriverOptions(search, limit) {
   const [employees, drivers] = await Promise.all([
@@ -38,7 +44,7 @@ function matchesOption(options, text) {
 }
 
 /**
- * Searchable lookup dropdown with inline quick-create on Enter / Tab when no match exists.
+ * Searchable lookup dropdown with Record Not Found → Add Master flow.
  */
 export default function LookupSelect({
   label,
@@ -49,7 +55,7 @@ export default function LookupSelect({
   onRecordCreated,
   placeholder = 'Type to search…',
   className = '',
-  limit = 10,
+  limit = LOOKUP_LIMIT,
   allowCreate = true,
   disabled = false,
 }) {
@@ -61,21 +67,42 @@ export default function LookupSelect({
     )
     : FETCHERS[type]
 
+  const masterMeta = useMemo(
+    () => resolveLookupMasterKey(type, employeeType),
+    [type, employeeType],
+  )
+  const masterConfig = useMemo(
+    () => getLookupMasterConfig(masterMeta.key, { employeeType: masterMeta.employeeType }),
+    [masterMeta],
+  )
+  const entityLabel = lookupEntityLabel(type, employeeType)
+
   const [query, setQuery] = useState(value ?? '')
   const [options, setOptions] = useState([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [pendingName, setPendingName] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [masterAddOpen, setMasterAddOpen] = useState(false)
+  const [masterSearchText, setMasterSearchText] = useState('')
   const [refreshToken, setRefreshToken] = useState(0)
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const wrapRef = useRef(null)
   const inputRef = useRef(null)
   const skipBlurRef = useRef(false)
-  const lookupId = useRef(`lookup-${type}-${employeeType ?? 'default'}-${Math.random().toString(36).slice(2)}`).current
-  const { toast } = useToast()
+  const popupId = useRef(`lookup-${type}-${employeeType ?? 'default'}-${Math.random().toString(36).slice(2)}`).current
   const kbd = useKeyboardShortcutsOptional()
+
+  const showNotFound = Boolean(
+    allowCreate && masterConfig && !loading && open && query.trim() && options.length === 0,
+  )
+
+  const navigableCount = showNotFound ? 1 : options.length
+
+  const countText = buildLookupCountText({
+    loading,
+    query,
+    optionCount: options.length,
+    showNotFound,
+  })
 
   const loadOptions = useCallback(async (searchText) => {
     if (!fetcher) return []
@@ -112,22 +139,14 @@ export default function LookupSelect({
   }, [open, query, loadOptions, refreshToken])
 
   useEffect(() => {
-    const onDoc = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [])
-
-  useEffect(() => {
     const onCreated = (e) => {
       if (!lookupEventMatches(e.detail, type, employeeType)) return
       setRefreshToken((n) => n + 1)
       if (e.detail?.label) {
         setOptions((prev) => {
-          const label = e.detail.label
-          if (prev.some((o) => o.toLowerCase() === label.toLowerCase())) return prev
-          return [...prev, label].sort((a, b) => a.localeCompare(b))
+          const lbl = e.detail.label
+          if (prev.some((o) => o.toLowerCase() === lbl.toLowerCase())) return prev
+          return [...prev, lbl].sort((a, b) => a.localeCompare(b))
         })
       }
     }
@@ -135,43 +154,66 @@ export default function LookupSelect({
     return () => window.removeEventListener(LOOKUP_CREATED_EVENT, onCreated)
   }, [type, employeeType])
 
-  const pick = (item) => {
+  const pick = useCallback((item, { advanceFocus = false } = {}) => {
     onChange?.(item)
     setQuery(item)
     setOpen(false)
-    setConfirmOpen(false)
-    setPendingName('')
-  }
+    setMasterAddOpen(false)
+    setMasterSearchText('')
+    if (advanceFocus && inputRef.current) {
+      requestAnimationFrame(() => focusNextEditable(inputRef.current))
+    }
+  }, [onChange])
 
-  usePopupKeyboard({
-    id: lookupId,
-    open: open && !disabled,
-    onClose: () => setOpen(false),
-    onConfirm: () => { if (options[activeIndex]) pick(options[activeIndex]) },
-    onArrow: (dir) => {
-      if (!options.length) return
-      setActiveIndex((i) => (dir === 'down' ? (i + 1) % options.length : (i - 1 + options.length) % options.length))
-    },
-    focusSearch: () => inputRef.current?.focus(),
+  const openMasterAdd = useCallback((text) => {
+    const trimmed = text.trim()
+    if (!trimmed || !allowCreate || !masterConfig) {
+      if (trimmed) {
+        onChange?.(trimmed)
+        setQuery(trimmed)
+      }
+      setOpen(false)
+      return
+    }
+    setMasterSearchText(trimmed)
+    setMasterAddOpen(true)
+    setOpen(false)
+  }, [allowCreate, masterConfig, onChange])
+
+  const handleEnterNoSelection = useCallback(() => {
+    if (loading) return
+    if (showNotFound) {
+      openMasterAdd(query)
+    }
+  }, [loading, showNotFound, openMasterAdd, query])
+
+  const { handleKeyDown, pick: pickWithFocus, openList } = useSearchableDropdownKeyboard({
+    popupId,
+    open: open && !disabled && !masterAddOpen,
+    setOpen,
+    disabled,
+    loading,
+    options,
+    navigableCount,
+    activeIndex,
+    setActiveIndex,
+    inputRef,
+    resetIndexOn: [query],
+    blockOpen: masterAddOpen,
+    onOpen: () => loadOptions(query),
+    onPick: (item) => pick(item, { advanceFocus: true }),
+    onEnterNoSelection: handleEnterNoSelection,
   })
 
   useEffect(() => {
     if (!kbd) return undefined
     const trigger = () => {
       if (document.activeElement === inputRef.current) {
-        setOpen(true)
-        inputRef.current?.focus()
-        loadOptions(query)
+        openList()
       }
     }
     return kbd.registerLookupTrigger(trigger)
-  }, [kbd, query, loadOptions])
-
-  const offerCreate = (text) => {
-    setPendingName(text.trim())
-    setConfirmOpen(true)
-    setOpen(false)
-  }
+  }, [kbd, openList])
 
   const commitValue = async (text, { fromTab = false } = {}) => {
     const trimmed = text.trim()
@@ -193,7 +235,7 @@ export default function LookupSelect({
       return true
     }
 
-    if (!allowCreate || !type) {
+    if (!allowCreate || !masterConfig) {
       onChange?.(trimmed)
       setQuery(trimmed)
       setOpen(false)
@@ -201,39 +243,8 @@ export default function LookupSelect({
     }
 
     if (fromTab) skipBlurRef.current = true
-    offerCreate(trimmed)
+    openMasterAdd(trimmed)
     return false
-  }
-
-  const handleKeyDown = async (e) => {
-    if (open && options.length) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setActiveIndex((i) => (i + 1) % options.length)
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setActiveIndex((i) => (i - 1 + options.length) % options.length)
-        return
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setOpen(false)
-        return
-      }
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      if (open && options[activeIndex]) {
-        pick(options[activeIndex])
-        return
-      }
-      await commitValue(query)
-    } else if (e.key === 'Tab' && !e.shiftKey) {
-      const ok = await commitValue(query, { fromTab: true })
-      if (!ok) e.preventDefault()
-    }
   }
 
   const handleBlur = () => {
@@ -241,7 +252,7 @@ export default function LookupSelect({
       skipBlurRef.current = false
       return
     }
-    if (confirmOpen || creating) return
+    if (masterAddOpen) return
     const trimmed = query.trim()
     if (!trimmed) {
       setOpen(false)
@@ -252,129 +263,117 @@ export default function LookupSelect({
     else setOpen(false)
   }
 
-  const handleConfirmCreate = async () => {
-    if (!pendingName) return
-    setCreating(true)
-    try {
-      const { type: createType, employeeType: createRole } = resolveQuickCreatePayload(type, employeeType)
-      const result = await lookupsApi.quickCreate(createType, pendingName, createRole)
-      const label = result.label ?? pendingName
-      invalidateSearchIndex()
-      notifyLookupCreated({ type, employeeType, label, id: result.id, created: result.created })
-      await loadOptions(label)
-      pick(label)
-      onRecordCreated?.(result)
-      toast({
-        title: result.created ? `${entityLabel} added` : `${entityLabel} selected`,
-        message: label,
-        type: 'success',
-      })
-    } catch (err) {
-      toast({ title: 'Could not add record', message: err.message, type: 'error' })
-      setConfirmOpen(false)
-      setPendingName('')
-      inputRef.current?.focus()
-    } finally {
-      setCreating(false)
-    }
+  const handleMasterSaved = async (result) => {
+    invalidateSearchIndex()
+    notifyLookupCreated({
+      type,
+      employeeType,
+      label: result.label,
+      id: result.id,
+      created: result.created,
+    })
+    await loadOptions(result.label)
+    onChange?.(result.label)
+    setQuery(result.label)
+    setOpen(false)
+    setMasterAddOpen(false)
+    setMasterSearchText('')
+    onRecordCreated?.(result)
   }
-
-  const handleDeclineCreate = () => {
-    setConfirmOpen(false)
-    setPendingName('')
-    inputRef.current?.focus()
-  }
-
-  const entityLabel = lookupEntityLabel(type, employeeType)
 
   return (
     <>
       <div ref={wrapRef} className={`relative ${className}`}>
-        {label && (
-          <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
-            {label}
-          </label>
-        )}
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          placeholder={placeholder}
-          disabled={disabled}
-          readOnly={disabled}
-          data-lookup-type={type}
-          role="combobox"
-          aria-expanded={open}
-          onChange={(e) => {
-            if (disabled) return
-            setQuery(e.target.value)
-            setOpen(true)
-            if (!e.target.value) onChange?.('')
-          }}
-          onFocus={() => {
-            if (disabled) return
-            setOpen(true)
-            loadOptions(query)
-          }}
-          onKeyDown={disabled ? undefined : handleKeyDown}
-          onBlur={disabled ? undefined : handleBlur}
-          className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
-        />
-        {!disabled && open && (
-          <ul
-            className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
-            role="listbox"
-          >
-            {loading && (
-              <li className="px-3 py-2 text-sm text-slate-500">Searching…</li>
-            )}
-            {!loading && options.length === 0 && (
-              <li className="px-3 py-2 text-sm text-slate-500">
-                {allowCreate && query.trim()
-                  ? 'No matches — press Enter to add'
-                  : 'No matches'}
-              </li>
-            )}
-            {!loading && options.map((opt, idx) => (
-              <li key={opt}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={idx === activeIndex}
-                  className={`w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-primary/10 dark:text-slate-100 dark:hover:bg-primary/20 ${
-                    idx === activeIndex ? 'bg-primary/10 dark:bg-primary/20' : ''
-                  }`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => pick(opt)}
-                >
-                  {opt}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <OutlinedField label={label}>
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            placeholder={placeholder}
+            disabled={disabled}
+            readOnly={disabled}
+            data-lookup-type={type}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={open ? `${popupId}-listbox` : undefined}
+            onChange={(e) => {
+              if (disabled) return
+              setQuery(e.target.value)
+              setOpen(true)
+              if (!e.target.value) onChange?.('')
+            }}
+            onFocus={() => {
+              if (disabled) return
+              setOpen(true)
+              loadOptions(query)
+            }}
+            onKeyDown={disabled ? undefined : async (e) => {
+              if (e.key === 'Tab' && !e.shiftKey) {
+                const ok = await commitValue(query, { fromTab: true })
+                if (!ok) e.preventDefault()
+                return
+              }
+              handleKeyDown(e)
+            }}
+            onBlur={disabled ? undefined : handleBlur}
+            className={`${OUTLINED_CONTROL_CLASS} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+          />
+        </OutlinedField>
+
+        <SearchableDropdownPanel
+          open={!disabled && open}
+          anchorRef={inputRef}
+          onClose={() => setOpen(false)}
+          countText={countText}
+          activeIndex={activeIndex}
+        >
+          {loading && (
+            <li className="lookup-dropdown-empty">Searching…</li>
+          )}
+          {!loading && showNotFound && (
+            <LookupNotFoundOption
+              entityLabel={entityLabel}
+              query={query}
+              active={activeIndex === 0}
+              onActivate={() => openMasterAdd(query)}
+            />
+          )}
+          {!loading && !showNotFound && options.length === 0 && (
+            <li className="lookup-dropdown-empty">No records found</li>
+          )}
+          {!loading && options.map((opt, idx) => (
+            <li key={opt}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={idx === activeIndex}
+                data-lookup-active={idx === activeIndex ? 'true' : undefined}
+                className={`lookup-dropdown-option${idx === activeIndex ? ' is-active' : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pickWithFocus(opt, { advanceFocus: true })}
+              >
+                <span className="lookup-dropdown-option-primary">{opt}</span>
+              </button>
+            </li>
+          ))}
+        </SearchableDropdownPanel>
       </div>
 
-      <Modal
-        open={confirmOpen}
-        onClose={handleDeclineCreate}
-        title="Add new record"
-        size="sm"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={handleDeclineCreate} disabled={creating}>
-              No
-            </Button>
-            <Button size="sm" onClick={handleConfirmCreate} disabled={creating}>
-              {creating ? 'Adding…' : 'Yes, add it'}
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-slate-700 dark:text-slate-300">
-          <strong>{pendingName}</strong> — this {entityLabel.toLowerCase()} does not exist. Would you like to add it?
-        </p>
-      </Modal>
+      {masterConfig ? (
+        <LookupMasterAddModal
+          open={masterAddOpen}
+          onClose={() => {
+            setMasterAddOpen(false)
+            setMasterSearchText('')
+            inputRef.current?.focus()
+          }}
+          lookupKey={masterMeta.key}
+          employeeType={masterMeta.employeeType}
+          searchText={masterSearchText}
+          returnFocusRef={inputRef}
+          onSaved={handleMasterSaved}
+        />
+      ) : null}
     </>
   )
 }

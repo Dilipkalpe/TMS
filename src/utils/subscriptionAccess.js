@@ -15,7 +15,12 @@ export function createSubscriptionAccess(user) {
     if (!user) return true
     if (path.startsWith('/platform')) return Boolean(user.isPlatformAdmin)
     if (user.isPlatformAdmin) return true
-    if (path.startsWith('/settings')) return hasFeature('multi_branch') || user?.role === 'Admin'
+    if (path.startsWith('/settings')) {
+      return hasFeature('multi_branch')
+        || user?.role === 'Admin'
+        || user?.role === 'Super Admin'
+        || Boolean(user?.isPlatformAdmin)
+    }
     if (path.startsWith('/accounting') || path.startsWith('/reports')) {
       if (path.includes('outstanding')) return hasFeature('outstanding')
       if (path.includes('profit-loss') || path.includes('booking-pl')) return hasFeature('profit_loss')
@@ -24,17 +29,35 @@ export function createSubscriptionAccess(user) {
       return hasFeature('accounting') || hasFeature('dashboard')
     }
     if (path.startsWith('/bookings')) return hasFeature('booking')
-    if (path.startsWith('/lr')) return hasFeature('lr')
+    if (path.startsWith('/lr') || path === '/operations' || path === '/shipment-management' || path === '/delivery-management'
+      || path.startsWith('/operations/loading-slip')
+      || path.startsWith('/operations/transit-pass')
+      || path.startsWith('/operations/dispatch')
+      || path.startsWith('/operations/in-transit')
+      || path.startsWith('/operations/delivery-complete')
+      || path.startsWith('/operations/delivery/pod')
+      || path.startsWith('/operations/billing')
+      || path.startsWith('/operations/trip-expenses')) return hasFeature('lr')
     if (path === '/' || path === '') return hasFeature('dashboard') || hasFeature('booking')
     return true
   }
 
-  return { planCode, features, hasFeature, canAccessPath }
+  /** First safe landing path when dashboard (/) is not allowed — avoids TenantGuard redirect loops. */
+  const firstAccessiblePath = () => {
+    if (!user || user.isPlatformAdmin) return '/'
+    if (hasFeature('dashboard') || hasFeature('booking')) return '/'
+    if (hasFeature('lr')) return '/lr/list'
+    if (hasFeature('accounting')) return '/accounting'
+    if (hasFeature('outstanding')) return '/accounting/outstanding'
+    return '/settings'
+  }
+
+  return { planCode, features, hasFeature, canAccessPath, firstAccessiblePath }
 }
 
 export const PLAN_MODULES = {
   booking: ['/bookings'],
-  lr: ['/lr'],
+  lr: ['/lr', '/shipment-management', '/delivery-management', '/operations', '/operations/loading-slip', '/operations/transit-pass', '/operations/dispatch', '/operations/in-transit', '/operations/delivery-complete', '/operations/delivery/pod', '/operations/billing', '/operations/trip-expenses'],
   billing: ['/bookings'],
   outstanding: ['/accounting/outstanding'],
   accounting: ['/accounting'],

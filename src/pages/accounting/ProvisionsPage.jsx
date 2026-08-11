@@ -98,7 +98,7 @@ export default function ProvisionsPage() {
         <p className="px-4 py-1 text-xs text-slate-500">{paged.total.toLocaleString('en-IN')} rows found</p>
         {paged.error && <p className="px-4 py-2 text-sm text-red-500">{paged.error}</p>}
         {paged.loading ? <p className="px-4 py-4 text-sm text-slate-500">Loading…</p> : (
-          <ERPDataTable columns={columns} data={paged.items} showActions={false} page={1} pageSize={paged.items.length || paged.pageSize} />
+          <ERPDataTable columns={columns} data={paged.items} showActions={false} selectable={false} page={1} pageSize={paged.items.length || paged.pageSize} />
         )}
         <TablePagination
           page={paged.page}

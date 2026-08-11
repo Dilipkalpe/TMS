@@ -6,12 +6,14 @@ import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import ERPDataTable from '../../components/ui/ERPDataTable'
+import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { ArrowLeft, Ban, Loader2, Printer } from 'lucide-react'
+import { ArrowLeft, Ban, IndianRupee, Loader2, Printer } from 'lucide-react'
 import { freightInvoicesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
-import TransportBillPrint from '../../components/print/TransportBillPrint'
+import { printModuleDocument } from '../../services/printService'
+import { PRINT_MODULE_CODES } from '../../config/printModules'
 
 export default function FreightInvoiceDetails() {
   const { id } = useParams()
@@ -21,6 +23,7 @@ export default function FreightInvoiceDetails() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
 
   const reload = () => {
     setLoading(true)
@@ -42,10 +45,12 @@ export default function FreightInvoiceDetails() {
     try {
       snapshot = inv.invoiceData ? JSON.parse(inv.invoiceData) : {}
     } catch { /* ignore */ }
-    print(
-      <TransportBillPrint
-        company={company}
-        bill={{
+    printModuleDocument({
+      moduleCode: PRINT_MODULE_CODES.BILLING,
+      company,
+      print,
+      documentData: {
+        bill: {
           billNo: inv.invoiceNo,
           billType: inv.billType,
           billDate: inv.invoiceDate,
@@ -58,9 +63,9 @@ export default function FreightInvoiceDetails() {
           netPayable: inv.balance,
           bookingId: inv.bookingId,
           ...snapshot,
-        }}
-      />,
-    )
+        },
+      },
+    })
   }
 
   const cancel = async () => {
@@ -93,6 +98,9 @@ export default function FreightInvoiceDetails() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/accounting/freight-invoices')}>Back</Button>
           <Button variant="outline" icon={Printer} onClick={handlePrint}>Print</Button>
+          {inv.status !== 'Cancelled' && inv.balance > 0 && (
+            <Button icon={IndianRupee} onClick={() => setPayOpen(true)}>Pay</Button>
+          )}
           {inv.bookingId && (
             <Button variant="outline" onClick={() => navigate(bookingPath(inv.bookingId))}>Open Booking</Button>
           )}
@@ -125,11 +133,17 @@ export default function FreightInvoiceDetails() {
           ]}
           data={lines}
           showActions={false}
+          selectable={false}
         />
       </Card>
 
       <Card className="p-0">
-        <CardHeader title="Payments" />
+        <CardHeader
+          title="Payments"
+          action={inv.balance > 0 ? (
+            <Button size="sm" icon={IndianRupee} onClick={() => setPayOpen(true)}>Record Payment</Button>
+          ) : null}
+        />
         <ERPDataTable
           columns={[
             { key: 'paymentDate', label: 'Date' },
@@ -140,9 +154,24 @@ export default function FreightInvoiceDetails() {
           ]}
           data={payments}
           showActions={false}
-          emptyMessage="No payments allocated to this invoice yet."
+          selectable={false}
+          emptyMessage="No payments yet — click Pay / Record Payment to collect."
         />
       </Card>
+
+      <InvoicePaymentModal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        invoice={{
+          id: inv.id,
+          invoiceNo: inv.invoiceNo,
+          customerName: inv.customerName,
+          totalAmount: inv.totalAmount,
+          outstanding: inv.balance,
+          balance: inv.balance,
+        }}
+        onPaid={() => reload()}
+      />
     </ERPContentPage>
   )
 }

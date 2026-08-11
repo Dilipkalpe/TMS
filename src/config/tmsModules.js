@@ -26,6 +26,24 @@ export const TMS_MODULES = {
     listKey: 'transit-passes',
     remark: 'Travel documents linked to vehicle, trip, and LR(s).',
   },
+  dispatch: {
+    id: 'dispatch',
+    title: 'Dispatch',
+    listPath: '/operations/dispatch/list',
+    addPath: '/operations/dispatch',
+    summaryKey: 'dispatch',
+    listKey: 'dispatch',
+    remark: 'Confirm vehicle gate-out and dispatch from transit pass.',
+  },
+  inTransit: {
+    id: 'in-transit',
+    title: 'In Transit',
+    listPath: '/operations/in-transit/list',
+    addPath: '/operations/in-transit',
+    summaryKey: 'in-transit',
+    listKey: 'in-transit',
+    remark: 'Track active trips, checkpoints, and location updates.',
+  },
   deliveryComplete: {
     id: 'delivery-complete',
     title: 'Delivery Complete',
@@ -83,11 +101,34 @@ export const TRANSIT_PASS_COLUMNS = [
   { key: 'passDate', label: 'Pass Date' },
   { key: 'lrNumber', label: 'LR No.' },
   { key: 'fromBranch', label: 'From' },
-  { key: 'toBranch', label: 'To' },
+  { key: 'toBranch', label: 'Destination' },
   { key: 'vehicleNumber', label: 'Vehicle No.' },
   { key: 'driver', label: 'Driver' },
   { key: 'status', label: 'Status', badge: true },
   { key: 'createdBy', label: 'Created By' },
+]
+
+export const DISPATCH_COLUMNS = [
+  { key: 'transitPassNo', label: 'Transit Pass No.' },
+  { key: 'lrNumber', label: 'LR No.' },
+  { key: 'dispatchDate', label: 'Date' },
+  { key: 'vehicleNumber', label: 'Vehicle' },
+  { key: 'driver', label: 'Driver' },
+  { key: 'from', label: 'From' },
+  { key: 'to', label: 'Destination' },
+  { key: 'status', label: 'Status', badge: true },
+]
+
+export const IN_TRANSIT_COLUMNS = [
+  { key: 'tripNo', label: 'Trip / Dispatch No.' },
+  { key: 'transitPassNo', label: 'Transit Pass' },
+  { key: 'lrNumber', label: 'LR No.' },
+  { key: 'vehicleNumber', label: 'Vehicle' },
+  { key: 'driver', label: 'Driver' },
+  { key: 'from', label: 'Origin' },
+  { key: 'to', label: 'Destination' },
+  { key: 'dispatchTime', label: 'Dispatch Time' },
+  { key: 'status', label: 'Status', badge: true },
 ]
 
 export const DELIVERY_COLUMNS = [
@@ -125,7 +166,6 @@ export const BILLING_COLUMNS = [
   { key: 'totalAmount', label: 'Total (₹)', money: true },
   { key: 'outstanding', label: 'Outstanding (₹)', money: true },
   { key: 'paymentStatus', label: 'Payment', badge: true },
-  { key: 'billingStatus', label: 'Billing', badge: true },
 ]
 
 export const EXPENSE_COLUMNS = [
@@ -144,6 +184,8 @@ export const EXPENSE_COLUMNS = [
 export const MODULE_COLUMN_MAP = {
   'loading-slips': LOADING_SLIP_COLUMNS,
   'transit-passes': TRANSIT_PASS_COLUMNS,
+  dispatch: DISPATCH_COLUMNS,
+  'in-transit': IN_TRANSIT_COLUMNS,
   'delivery-complete': DELIVERY_COLUMNS,
   pod: POD_COLUMNS,
   billing: BILLING_COLUMNS,
@@ -165,12 +207,26 @@ export const MODULE_KPI_MAP = {
     { field: 'cancelled', label: 'Cancelled', color: 'violet' },
     { field: 'today', label: "Today's Pass", color: 'cyan' },
   ],
+  dispatch: [
+    { field: 'total', label: 'Total', color: 'blue' },
+    { field: 'pending', label: 'Pending Dispatch', color: 'orange' },
+    { field: 'todayDispatched', label: 'Today Dispatched', color: 'green' },
+    { field: 'inTransit', label: 'In Transit', color: 'violet' },
+    { field: 'cancelled', label: 'Cancelled', color: 'red' },
+  ],
+  'in-transit': [
+    { field: 'total', label: 'Active Trips', color: 'blue' },
+    { field: 'dispatched', label: 'Dispatched', color: 'orange' },
+    { field: 'delayed', label: 'Delayed', color: 'red' },
+    { field: 'atDestination', label: 'At Destination', color: 'green' },
+    { field: 'today', label: "Today's Updates", color: 'cyan' },
+  ],
   'delivery-complete': [
     { field: 'total', label: 'Total Deliveries', color: 'blue' },
+    { field: 'pendingDelivery', label: 'Ready for Delivery', color: 'orange' },
     { field: 'today', label: "Today's Deliveries", color: 'green' },
     { field: 'thisMonth', label: 'This Month', color: 'violet' },
-    { field: 'pendingPod', label: 'Pending POD', color: 'orange' },
-    { field: 'avgDays', label: 'Avg Delivery Days', color: 'cyan' },
+    { field: 'pendingPod', label: 'Pending POD', color: 'cyan' },
   ],
   pod: [
     { field: 'total', label: 'Total POD', color: 'blue' },

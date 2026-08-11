@@ -64,7 +64,7 @@ export default function LrDetailPage() {
 
   if (loading || !lr) {
     return (
-      <ERPContentPage module="LR Management" title={`LR ${lrNumber}`}>
+      <ERPContentPage module="LR" title={`LR ${lrNumber}`}>
         <p className="text-sm text-slate-500">Loading…</p>
       </ERPContentPage>
     )
@@ -215,24 +215,23 @@ export default function LrDetailPage() {
 
   return (
     <ERPContentPage
-      module="LR Management"
+      module="LR"
       title={`LR ${lrNumber}`}
       toolbar={(
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/lr')}>Back to LR Management</Button>
+          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/lr/list')}>Back to LR List</Button>
           {activeSection === 'info' && (
             <Link to={lrEditPath(lrNumber)}>
               <Button variant="outline">Edit LR</Button>
             </Link>
           )}
-          {sectionMeta?.processStep && status !== 'Closed' && (
+          {sectionMeta?.processStep && status !== 'Closed' && activeSection !== 'dispatch' && (
             <Button
               icon={ArrowRight}
               onClick={() => navigate(lrProcessPath(lrNumber, sectionMeta.processStep))}
             >
               {activeSection === 'loading' ? 'Create / Update Loading' :
                 activeSection === 'transit' ? 'Generate Transit Pass' :
-                activeSection === 'dispatch' ? 'Dispatch Vehicle' :
                 activeSection === 'delivery' ? 'Confirm Delivery' :
                 activeSection === 'pod' ? 'Upload POD' :
                 activeSection === 'invoice' ? 'Generate Invoice' :

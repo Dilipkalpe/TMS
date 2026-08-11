@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import { Select } from '../../components/ui/Input'
 import { routingApi, tripsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 
@@ -199,17 +200,17 @@ export default function RouteOptimizerPage() {
                 <p className="text-sm text-slate-500">Loading trips…</p>
               ) : (
                 <>
-                  <select
-                    className="mb-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                  <Select
+                    label={false}
+                    className="mb-3"
                     value={selectedTripId}
                     onChange={(e) => setSelectedTripId(e.target.value)}
-                  >
-                    {trips.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.tripCode} — {t.origin} → {t.destination}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select trip…"
+                    options={trips.map((t) => ({
+                      value: t.id,
+                      label: `${t.tripCode} — ${t.origin} → ${t.destination}`,
+                    }))}
+                  />
                   {selectedTrip && (
                     <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
                       <p>Stops: {(selectedTrip.stops ?? []).length}</p>

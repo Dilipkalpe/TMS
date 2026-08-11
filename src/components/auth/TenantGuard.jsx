@@ -6,7 +6,7 @@ import { useSubscription } from '../../context/SubscriptionContext'
 export default function TenantGuard({ children }) {
   const { user } = useAuth()
   const { needsCompanySelection } = useCompany()
-  const { canAccessPath } = useSubscription()
+  const { canAccessPath, firstAccessiblePath } = useSubscription()
   const location = useLocation()
   const path = location.pathname
 
@@ -15,7 +15,10 @@ export default function TenantGuard({ children }) {
   }
 
   if (!canAccessPath(path)) {
-    return <Navigate to="/" replace />
+    const fallback = firstAccessiblePath?.() || '/'
+    // Avoid / → / redirect loop when the user cannot open the dashboard.
+    if (fallback === path) return children
+    return <Navigate to={fallback} replace />
   }
 
   return children

@@ -8,7 +8,8 @@ import { bookingFinanceApi, freightInvoicesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { Plus, Loader2, Printer, Trash2 } from 'lucide-react'
 import { usePrint } from '../../context/PrintContext'
-import TransportBillPrint from '../print/TransportBillPrint'
+import { printModuleDocument } from '../../services/printService'
+import { PRINT_MODULE_CODES } from '../../config/printModules'
 import { useNavigate } from 'react-router-dom'
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'NEFT', 'Cheque', 'RTGS']
@@ -201,7 +202,7 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
           </div>
           <Button className="mt-3" icon={saving ? Loader2 : Plus} disabled={saving} onClick={submitPayment}>Record Payment</Button>
           <div className="mt-4">
-            <ERPDataTable columns={paymentCols} data={summary?.payments ?? []} showActions={false} />
+            <ERPDataTable columns={paymentCols} data={summary?.payments ?? []} showActions={false} selectable={false} />
           </div>
         </Card>
 
@@ -288,7 +289,19 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
                 </p>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" icon={Printer} onClick={() => print(<TransportBillPrint bill={b} company={company} booking={booking} />)}>Print</Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Printer}
+                  onClick={() => printModuleDocument({
+                    moduleCode: PRINT_MODULE_CODES.BILLING,
+                    company,
+                    print,
+                    documentData: { bill: b },
+                  })}
+                >
+                  Print
+                </Button>
                 <Button variant="ghost" size="sm" icon={Trash2} disabled={saving} onClick={() => deleteBill(b)}>Delete</Button>
               </div>
             </div>

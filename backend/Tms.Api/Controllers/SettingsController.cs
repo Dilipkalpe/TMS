@@ -10,7 +10,12 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/settings")]
-public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHostEnvironment env, DocumentFlowService documentFlow) : ControllerBase
+public class SettingsController(
+    TmsDbContext db,
+    ITenantContext tenants,
+    IWebHostEnvironment env,
+    DocumentFlowService documentFlow,
+    CompanyDataPurgeService dataPurge) : ControllerBase
 {
     private static readonly string[] AllowedLogoExtensions = [".png", ".jpg", ".jpeg", ".svg", ".webp"];
     private const long MaxLogoBytes = 2 * 1024 * 1024;
@@ -208,6 +213,51 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
         return Ok(new { message = "Logo removed." });
     }
 
+    /// <summary>
+    /// Deletes transaction + master data for the current company. Keeps configuration
+    /// (company settings, users, branches, numbering config, print templates, COA, notification templates).
+    /// </summary>
+    [HttpPost("purge-data")]
+    public async Task<ActionResult<object>> PurgeData([FromBody] PurgeDataRequest body, CancellationToken ct)
+    {
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        if (!TenantRoles.CanManageUsers(role) && !tenants.IsPlatformAdmin)
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only company Admin can purge data." });
+
+        if (!string.Equals(body?.ConfirmText?.Trim(), CompanyDataPurgeService.ConfirmPhrase, StringComparison.Ordinal))
+        {
+            return BadRequest(new
+            {
+                message = $"Type {CompanyDataPurgeService.ConfirmPhrase} to confirm.",
+                confirmPhrase = CompanyDataPurgeService.ConfirmPhrase,
+            });
+        }
+
+        if (tenants.EffectiveCompanyId == null)
+            return BadRequest(new { message = "Select a company before purging data." });
+
+        try
+        {
+            var result = await dataPurge.PurgeAsync(ct);
+            return Ok(new
+            {
+                success = result.Success,
+                message = result.Message,
+                deleted = result.DeletedCounts,
+                preserved = new[]
+                {
+                    "Company settings", "Users & roles", "Branches", "Document numbering config",
+                    "Print templates", "Chart of accounts", "Notification templates & channel settings",
+                    "Subscription / plan", "HR departments, designations, leave types, holidays",
+                },
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     async Task<CompanySettings?> FindSettingsAsync(CancellationToken ct = default)
     {
         if (tenants.EffectiveCompanyId == null) return null;
@@ -233,6 +283,8 @@ public class SettingsController(TmsDbContext db, ITenantContext tenants, IWebHos
 }
 
 public record DocumentFlowRequest(string DocumentFlow);
+
+public record PurgeDataRequest(string? ConfirmText);
 
 /// <summary>Alias route matching product API: GET /api/company/settings/document-flow</summary>
 [Authorize]

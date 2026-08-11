@@ -121,7 +121,7 @@ INSERT INTO company_subscriptions (company_id, plan_id, status, amount_inr)
 SELECT c.id, p.id, 'active', p.price_inr
 FROM companies c
 CROSS JOIN subscription_plans p
-WHERE c.code = 'DEFAULT' AND p.code = 'professional'
+WHERE c.code = '01' AND p.code = 'professional'
 AND NOT EXISTS (SELECT 1 FROM company_subscriptions cs WHERE cs.company_id = c.id AND cs.status = 'active');
 
 CREATE INDEX IF NOT EXISTS idx_bookings_company ON bookings(company_id);

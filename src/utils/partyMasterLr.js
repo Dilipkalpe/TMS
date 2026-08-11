@@ -25,6 +25,39 @@ export function applyConsigneeToLrForm(row) {
   }
 }
 
+/** Merge party master into form and sync route cities (pickup / delivery). */
+export function applyConsignorPartyToForm(prev, row) {
+  if (!row) return prev
+  const applied = applyConsignorToLrForm(row)
+  const origin = (applied.from || row.city || '').trim()
+  return {
+    ...prev,
+    ...applied,
+    from: origin,
+    pickupCity: origin,
+    pickupAddress: row.address || prev.pickupAddress,
+  }
+}
+
+export function applyConsigneePartyToForm(prev, row) {
+  if (!row) return prev
+  const applied = applyConsigneeToLrForm(row)
+  const dest = (applied.to || row.defaultToLocation || row.city || '').trim()
+  return {
+    ...prev,
+    ...applied,
+    to: dest,
+    deliveryBranch: dest || prev.deliveryBranch,
+  }
+}
+
+/** Normalize route city fields before validate / save. */
+export function syncLrRouteFields(form) {
+  const from = (form.pickupCity || form.from || '').trim()
+  const to = (form.to || '').trim()
+  return { ...form, from, pickupCity: from, to }
+}
+
 export function partyDisplayLabel(row) {
   if (!row) return ''
   const name = row.companyName || row.name

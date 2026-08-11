@@ -289,8 +289,8 @@ export function useOpsExtended(initial = {}) {
 
 export const LOADING_CHECKLIST = [
   'All LR verified and matched',
-  'Packages loaded as per LR',
+  'All packages loaded as per LR',
+  'Goods loaded in proper condition',
   'Vehicle cleaned & checked',
-  'Documents checked',
-  'Seal applied',
+  'Load secured properly',
 ]

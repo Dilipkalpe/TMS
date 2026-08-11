@@ -8,11 +8,12 @@ export default function TablePrintFormat({
   columns = [],
   rows = [],
   summary,
+  variant = 'T1',
 }) {
-  const cols = columns.filter((c) => c.key && c.key !== '__action' && c.key !== '__sr')
+  const cols = columns.filter((c) => c.key && c.key !== '__action' && c.key !== '__sr' && c.key !== '__select')
 
   return (
-    <div className="print-document">
+    <div className={`print-document print-variant-${variant}`}>
       <PrintCompanyHeader
         company={company}
         documentTitle={documentTitle}

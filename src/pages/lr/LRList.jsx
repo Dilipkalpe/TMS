@@ -13,9 +13,9 @@ import { lrEditPath, lrProcessPath } from '../../utils/docPath'
 import { LR_STATUS_STEPS, lrStatusProgress, lrStatusStepIndex } from '../../constants/lrStatusFlow'
 import { useToast } from '../../context/ToastContext'
 import { usePrint } from '../../context/PrintContext'
-import LRPrintFormat from '../../components/print/LRPrintFormat'
+import { printGridRowDocument } from '../../utils/printGridDocument'
+import { PRINT_MODULE_CODES } from '../../config/printModules'
 import { withAuditColumns } from '../../utils/auditColumns'
-import { Workflow } from 'lucide-react'
 
 const STATUS_FILTER_OPTIONS = ['(All)', ...LR_STATUS_STEPS]
 
@@ -64,23 +64,6 @@ export default function LRList() {
     },
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
     { key: 'paymentType', label: 'Payment', render: (r) => <Badge variant={statusVariant(r.paymentType === 'Paid' ? 'Paid' : 'Pending')}>{r.paymentType}</Badge> },
-    {
-      key: 'process',
-      label: 'Flow',
-      render: (r) => (
-        <Button
-          size="sm"
-          variant="outline"
-          icon={Workflow}
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(lrProcessPath(r.lrNumber))
-          }}
-        >
-          Open
-        </Button>
-      ),
-    },
   ]), [navigate])
 
   const handleDelete = async (row) => {
@@ -99,12 +82,13 @@ export default function LRList() {
   }
 
   const handlePrintLr = async (row) => {
-    try {
-      const lr = await lrApi.get(row.lrNumber)
-      print(<LRPrintFormat lr={lr} company={company} />)
-    } catch (err) {
-      toast({ title: 'Print failed', message: err.message, type: 'error' })
-    }
+    await printGridRowDocument({
+      moduleCode: PRINT_MODULE_CODES.LR_LIST,
+      row,
+      company,
+      print,
+      toast,
+    })
   }
 
   return (
@@ -144,10 +128,12 @@ export default function LRList() {
       onRefreshExternal={paged.refresh}
       sortKey="lrDate"
       onRowClick={(r) => navigate(lrProcessPath(r.lrNumber))}
+      onView={(r) => navigate(lrProcessPath(r.lrNumber))}
       onEdit={(r) => navigate(lrEditPath(r.lrNumber))}
       onDelete={handleDelete}
       onPrint={handlePrintLr}
       rowPrintTitle="Print LR"
+      printModuleCode={PRINT_MODULE_CODES.LR_LIST}
       exportFilename="lr-export.csv"
       serverMode
       serverTotal={paged.total}

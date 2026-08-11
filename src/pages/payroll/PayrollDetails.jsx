@@ -4,6 +4,7 @@ import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Badge, { statusVariant } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { Select } from '../../components/ui/Input'
 import ERPDataTable from '../../components/ui/ERPDataTable'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { TablePrintButton } from '../../components/print/ReportPrintButton'
@@ -137,13 +138,13 @@ export default function PayrollDetails() {
             )}
             {run.status === 'Processed' && (
               <div className="flex flex-wrap items-end gap-2">
-                <select
+                <Select
+                  label={false}
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
-                >
-                  {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
+                  options={PAYMENT_MODES}
+                  className="min-w-[10rem]"
+                />
                 <Button
                   icon={busy ? Loader2 : Wallet}
                   disabled={busy}
@@ -182,14 +183,14 @@ export default function PayrollDetails() {
                 View Payment Register →
               </Link>
             </div>
-            <ERPDataTable columns={attendantColumns} data={accounting} showActions={false} />
+            <ERPDataTable columns={attendantColumns} data={accounting} showActions={false} selectable={false} />
           </Card>
         )}
         <Card padding={false}>
           <div className="border-b border-slate-100 px-3 py-2.5 dark:border-slate-800 sm:px-4">
             <CardHeader title="Payroll Entries" subtitle="Driver-wise salary breakdown" />
           </div>
-          <ERPDataTable columns={entryColumns} data={entries} showActions={false} />
+          <ERPDataTable columns={entryColumns} data={entries} showActions={false} selectable={false} />
         </Card>
       </div>
     </ERPContentPage>

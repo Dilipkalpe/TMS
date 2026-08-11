@@ -40,9 +40,9 @@ export default function OutstandingReport() {
   ]
 
   const tabs = [
-    { id: 'customers', label: 'Customer Wise', content: <ERPDataTable columns={agingColumns('Customer')} data={outstandingCustomers} showActions={false} /> },
-    { id: 'vendors', label: 'Vendor Wise', content: <ERPDataTable columns={agingColumns('Vendor')} data={outstandingVendors} showActions={false} /> },
-    { id: 'parties', label: 'Party Provisions', content: <ERPDataTable columns={agingColumns('Party')} data={outstandingParties} showActions={false} /> },
+    { id: 'customers', label: 'Customer Wise', content: <ERPDataTable columns={agingColumns('Customer')} data={outstandingCustomers} showActions={false} selectable={false} /> },
+    { id: 'vendors', label: 'Vendor Wise', content: <ERPDataTable columns={agingColumns('Vendor')} data={outstandingVendors} showActions={false} selectable={false} /> },
+    { id: 'parties', label: 'Party Provisions', content: <ERPDataTable columns={agingColumns('Party')} data={outstandingParties} showActions={false} selectable={false} /> },
   ]
 
   return (
