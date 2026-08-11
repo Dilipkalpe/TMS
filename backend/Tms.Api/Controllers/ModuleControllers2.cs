@@ -235,6 +235,16 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
 [Route("api/documents")]
 public class DocumentsController(TmsDbContext db, ITenantContext tenants) : ControllerBase
 {
+    [HttpGet]
+    public async Task<IActionResult> List([FromQuery] int limit = 200) =>
+        Ok(await TenantScope.Documents(db, tenants).AsNoTracking()
+            .OrderByDescending(d => d.CreatedAt)
+            .Take(Math.Min(Math.Max(limit, 1), 500))
+            .Select(d => new
+            {
+                d.Id, d.EntityType, d.EntityId, d.DocType, d.Title, d.FileUrl, d.ExpiresAt, d.CreatedAt,
+            }).ToListAsync());
+
     [HttpGet("expiring")]
     public async Task<IActionResult> Expiring([FromQuery] int days = 30)
     {
@@ -287,6 +297,44 @@ public class DocumentsController(TmsDbContext db, ITenantContext tenants) : Cont
 [Route("api/analytics")]
 public class AnalyticsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
+    [HttpGet("overview")]
+    public async Task<IActionResult> Overview()
+    {
+        var bookingQ = tenants.Filter(branches.Filter(db.Bookings.AsQueryable()));
+        var tripQ = TenantScope.Trips(db, tenants, branches);
+        var vehicleQ = TenantScope.Vehicles(db, tenants, branches);
+        var invoiceQ = tenants.Filter(db.Invoices.AsQueryable());
+        var fuelQ = TenantScope.FuelEntries(db, tenants, branches);
+
+        var totalBookings = await bookingQ.CountAsync();
+        var openBookings = await bookingQ.CountAsync(b => b.Status != "Delivered" && b.Status != "Cancelled" && b.Status != "Closed");
+        var tripsPlanned = await tripQ.CountAsync(t => t.Status == "PLANNED" || t.Status == "ASSIGNED");
+        var tripsInTransit = await tripQ.CountAsync(t => t.Status == "IN_TRANSIT");
+        var tripsCompleted = await tripQ.CountAsync(t => t.Status == "COMPLETED");
+        var vehicles = await vehicleQ.CountAsync();
+        var vehiclesOnTrip = await vehicleQ.CountAsync(v => v.Status == "On Trip");
+        var revenue = await invoiceQ.SumAsync(i => (decimal?)i.TotalAmount) ?? 0;
+        var pendingInvoices = await invoiceQ.CountAsync(i => i.Status == "PENDING" || i.Status == "OVERDUE");
+        var fuelCost = await fuelQ.SumAsync(f => (decimal?)f.TotalCost) ?? 0;
+        var fuelLiters = await fuelQ.SumAsync(f => (decimal?)f.Liters) ?? 0;
+
+        return Ok(new
+        {
+            totalBookings,
+            openBookings,
+            tripsPlanned,
+            tripsInTransit,
+            tripsCompleted,
+            vehicles,
+            vehiclesOnTrip,
+            utilizationPct = vehicles > 0 ? (int)Math.Round(vehiclesOnTrip * 100.0 / vehicles) : 0,
+            revenue,
+            pendingInvoices,
+            fuelCost,
+            fuelLiters,
+        });
+    }
+
     [HttpGet("fleet-utilization")]
     public async Task<IActionResult> FleetUtilization()
     {
@@ -547,7 +595,7 @@ public class IotController(TmsDbContext db, ITenantContext tenants) : Controller
 [Authorize]
 [ApiController]
 [Route("api/ai")]
-public class AiController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class AiController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     async Task<Guid?> CurrentUserId()
     {
@@ -574,18 +622,101 @@ public class AiController(TmsDbContext db, ITenantContext tenants) : ControllerB
             db.AiChatSessions.Add(session);
         }
         db.AiMessages.Add(new AiMessage { Id = Guid.NewGuid(), CompanyId = companyId, SessionId = session.Id, Role = "user", Content = body.Message, CreatedAt = DateTime.UtcNow });
-        var reply = $"TMS Pro Assistant: Received your query about \"{body.Message[..Math.Min(80, body.Message.Length)]}\". Connect OpenAI API in production for full AI features.";
+        var reply = await BuildOpsAssistantReplyAsync(body.Message);
         db.AiMessages.Add(new AiMessage { Id = Guid.NewGuid(), CompanyId = companyId, SessionId = session.Id, Role = "assistant", Content = reply, CreatedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
         return Ok(new { sessionId = session.Id, reply });
+    }
+
+    async Task<string> BuildOpsAssistantReplyAsync(string message)
+    {
+        var q = message.Trim().ToLowerInvariant();
+        var bookingQ = tenants.Filter(branches.Filter(db.Bookings.AsQueryable()));
+        var tripQ = TenantScope.Trips(db, tenants, branches);
+        var vehicleQ = TenantScope.Vehicles(db, tenants, branches);
+        var invoiceQ = tenants.Filter(db.Invoices.AsQueryable());
+
+        if (q.Contains("help") || q.Contains("what can") || q == "?" )
+        {
+            return "I can answer live TMS operations questions: bookings/shipments count, open trips, fleet on-trip, pending invoices, fuel spend, and LR workflow next steps (Loading Slip → Transit Pass → Dispatch → In Transit → Delivery → POD → Billing → Expenses). Ask e.g. \"How many open bookings?\" or \"Fleet status\".";
+        }
+
+        if (q.Contains("booking") || q.Contains("shipment"))
+        {
+            var total = await bookingQ.CountAsync();
+            var open = await bookingQ.CountAsync(b => b.Status != "Delivered" && b.Status != "Cancelled" && b.Status != "Closed");
+            var recent = await bookingQ.OrderByDescending(b => b.BookingDate).Select(b => b.Id).FirstOrDefaultAsync();
+            return $"Shipments/bookings: {total} total, {open} open. Latest booking: {recent ?? "none"}.";
+        }
+
+        if (q.Contains("trip") || q.Contains("dispatch") || q.Contains("transit"))
+        {
+            var planned = await tripQ.CountAsync(t => t.Status == "PLANNED" || t.Status == "ASSIGNED");
+            var moving = await tripQ.CountAsync(t => t.Status == "IN_TRANSIT");
+            var done = await tripQ.CountAsync(t => t.Status == "COMPLETED");
+            return $"Trips: {planned} planned/assigned, {moving} in transit, {done} completed. LR dispatch desks are under Shipment/Delivery Management.";
+        }
+
+        if (q.Contains("fleet") || q.Contains("vehicle") || q.Contains("gps"))
+        {
+            var total = await vehicleQ.CountAsync();
+            var onTrip = await vehicleQ.CountAsync(v => v.Status == "On Trip");
+            var pct = total > 0 ? (int)Math.Round(onTrip * 100.0 / total) : 0;
+            return $"Fleet: {onTrip}/{total} vehicles on trip ({pct}% utilization). Open GPS Tracking under Operations for live map.";
+        }
+
+        if (q.Contains("invoice") || q.Contains("billing") || q.Contains("revenue") || q.Contains("finance"))
+        {
+            var pending = await invoiceQ.CountAsync(i => i.Status == "PENDING" || i.Status == "OVERDUE");
+            var revenue = await invoiceQ.SumAsync(i => (decimal?)i.TotalAmount) ?? 0;
+            return $"Finance: revenue ₹{revenue:N2}, pending/overdue invoices: {pending}. LR billing desk: Operations → Billing after POD.";
+        }
+
+        if (q.Contains("fuel"))
+        {
+            var fuelQ = TenantScope.FuelEntries(db, tenants, branches);
+            var liters = await fuelQ.SumAsync(f => (decimal?)f.Liters) ?? 0;
+            var cost = await fuelQ.SumAsync(f => (decimal?)f.TotalCost) ?? 0;
+            var suspicious = await fuelQ.CountAsync(f => f.IsSuspicious);
+            return $"Fuel: {liters:N1} L, cost ₹{cost:N2}, suspicious entries: {suspicious}. Manage under Operations → Fuel Management.";
+        }
+
+        if (q.Contains("workflow") || q.Contains("lr ") || q.StartsWith("lr") || q.Contains("loading") || q.Contains("pod"))
+        {
+            return "LR ops chain: Create LR → Loading Slip → Transit Pass → Dispatch → In Transit → Delivery Complete → POD → Billing → Trip Expenses. Each desk only shows LRs in the correct status queue.";
+        }
+
+        var bookings = await bookingQ.CountAsync();
+        var trips = await tripQ.CountAsync();
+        var vehicles = await vehicleQ.CountAsync();
+        return $"Live snapshot — bookings: {bookings}, trips: {trips}, vehicles: {vehicles}. Ask about bookings, trips, fleet, fuel, invoices, or LR workflow. Tip: type \"help\" for examples.";
     }
 
     [HttpGet("forecasts")]
     public async Task<IActionResult> Forecasts()
     {
         if (tenants.EffectiveCompanyId == null) return Ok(Array.Empty<object>());
-        return Ok(await TenantScope.ForecastSnapshots(db, tenants).AsNoTracking()
-            .OrderByDescending(f => f.CreatedAt).Take(12).ToListAsync());
+        var existing = await TenantScope.ForecastSnapshots(db, tenants).AsNoTracking()
+            .OrderByDescending(f => f.CreatedAt).Take(12).ToListAsync();
+        if (existing.Count > 0) return Ok(existing);
+
+        var bookingQ = tenants.Filter(branches.Filter(db.Bookings.AsQueryable()));
+        var avgFreight = await bookingQ.AverageAsync(b => (decimal?)b.Freight) ?? 0;
+        var count30 = await bookingQ.CountAsync(b => b.BookingDate >= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)));
+        var predicted = avgFreight * Math.Max(count30, 1);
+        return Ok(new[]
+        {
+            new
+            {
+                id = Guid.Empty,
+                forecastType = "Freight revenue (next 30 days)",
+                predictedValue = predicted,
+                periodStart = DateOnly.FromDateTime(DateTime.UtcNow),
+                periodEnd = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+                createdAt = DateTime.UtcNow,
+                note = "Computed from recent booking freight average × volume",
+            }
+        });
     }
 }
 

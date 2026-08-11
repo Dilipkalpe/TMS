@@ -709,6 +709,7 @@ export const financeApi = {
 }
 
 export const documentsApi = {
+  list: (limit = 200) => apiRequest(`/documents?limit=${limit}`),
   expiring: (days = 30) => apiRequest(`/documents/expiring?days=${days}`),
   save: (data) => apiRequest('/documents', { method: 'POST', body: data }),
 }
@@ -727,6 +728,7 @@ export const notificationsApi = {
 }
 
 export const analyticsApi = {
+  overview: () => apiRequest('/analytics/overview'),
   fleetUtilization: () => apiRequest('/analytics/fleet-utilization'),
   routeProfitability: () => apiRequest('/analytics/route-profitability'),
 }
