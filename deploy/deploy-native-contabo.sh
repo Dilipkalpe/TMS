@@ -128,6 +128,32 @@ install_systemd() {
   conn="${TMS_CONNECTION_STRING:-$CONN_DEFAULT}"
   cors="http://${PUBLIC_HOST}"
 
+  local dotnet_bin
+  dotnet_bin="$(command -v dotnet || true)"
+  [[ -x /usr/share/dotnet/dotnet ]] && dotnet_bin=/usr/share/dotnet/dotnet
+  if [[ -z "${dotnet_bin}" ]] || ! "$dotnet_bin" --list-runtimes 2>/dev/null | grep -qi 'Microsoft.AspNetCore.App 8'; then
+    curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+    bash /tmp/dotnet-install.sh --channel 8.0 --runtime aspnetcore --install-dir /usr/share/dotnet
+    ln -sfn /usr/share/dotnet/dotnet /usr/bin/dotnet
+    dotnet_bin=/usr/share/dotnet/dotnet
+  fi
+
+  mkdir -p /etc/tms
+  cat >/etc/tms/tms-api.env <<EOF
+ASPNETCORE_ENVIRONMENT=Production
+ASPNETCORE_URLS=http://127.0.0.1:5000
+TMS_CONNECTION_STRING=${conn}
+TMS_JWT_KEY=${jwt_key}
+Cors__Origins__0=${cors}
+Database__RunStartupMigrations=true
+Database__FailOnMigrationError=false
+DemoData__Enabled=false
+Gps__AllowSimulator=false
+EOF
+  chmod 640 /etc/tms/tms-api.env
+  chown root:www-data /etc/tms/tms-api.env
+
+  # Type=simple: ASP.NET does not call sd_notify without UseSystemd(); Type=notify can crash/kill the process.
   cat >"/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
 Description=TMS Pro API (.NET 8) — native Contabo
@@ -135,22 +161,15 @@ After=network.target postgresql.service
 Wants=postgresql.service
 
 [Service]
-Type=notify
+Type=simple
 User=www-data
 WorkingDirectory=${API_DIR}
-Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
-Environment=TMS_CONNECTION_STRING=${conn}
-Environment=TMS_JWT_KEY=${jwt_key}
-Environment=Cors__Origins__0=${cors}
-Environment=Database__RunStartupMigrations=true
-Environment=Database__FailOnMigrationError=false
-Environment=DemoData__Enabled=false
-Environment=Gps__AllowSimulator=false
-ExecStart=/usr/bin/dotnet ${API_DIR}/Tms.Api.dll
+EnvironmentFile=/etc/tms/tms-api.env
+ExecStart=${dotnet_bin} ${API_DIR}/Tms.Api.dll
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
+TimeoutStartSec=120
 SyslogIdentifier=${SERVICE_NAME}
 LimitNOFILE=65535
 
@@ -158,12 +177,11 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOF
 
-  # Allow www-data to read api dir
   chown -R www-data:www-data "$API_DIR"
   systemctl daemon-reload
   systemctl enable "$SERVICE_NAME"
   systemctl restart "$SERVICE_NAME"
-  sleep 4
+  sleep 5
   systemctl --no-pager --full status "$SERVICE_NAME" | head -25 || true
 }
 
