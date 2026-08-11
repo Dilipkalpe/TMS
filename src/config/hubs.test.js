@@ -28,9 +28,16 @@ describe('hub navigation config', () => {
   it('operations hub cards have required fields', () => {
     expect(operationsCards.length).toBeGreaterThan(0)
     expectCardShape(operationsCards)
-    expect(operationsHubSections).toHaveLength(1)
-    expect(operationsHubSections[0].title).toBe('Enterprise Modules')
-    expect(operationsCards.some((c) => ['POD', 'ePOD', 'Finance', 'Trips'].includes(c.title))).toBe(false)
+    expectUniquePaths(operationsCards)
+    expect(operationsHubSections.map((s) => s.title)).toEqual([
+      'Core operations',
+      'Intelligence & compliance',
+      'Enterprise extensions',
+    ])
+    expect(operationsHubSections.every((s) => s.cards?.length > 0)).toBe(true)
+    expect(operationsCards.some((c) => ['POD', 'ePOD'].includes(c.title))).toBe(false)
+    expect(operationsCards.some((c) => c.title === 'Trips')).toBe(true)
+    expect(operationsCards.some((c) => c.title === 'Finance')).toBe(true)
   })
 
   it('billing is a main sidebar menu item', () => {
