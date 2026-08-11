@@ -7,6 +7,8 @@ import PodPrintFormat from '../components/print/PodPrintFormat'
 import TransportBillPrint from '../components/print/TransportBillPrint'
 import LoadingSlipPrintFormat from '../components/print/LoadingSlipPrintFormat'
 import InTransitPrintFormat from '../components/print/InTransitPrintFormat'
+import HubManifestPrintFormat from '../components/print/HubManifestPrintFormat'
+import HubReceivingPrintFormat from '../components/print/HubReceivingPrintFormat'
 import { PRINT_MODULE_CODES, normalizeTemplateCode } from '../config/printModules'
 import {
   getSampleDocumentData,
@@ -87,6 +89,17 @@ export function renderPrintNode({
       return <PodPrintFormat variant={variant} model={data.model ?? data.pod} company={company} />
     case PRINT_MODULE_CODES.BILLING:
       return <TransportBillPrint variant={variant} bill={data.bill} company={company} />
+    case PRINT_MODULE_CODES.HUB_MANIFEST:
+      return <HubManifestPrintFormat variant={variant} manifest={data.manifest} company={company} />
+    case PRINT_MODULE_CODES.HUB_RECEIVING:
+      return (
+        <HubReceivingPrintFormat
+          variant={variant}
+          manifest={data.manifest}
+          receiveEvents={data.receiveEvents}
+          company={company}
+        />
+      )
     default:
       return <LRPrintFormat variant={variant} lr={lr} company={company} />
   }

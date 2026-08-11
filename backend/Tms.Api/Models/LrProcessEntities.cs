@@ -7,6 +7,8 @@ public static class LrStatuses
     public const string LoadingCompleted = "Loading Completed";
     public const string TransitPassGenerated = "Transit Pass Generated";
     public const string InTransit = "In Transit";
+    public const string HubReceived = "Hub Received";
+    public const string AvailableForReManifest = "Available for Re-Manifest";
     public const string DeliveryCompleted = "Delivery Completed";
     public const string PodUploaded = "POD Uploaded";
     public const string InvoiceGenerated = "Invoice Generated";
@@ -17,6 +19,7 @@ public static class LrStatuses
     public static readonly IReadOnlyList<string> All =
     [
         Draft, LRCreated, LoadingCompleted, TransitPassGenerated, InTransit,
+        HubReceived, AvailableForReManifest,
         DeliveryCompleted, PodUploaded, InvoiceGenerated, ExpenseAdded, ExpenseApproved, Closed,
     ];
 }

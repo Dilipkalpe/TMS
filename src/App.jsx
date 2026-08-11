@@ -19,7 +19,7 @@ import {
   ConsigneeList, ConsigneeDetails, NewConsignee,
   ItemList, ItemDetails, NewItem,
   ExpensesHub, ExpenseList, NewExpense,
-  SettingsHub, Settings, DataCleanupPage, MastersHub, ShipmentManagementHub, DeliveryManagementHub,
+  SettingsHub, Settings, DataCleanupPage, MastersHub, ShipmentManagementHub, HubTransferPage, DeliveryManagementHub,
   BranchesPage, PortalUsersPage, UsersPage, DocumentNumberingPage, NotificationSettings, PrintTemplateSettingsPage,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
@@ -79,6 +79,8 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="shipment-management" element={<ShipmentManagementHub />} />
+        <Route path="shipment-management/hub-transfer" element={<HubTransferPage />} />
+        <Route path="operations/hub-transfer" element={<Navigate to="/shipment-management/hub-transfer" replace />} />
         <Route path="delivery-management" element={<DeliveryManagementHub />} />
         <Route path="bookings" element={<BookingManagementLayout />}>
           <Route index element={<Navigate to="/bookings/pending" replace />} />

@@ -63,6 +63,15 @@ public static class TenantScope
         return branches != null ? branches.Filter(q) : q;
     }
 
+    public static IQueryable<HubManifest> HubManifests(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    {
+        var q = tenants.Filter(db.HubManifests.AsQueryable());
+        return branches != null ? branches.Filter(q) : q;
+    }
+
+    public static IQueryable<LrMovement> LrMovements(TmsDbContext db, ITenantContext tenants) =>
+        tenants.Filter(db.LrMovements.AsQueryable());
+
     public static IQueryable<MarketplaceListing> MarketplaceListings(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.MarketplaceListings.AsQueryable());
 

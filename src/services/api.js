@@ -727,6 +727,21 @@ export const ewayBillsApi = {
   markCancelled: (id) => apiRequest(`/eway-bills/${id}/mark-cancelled`, { method: 'POST' }),
 }
 
+export const hubTransferApi = {
+  summary: (params = {}) => apiRequest(`/hub-transfer/summary?${queryString(params)}`),
+  listLrs: (params = {}) => apiRequest(`/hub-transfer/lrs?${queryString(params)}`),
+  inboundPreview: (params = {}) => apiRequest(`/hub-transfer/inbound-preview?${queryString(params)}`),
+  getManifest: (id) => apiRequest(`/hub-transfer/manifests/${id}`),
+  receive: (data) => apiRequest('/hub-transfer/receive', { method: 'POST', body: data }),
+  unload: (data) => apiRequest('/hub-transfer/unload', { method: 'POST', body: data }),
+  reManifest: (data) => apiRequest('/hub-transfer/re-manifest', { method: 'POST', body: data }),
+  assignVehicle: (id, data) => apiRequest(`/hub-transfer/manifests/${id}/vehicle`, { method: 'PUT', body: data }),
+  dispatch: (id, data = {}) => apiRequest(`/hub-transfer/manifests/${id}/dispatch`, { method: 'POST', body: data }),
+  movements: (lrNumber) => apiRequest(`/hub-transfer/lrs/${encodeURIComponent(toDocPath(lrNumber))}/movements`),
+  manifestPrint: (id) => apiRequest(`/hub-transfer/manifests/${id}/print`),
+  receiveReport: (id) => apiRequest(`/hub-transfer/receive-report/${id}`),
+}
+
 export const notificationsApi = {
   list: () => apiRequest('/notifications'),
   markRead: (id) => apiRequest(`/notifications/${id}/read`, { method: 'PATCH' }),

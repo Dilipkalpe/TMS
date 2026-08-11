@@ -8,6 +8,8 @@ export const PRINT_MODULE_CODES = {
   DELIVERY_COMPLETE: 'DELIVERY_COMPLETE',
   POD: 'POD',
   BILLING: 'BILLING',
+  HUB_MANIFEST: 'HUB_MANIFEST',
+  HUB_RECEIVING: 'HUB_RECEIVING',
 }
 
 export const PRINT_TEMPLATE_CODES = ['T1', 'T2', 'T3', 'T4', 'T5']
@@ -69,6 +71,18 @@ export const PRINT_MODULES = [
     moduleCode: PRINT_MODULE_CODES.BILLING,
     label: 'Freight Bill / Tax Invoice',
     shortLabel: 'Freight Bill',
+    document: true,
+  },
+  {
+    moduleCode: PRINT_MODULE_CODES.HUB_MANIFEST,
+    label: 'Hub Re-Manifest',
+    shortLabel: 'Hub Manifest',
+    document: true,
+  },
+  {
+    moduleCode: PRINT_MODULE_CODES.HUB_RECEIVING,
+    label: 'Hub Receiving Report',
+    shortLabel: 'Hub Receiving',
     document: true,
   },
 ]

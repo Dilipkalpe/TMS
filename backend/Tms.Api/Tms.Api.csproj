@@ -59,6 +59,7 @@
     <None Include="..\..\database\notifications\schema.sql" Link="database\notifications\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\print-templates\schema.sql" Link="database\print-templates\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\eway\schema.sql" Link="database\eway\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\hub-transfer\schema.sql" Link="database\hub-transfer\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\portal\schema.sql" Link="database\portal\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\routing\schema.sql" Link="database\routing\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\branches\schema.sql" Link="database\branches\schema.sql" CopyToOutputDirectory="PreserveNewest" />

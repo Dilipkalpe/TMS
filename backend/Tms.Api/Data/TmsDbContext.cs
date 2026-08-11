@@ -63,6 +63,10 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<LrDeliverySheet> LrDeliverySheets => Set<LrDeliverySheet>();
     public DbSet<LrExpense> LrExpenses => Set<LrExpense>();
     public DbSet<LrStatusHistory> LrStatusHistories => Set<LrStatusHistory>();
+    public DbSet<HubManifest> HubManifests => Set<HubManifest>();
+    public DbSet<HubManifestLr> HubManifestLrs => Set<HubManifestLr>();
+    public DbSet<LrMovement> LrMovements => Set<LrMovement>();
+    public DbSet<HubTransferAudit> HubTransferAudits => Set<HubTransferAudit>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
     public DbSet<Voucher> Vouchers => Set<Voucher>();
@@ -1376,6 +1380,98 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.ChangedBy).HasColumnName("changed_by");
             e.Property(x => x.ChangedAt).HasColumnName("changed_at");
             e.Property(x => x.Remarks).HasColumnName("remarks");
+        });
+
+        modelBuilder.Entity<HubManifest>(e =>
+        {
+            e.ToTable("hub_manifests");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.ManifestNo).HasColumnName("manifest_no").HasMaxLength(80);
+            e.Property(x => x.FromHubBranchId).HasColumnName("from_hub_branch_id");
+            e.Property(x => x.FromHubName).HasColumnName("from_hub_name").HasMaxLength(200);
+            e.Property(x => x.ToDestination).HasColumnName("to_destination").HasMaxLength(200);
+            e.Property(x => x.VehicleId).HasColumnName("vehicle_id").HasMaxLength(80);
+            e.Property(x => x.VehicleNumber).HasColumnName("vehicle_number").HasMaxLength(40);
+            e.Property(x => x.VehicleType).HasColumnName("vehicle_type").HasMaxLength(80);
+            e.Property(x => x.DriverId).HasColumnName("driver_id").HasMaxLength(80);
+            e.Property(x => x.DriverName).HasColumnName("driver_name").HasMaxLength(200);
+            e.Property(x => x.DriverMobile).HasColumnName("driver_mobile").HasMaxLength(40);
+            e.Property(x => x.Status).HasColumnName("status").HasMaxLength(40);
+            e.Property(x => x.DispatchAt).HasColumnName("dispatch_at");
+            e.Property(x => x.SourceLoadingSheetId).HasColumnName("source_loading_sheet_id");
+            e.Property(x => x.IsInbound).HasColumnName("is_inbound");
+            e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            e.HasMany(x => x.Lines).WithOne(l => l.Manifest).HasForeignKey(l => l.ManifestId);
+        });
+
+        modelBuilder.Entity<HubManifestLr>(e =>
+        {
+            e.ToTable("hub_manifest_lrs");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ManifestId).HasColumnName("manifest_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number").HasMaxLength(80);
+            e.Property(x => x.Packages).HasColumnName("packages");
+            e.Property(x => x.Weight).HasColumnName("weight").HasPrecision(18, 3);
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.LineStatus).HasColumnName("line_status").HasMaxLength(40);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<LrMovement>(e =>
+        {
+            e.ToTable("lr_movements");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number").HasMaxLength(80);
+            e.Property(x => x.MovementNo).HasColumnName("movement_no");
+            e.Property(x => x.MovementType).HasColumnName("movement_type").HasMaxLength(40);
+            e.Property(x => x.FromLocation).HasColumnName("from_location").HasMaxLength(200);
+            e.Property(x => x.ToLocation).HasColumnName("to_location").HasMaxLength(200);
+            e.Property(x => x.CurrentHubBranchId).HasColumnName("current_hub_branch_id");
+            e.Property(x => x.CurrentHubName).HasColumnName("current_hub_name").HasMaxLength(200);
+            e.Property(x => x.VehicleId).HasColumnName("vehicle_id").HasMaxLength(80);
+            e.Property(x => x.VehicleNumber).HasColumnName("vehicle_number").HasMaxLength(40);
+            e.Property(x => x.DriverId).HasColumnName("driver_id").HasMaxLength(80);
+            e.Property(x => x.DriverName).HasColumnName("driver_name").HasMaxLength(200);
+            e.Property(x => x.ManifestId).HasColumnName("manifest_id");
+            e.Property(x => x.Status).HasColumnName("status").HasMaxLength(40);
+            e.Property(x => x.DispatchAt).HasColumnName("dispatch_at");
+            e.Property(x => x.HubReceivedAt).HasColumnName("hub_received_at");
+            e.Property(x => x.UnloadAt).HasColumnName("unload_at");
+            e.Property(x => x.DeliveryAt).HasColumnName("delivery_at");
+            e.Property(x => x.ReceivedBy).HasColumnName("received_by").HasMaxLength(100);
+            e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            e.HasOne(x => x.Manifest).WithMany().HasForeignKey(x => x.ManifestId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<HubTransferAudit>(e =>
+        {
+            e.ToTable("hub_transfer_audits");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number").HasMaxLength(80);
+            e.Property(x => x.ManifestId).HasColumnName("manifest_id");
+            e.Property(x => x.MovementId).HasColumnName("movement_id");
+            e.Property(x => x.Action).HasColumnName("action").HasMaxLength(80);
+            e.Property(x => x.PreviousStatus).HasColumnName("previous_status").HasMaxLength(40);
+            e.Property(x => x.NewStatus).HasColumnName("new_status").HasMaxLength(40);
+            e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.PerformedBy).HasColumnName("performed_by").HasMaxLength(100);
+            e.Property(x => x.PerformedAt).HasColumnName("performed_at");
         });
 
         modelBuilder.Entity<BookingPayment>(e =>

@@ -30,6 +30,7 @@ public static class SchemaBootstrap
             ("Reports", () => ReportsSchemaMigrator.EnsureAsync(db, ct)),
             ("PrintTemplates", () => PrintTemplateSchemaMigrator.EnsureAsync(db, ct)),
             ("EwayBill", () => EwayBillSchemaMigrator.EnsureAsync(db, ct)),
+            ("HubTransfer", () => HubTransferSchemaMigrator.EnsureAsync(db, ct)),
             ("SaaS", () => TenantSchemaMigrator.EnsureAsync(db, logger, ct)),
         ];
 

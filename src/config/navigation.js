@@ -12,6 +12,7 @@ export const navigation = [
       '/operations/loading-slip',
       '/operations/transit-pass',
       '/operations/dispatch',
+      '/operations/hub-transfer',
     ],
     excludePrefixes: ['/lr/expense-approval'],
   },
