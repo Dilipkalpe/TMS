@@ -18,6 +18,7 @@ dist-ssr
 deploy/.env
 deploy/.env.*
 !deploy/.env.production.example
+deploy/backups/
 .build-cache/
 publish/
 backend/**/bin/
