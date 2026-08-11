@@ -57,6 +57,12 @@ public static class TenantScope
     public static IQueryable<Document> Documents(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.Documents.AsQueryable());
 
+    public static IQueryable<EwayBill> EwayBills(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    {
+        var q = tenants.Filter(db.EwayBills.AsQueryable());
+        return branches != null ? branches.Filter(q) : q;
+    }
+
     public static IQueryable<MarketplaceListing> MarketplaceListings(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.MarketplaceListings.AsQueryable());
 

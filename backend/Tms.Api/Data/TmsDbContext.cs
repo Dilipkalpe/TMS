@@ -36,6 +36,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<TripStatusHistory> TripStatusHistories => Set<TripStatusHistory>();
     public DbSet<ProofOfDelivery> ProofOfDeliveries => Set<ProofOfDelivery>();
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<EwayBill> EwayBills => Set<EwayBill>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationTemplate> NotificationTemplates => Set<NotificationTemplate>();
     public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
@@ -679,6 +680,33 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
             e.Property(x => x.RenewedAt).HasColumnName("renewed_at");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<EwayBill>(e =>
+        {
+            e.ToTable("eway_bills");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number").HasMaxLength(80);
+            e.Property(x => x.EwayBillNo).HasColumnName("eway_bill_no").HasMaxLength(50);
+            e.Property(x => x.EwayBillDate).HasColumnName("eway_bill_date");
+            e.Property(x => x.ValidUpto).HasColumnName("valid_upto");
+            e.Property(x => x.VehicleNo).HasColumnName("vehicle_no").HasMaxLength(40);
+            e.Property(x => x.FromPlace).HasColumnName("from_place").HasMaxLength(200);
+            e.Property(x => x.ToPlace).HasColumnName("to_place").HasMaxLength(200);
+            e.Property(x => x.DocumentValue).HasColumnName("document_value").HasPrecision(18, 2);
+            e.Property(x => x.Status).HasColumnName("status").HasMaxLength(30);
+            e.Property(x => x.Source).HasColumnName("source").HasMaxLength(20);
+            e.Property(x => x.PortalRef).HasColumnName("portal_ref").HasMaxLength(100);
+            e.Property(x => x.Notes).HasColumnName("notes");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            e.HasIndex(x => new { x.CompanyId, x.LrNumber });
+            e.HasIndex(x => new { x.CompanyId, x.Status });
         });
 
         modelBuilder.Entity<Notification>(e =>

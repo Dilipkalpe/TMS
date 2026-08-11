@@ -138,7 +138,7 @@ export default function LrEntryFormLayout({
     }
   }, [form.items])
 
-  const { gstAmount } = useMemo(() => computeLrFinancials(form), [form])
+  const { gstAmount, totalAmount } = useMemo(() => computeLrFinancials(form), [form])
 
   useEffect(() => {
     if (Math.abs(Number(form.gst) - gstAmount) > 0.01) {

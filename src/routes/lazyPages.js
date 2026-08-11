@@ -160,6 +160,7 @@ export const TripsPage = lazy(() => import('../pages/operations/ModulePages').th
 export const ShipmentsPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.ShipmentsPage })))
 export const FinanceModulePage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.FinanceModulePage })))
 export const DocumentsPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.DocumentsPage })))
+export const EwayBillPage = lazy(() => import('../pages/operations/EwayBillPage'))
 export const NotificationsPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.NotificationsPage })))
 export const AnalyticsPage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.AnalyticsPage })))
 export const MarketplacePage = lazy(() => import('../pages/operations/ModulePages').then(m => ({ default: m.MarketplacePage })))

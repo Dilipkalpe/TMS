@@ -9,6 +9,7 @@ export const operationsCards = [
   { title: 'Finance', path: '/operations/finance', icon: 'Wallet', description: 'Ops revenue summary, invoices & expenses', tone: 'emerald', chip: 'Finance' },
   { title: 'Predictive Maintenance', path: '/maintenance', icon: 'Wrench', description: 'Service schedules & breakdown risk', tone: 'slate', chip: 'Maint' },
   { title: 'Documents', path: '/operations/documents', icon: 'FileText', description: 'Compliance docs, add & expiry alerts', tone: 'rose', chip: 'Docs' },
+  { title: 'E-Way Bill', path: '/operations/eway-bill', icon: 'FileCheck', description: 'Track e-way bills, expiry alerts & portal stub', tone: 'rose', chip: 'GST' },
   { title: 'Notifications', path: '/operations/notifications', icon: 'Bell', description: 'Inbox, outbox, templates & test send', tone: 'orange', chip: 'Alert' },
   { title: 'Analytics', path: '/operations/analytics', icon: 'BarChart3', description: 'Fleet, bookings, fuel & route KPIs', tone: 'green', chip: 'KPI' },
   { title: 'Marketplace', path: '/operations/marketplace', icon: 'ShoppingBag', description: 'Create load/truck listings and place bids', tone: 'cyan', chip: 'Ext' },
@@ -36,7 +37,7 @@ export const operationsHubSections = [
   {
     title: 'Intelligence & compliance',
     description: 'Insights, documents, alerts, and assistants',
-    cards: pick('Analytics', 'Documents', 'Notifications', 'AI Assistant', 'Predictive Maintenance'),
+    cards: pick('Analytics', 'Documents', 'E-Way Bill', 'Notifications', 'AI Assistant', 'Predictive Maintenance'),
   },
   {
     title: 'Enterprise extensions',
@@ -47,6 +48,7 @@ export const operationsHubSections = [
 
 export const operationsQuickActions = [
   { label: 'Open GPS map', path: '/operations/gps', variant: 'accent' },
+  { label: 'E-Way bills', path: '/operations/eway-bill', variant: 'ghost' },
   { label: 'View analytics', path: '/operations/analytics', variant: 'ghost' },
   { label: 'Ask AI assistant', path: '/operations/ai', variant: 'ghost' },
 ]

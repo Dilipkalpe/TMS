@@ -717,6 +717,16 @@ export const documentsApi = {
   save: (data) => apiRequest('/documents', { method: 'POST', body: data }),
 }
 
+export const ewayBillsApi = {
+  list: (params = {}) => apiRequest(`/eway-bills?${queryString(params)}`),
+  get: (id) => apiRequest(`/eway-bills/${id}`),
+  create: (data) => apiRequest('/eway-bills', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/eway-bills/${id}`, { method: 'PUT', body: data }),
+  generate: (id) => apiRequest(`/eway-bills/${id}/generate`, { method: 'POST' }),
+  cancel: (id) => apiRequest(`/eway-bills/${id}/cancel`, { method: 'POST' }),
+  markCancelled: (id) => apiRequest(`/eway-bills/${id}/mark-cancelled`, { method: 'POST' }),
+}
+
 export const notificationsApi = {
   list: () => apiRequest('/notifications'),
   markRead: (id) => apiRequest(`/notifications/${id}/read`, { method: 'PATCH' }),

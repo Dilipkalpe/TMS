@@ -282,3 +282,27 @@ public class ForecastSnapshot : ITenantScoped
     public decimal? Confidence { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>TMS E-Way Bill tracking linked to an LR. Portal generate/cancel is stubbed until GSP is configured.</summary>
+public class EwayBill : IBranchScoped, IAuditable
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public string LrNumber { get; set; } = "";
+    public string? EwayBillNo { get; set; }
+    public DateOnly? EwayBillDate { get; set; }
+    public DateOnly? ValidUpto { get; set; }
+    public string? VehicleNo { get; set; }
+    public string? FromPlace { get; set; }
+    public string? ToPlace { get; set; }
+    public decimal? DocumentValue { get; set; }
+    public string Status { get; set; } = "Draft";
+    public string Source { get; set; } = "Manual";
+    public string? PortalRef { get; set; }
+    public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
+}

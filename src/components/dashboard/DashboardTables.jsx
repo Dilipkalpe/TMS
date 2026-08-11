@@ -37,45 +37,47 @@ export function DashboardChartsRow({ lrTrend = [], lrStatusSummary = [], lrStatu
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <Card className="p-4">
-        <CardHeader title="LR Trend" subtitle="Created · Delivered · Pending (last 31 days when range is wider)" />
-        <div className="mt-2 h-52">
+      <Card className="flex h-full flex-col overflow-hidden p-4">
+        <CardHeader title="LR Trend" subtitle="Created · Delivered · Pending" />
+        <div className="mt-1 h-52 min-h-0 overflow-hidden">
           <AnalyticsChart
-            title=""
+            embedded
             type="multiLine"
             data={trendData.length ? trendData : [{ label: '—', created: 0, delivered: 0, pending: 0 }]}
           />
         </div>
       </Card>
 
-      <Card className="p-4">
+      <Card className="flex h-full flex-col overflow-hidden p-4">
         <CardHeader title="LR Status Summary" subtitle={`Total ${lrStatusTotal.toLocaleString('en-IN')} LR`} />
-        <div className="mt-2 h-52">
+        <div className="mt-1 h-44 min-h-0 overflow-hidden">
           <AnalyticsChart
-            title=""
+            embedded
             type="donut"
             data={donutData.length ? donutData : [{ label: 'No data', value: 1 }]}
           />
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-          {lrStatusSummary.map((s, i) => (
-            <div key={s.label} className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-              <span className="text-slate-600 dark:text-slate-400">{s.label}</span>
-              <span className="font-semibold text-slate-800 dark:text-slate-200">{s.percent}%</span>
-            </div>
-          ))}
-        </div>
+        {lrStatusSummary.length > 0 ? (
+          <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+            {lrStatusSummary.map((s, i) => (
+              <div key={s.label} className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                <span className="text-slate-600 dark:text-slate-400">{s.label}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{s.percent}%</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </Card>
 
-      <Card className="p-4">
-        <div className="mb-2 flex items-center justify-between">
+      <Card className="flex h-full flex-col overflow-hidden p-4">
+        <div className="mb-1 flex items-start justify-between gap-2">
           <CardHeader title="Top 5 Destinations" />
-          <Link to="/reports" className="text-xs font-medium text-primary hover:underline">View All</Link>
+          <Link to="/reports" className="shrink-0 pt-0.5 text-xs font-medium text-primary hover:underline">View All</Link>
         </div>
-        <div className="mt-2 h-52">
+        <div className="mt-1 h-52 min-h-0 overflow-hidden">
           <AnalyticsChart
-            title=""
+            embedded
             type="horizontal"
             data={destData.length ? destData : [{ label: '—', value: 0 }]}
             color="#1e5a8a"
@@ -101,7 +103,7 @@ export function DashboardTablesRow({ recentLrs = [], pendingDeliveries = [], not
     <div className="grid gap-4 xl:grid-cols-3">
       <Card padding={false} className="overflow-hidden">
         <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <CardHeader title="Recent LR" />
+          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Recent LR</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -139,7 +141,7 @@ export function DashboardTablesRow({ recentLrs = [], pendingDeliveries = [], not
 
       <Card padding={false} className="overflow-hidden">
         <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <CardHeader title="Pending Deliveries" />
+          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Pending Deliveries</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -173,7 +175,7 @@ export function DashboardTablesRow({ recentLrs = [], pendingDeliveries = [], not
 
       <Card padding={false} className="overflow-hidden">
         <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <CardHeader title="Recent Notifications" />
+          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Recent Notifications</h3>
         </div>
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {notifications.length === 0 ? (

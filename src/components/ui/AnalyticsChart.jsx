@@ -152,11 +152,11 @@ function MultiLineChart({ data }) {
     return <polyline key={key} points={pts} fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
   }
   return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-full min-h-[120px] w-full" preserveAspectRatio="none">
+    <div className="flex h-full min-h-0 flex-col">
+      <svg viewBox={`0 0 ${w} ${h}`} className="min-h-0 w-full flex-1" preserveAspectRatio="none">
         {series.map((s) => mkLine(s.key, s.color))}
       </svg>
-      <div className="mt-2 flex flex-wrap justify-center gap-3 text-[10px]">
+      <div className="mt-1.5 flex shrink-0 flex-wrap justify-center gap-3 text-[10px]">
         {series.map((l) => (
           <span key={l.label} className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
             <span className="h-2 w-2 rounded-full" style={{ background: l.color }} />
@@ -393,6 +393,8 @@ export default function AnalyticsChart({
   color = '#1e5a8a',
   gaugeValue,
   className = '',
+  /** When true, render chart only (no nested card chrome) — use inside parent Card. */
+  embedded = false,
 }) {
   const renderChart = () => {
     switch (type) {
@@ -421,10 +423,21 @@ export default function AnalyticsChart({
     }
   }
 
+  if (embedded) {
+    return (
+      <div className={`flex h-full min-h-0 flex-col overflow-hidden ${className}`}>
+        {(title || subtitle || badge) ? (
+          <ChartHeader title={title} subtitle={subtitle} type={type} badge={badge} badgePositive={badgePositive} />
+        ) : null}
+        <div className="relative min-h-0 flex-1 overflow-hidden">{renderChart()}</div>
+      </div>
+    )
+  }
+
   return (
-    <div className={`analytics-chart-card flex h-full min-h-[200px] flex-col rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900 sm:p-4 ${className}`}>
+    <div className={`analytics-chart-card flex h-full min-h-[200px] flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900 sm:p-4 ${className}`}>
       <ChartHeader title={title} subtitle={subtitle} type={type} badge={badge} badgePositive={badgePositive} />
-      <div className="relative min-h-0 flex-1">{renderChart()}</div>
+      <div className="relative min-h-0 flex-1 overflow-hidden">{renderChart()}</div>
     </div>
   )
 }

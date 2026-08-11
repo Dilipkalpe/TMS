@@ -44,7 +44,7 @@ import {
   DispatchListPage, DispatchPage, InTransitListPage, InTransitPage,
   DeliveryCompleteListPage, DeliveryCompletePage, PodListPage, PodEntryPage, BillingListPage, CreateInvoicePage, TripExpensesEntryPage,
   TmsModuleListRoute,
-  FinanceModulePage, DocumentsPage, NotificationsPage, AnalyticsPage,
+  FinanceModulePage, DocumentsPage, EwayBillPage, NotificationsPage, AnalyticsPage,
   MarketplacePage, WarehousePage, IotPage, AiPage, PlatformHub,
 } from './routes/lazyPages'
 import { PortalAuthProvider } from './context/PortalAuthContext'
@@ -152,6 +152,7 @@ export default function App() {
         <Route path="operations/shipments" element={<ShipmentsPage />} />
         <Route path="operations/finance" element={<FinanceModulePage />} />
         <Route path="operations/documents" element={<DocumentsPage />} />
+        <Route path="operations/eway-bill" element={<EwayBillPage />} />
         <Route path="operations/notifications" element={<NotificationsPage />} />
         <Route path="operations/analytics" element={<AnalyticsPage />} />
         <Route path="operations/marketplace" element={<MarketplacePage />} />

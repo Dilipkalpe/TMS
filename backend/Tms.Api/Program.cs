@@ -143,6 +143,7 @@ builder.Services.AddScoped<LookupQuickCreateService>();
 builder.Services.AddScoped<DriverSyncService>();
 builder.Services.AddScoped<DocumentFlowService>();
 builder.Services.AddScoped<DocumentNumberService>();
+builder.Services.AddScoped<EwayBillSyncService>();
 builder.Services.AddScoped<CompanyDataPurgeService>();
 
 builder.Services.AddHttpClient();
@@ -323,6 +324,9 @@ if (!app.Environment.IsEnvironment("Testing"))
 
                 logger.LogInformation("Ensuring print template schema…");
                 await PrintTemplateSchemaMigrator.EnsureAsync(db);
+
+                logger.LogInformation("Ensuring e-way bill schema…");
+                await EwayBillSchemaMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring SaaS tenant schema…");
                 await TenantSchemaMigrator.EnsureAsync(db, logger);

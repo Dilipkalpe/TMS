@@ -661,7 +661,19 @@ export default function BillingInvoicePageContent({
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" type="button" disabled title="Integration not configured">Generate E-Invoice</Button>
-            <Button size="sm" variant="outline" type="button" disabled title="Integration not configured">Generate E-Way Bill</Button>
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={() => {
+                const lr = primaryLrNumber || ''
+                navigate(lr
+                  ? `/operations/eway-bill?tab=register&lr=${encodeURIComponent(lr)}`
+                  : '/operations/eway-bill')
+              }}
+            >
+              Open E-Way Module
+            </Button>
           </div>
         </BillingSectionCard>
 

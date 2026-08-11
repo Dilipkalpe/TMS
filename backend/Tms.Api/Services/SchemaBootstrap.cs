@@ -29,6 +29,7 @@ public static class SchemaBootstrap
             ("DocumentNumbering", () => DocumentNumberingSchemaMigrator.EnsureAsync(db, ct)),
             ("Reports", () => ReportsSchemaMigrator.EnsureAsync(db, ct)),
             ("PrintTemplates", () => PrintTemplateSchemaMigrator.EnsureAsync(db, ct)),
+            ("EwayBill", () => EwayBillSchemaMigrator.EnsureAsync(db, ct)),
             ("SaaS", () => TenantSchemaMigrator.EnsureAsync(db, logger, ct)),
         ];
 

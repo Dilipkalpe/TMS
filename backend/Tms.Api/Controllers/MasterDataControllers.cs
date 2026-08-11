@@ -626,7 +626,7 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
 [Authorize]
 [ApiController]
 [Route("api/lr")]
-public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers) : ControllerBase
+public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers, EwayBillSyncService ewayBillSync) : ControllerBase
 {
     async Task<Driver?> ResolveDriverAsync(string? driverName, CancellationToken ct = default)
     {
@@ -1027,6 +1027,8 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         };
         db.LorryReceipts.Add(lr);
         await db.SaveChangesAsync();
+        try { await ewayBillSync.SyncFromLrAsync(lr); }
+        catch { /* e-way sync is best-effort */ }
         return CreatedAtAction(nameof(Get), new { lrNumber }, EntityMappers.ToDto(lr));
     }
 
@@ -1138,6 +1140,8 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             - (lr.Advance ?? 0);
         lr.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+        try { await ewayBillSync.SyncFromLrAsync(lr); }
+        catch { /* e-way sync is best-effort */ }
         return Ok(EntityMappers.ToDto(lr));
     }
 
