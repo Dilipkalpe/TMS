@@ -1,4 +1,6 @@
-export const accountingCards = [
+import { hubSection, withHubTheme } from './hubTheme'
+
+export const accountingCards = withHubTheme([
   { title: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: 'ListTree', description: 'Master list of all ledger accounts' },
   { title: 'Ledger Master', path: '/accounting/ledger-master', icon: 'BookOpen', description: 'Create and manage ledger accounts' },
   { title: 'Voucher Entry', path: '/accounting/voucher-entry', icon: 'FilePlus', description: 'Record journal, receipt and payment vouchers' },
@@ -23,4 +25,42 @@ export const accountingCards = [
   { title: 'Balance Sheet', path: '/accounting/balance-sheet', icon: 'Scale', description: 'Assets, liabilities and capital' },
   { title: 'Outstanding', path: '/accounting/outstanding', icon: 'AlertCircle', description: 'Receivable and payable outstanding' },
   { title: 'GST Reports', path: '/accounting/gst', icon: 'FileSpreadsheet', description: 'GST input, output and summary' },
+])
+
+const byPath = Object.fromEntries(accountingCards.map((c) => [c.path, c]))
+const pick = (...paths) => paths.map((p) => byPath[p]).filter(Boolean)
+
+export const accountingHubSections = [
+  hubSection('Masters & entry', 'Account structure and voucher posting', pick(
+    '/accounting/chart-of-accounts',
+    '/accounting/ledger-master',
+    '/accounting/voucher-entry',
+  ), { chip: 'Entry' }),
+  hubSection('Ledgers', 'Party and asset ledgers', pick(
+    '/accounting/ledger-report',
+    '/accounting/customer-ledger',
+    '/accounting/vendor-ledger',
+    '/accounting/driver-ledger',
+    '/accounting/vehicle-ledger',
+  ), { chip: 'Ledger' }),
+  hubSection('Books & registers', 'Day books and voucher registers', pick(
+    '/accounting/cash-book',
+    '/accounting/bank-book',
+    '/accounting/day-book',
+    '/accounting/journal-register',
+    '/accounting/receipt-register',
+    '/accounting/payment-register',
+    '/accounting/purchase-register',
+    '/accounting/sales-register',
+    '/accounting/freight-invoices',
+  ), { chip: 'Book' }),
+  hubSection('Statements & compliance', 'Financial statements and outstanding', pick(
+    '/accounting/trial-balance',
+    '/accounting/profit-loss',
+    '/accounting/balance-sheet',
+    '/accounting/outstanding',
+    '/accounting/payment-adjustment',
+    '/accounting/provisions',
+    '/accounting/gst',
+  ), { chip: 'Report' }),
 ]

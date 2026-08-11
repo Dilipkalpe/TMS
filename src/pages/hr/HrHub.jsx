@@ -1,6 +1,4 @@
-import ERPContentPage from '../../components/ui/ERPContentPage'
-import HubCardGrid from '../../components/ui/HubCardGrid'
-import StatusSummaryCards from '../../components/ui/StatusSummaryCards'
+import CommandCenterHub from '../../components/ui/CommandCenterHub'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { hrPayrollHubSections } from '../../config/hrPayrollHub'
 import { useApiObject } from '../../hooks/useApiResource'
@@ -10,39 +8,46 @@ export default function HrHub() {
   const { data: hrSummary, loading: hrLoading, error: hrError } = useApiObject(() => hrApi.summary(), [])
   const { data: paySummary, loading: payLoading, error: payError } = useApiObject(() => payrollApi.summary(), [])
 
-  const kpiCards = [
-    ...(hrSummary ? [
-      { label: 'Total Employees', color: 'blue', icon: 'Users', count: hrSummary.totalEmployees },
-      { label: 'Active', color: 'green', icon: 'UserCheck', count: hrSummary.activeEmployees },
-      { label: 'On Leave', color: 'amber', icon: 'CalendarOff', count: hrSummary.onLeave },
-      { label: 'Present Today', color: 'green', icon: 'CalendarCheck', count: hrSummary.todayPresent },
-    ] : []),
-    ...(paySummary ? [
-      { label: 'Draft Runs', color: 'amber', icon: 'FileEdit', count: paySummary.draftRuns },
-      { label: 'Total Paid', color: 'green', icon: 'IndianRupee', count: formatCurrency(paySummary.totalPaidAmount) },
-    ] : []),
-  ]
-
   const error = hrError || payError
   const loading = hrLoading || payLoading
 
+  const kpis = []
+  if (!loading && hrSummary) {
+    kpis.push(
+      { label: 'Employees', value: String(hrSummary.totalEmployees ?? 0), hint: `${hrSummary.activeEmployees ?? 0} active`, tone: 'ok' },
+      { label: 'On leave', value: String(hrSummary.onLeave ?? 0), hint: 'currently away', tone: 'warn' },
+      { label: 'Present today', value: String(hrSummary.todayPresent ?? 0), hint: 'attendance marked' },
+    )
+  }
+  if (!loading && paySummary) {
+    kpis.push(
+      { label: 'Draft runs', value: String(paySummary.draftRuns ?? 0), hint: 'pending process', tone: paySummary.draftRuns ? 'warn' : 'default' },
+      { label: 'Total paid', value: formatCurrency(paySummary.totalPaidAmount), hint: paySummary.lastRunPeriod ? `Last: ${paySummary.lastRunPeriod}` : 'Payroll paid' },
+    )
+  }
+
   return (
-    <ERPContentPage module="HR & Payroll" title="HR & Payroll">
-      <div className="space-y-6">
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            {error}
-          </div>
-        )}
-        {!loading && kpiCards.length > 0 && <StatusSummaryCards cards={kpiCards} />}
-        {paySummary?.lastRunPeriod && (
-          <p className="text-sm text-slate-500">
-            Last payroll period:{' '}
-            <span className="font-medium text-slate-700 dark:text-slate-200">{paySummary.lastRunPeriod}</span>
-          </p>
-        )}
-        <HubCardGrid sections={hrPayrollHubSections} iconFallback="Briefcase" columns="lg" />
-      </div>
-    </ERPContentPage>
+    <CommandCenterHub
+      module="HR & Payroll"
+      title="HR & Payroll"
+      eyebrow="People"
+      headline="Workforce & payroll"
+      description="Manage employees, attendance, leave, and monthly payroll in one workspace."
+      quickActions={[
+        { label: 'Employees', path: '/hr/employees', variant: 'accent' },
+        { label: 'Generate payroll', path: '/payroll/generate', variant: 'ghost' },
+        { label: 'Attendance', path: '/hr/attendance', variant: 'ghost' },
+      ]}
+      kpis={kpis.slice(0, 4)}
+      sections={hrPayrollHubSections}
+      iconFallback="Briefcase"
+      columns="lg"
+    >
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {error}
+        </div>
+      ) : null}
+    </CommandCenterHub>
   )
 }

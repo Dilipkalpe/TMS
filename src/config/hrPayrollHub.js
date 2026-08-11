@@ -1,5 +1,9 @@
-import { hrCards } from './hrHub'
-import { payrollCards } from './payrollHub'
+import { withHubTheme } from './hubTheme'
+import { hrCards as rawHrCards } from './hrHub'
+import { payrollCards as rawPayrollCards } from './payrollHub'
+
+export const hrCards = withHubTheme(rawHrCards, { chip: 'HR' })
+export const payrollCards = withHubTheme(rawPayrollCards, { chip: 'Pay' })
 
 export const hrPayrollHubSections = [
   {

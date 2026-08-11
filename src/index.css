@@ -33,16 +33,22 @@
 .app-shell-bg {
   background-color: var(--color-surface);
   background-image:
-    linear-gradient(rgba(30, 90, 138, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(30, 90, 138, 0.04) 1px, transparent 1px);
-  background-size: 40px 40px;
+    radial-gradient(1100px 420px at 8% -8%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 60%),
+    radial-gradient(900px 380px at 92% 0%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 55%),
+    linear-gradient(rgba(30, 90, 138, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 90, 138, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 40px 40px, 40px 40px;
+  background-attachment: local, local, local, local;
 }
 
 .dark .app-shell-bg {
   background-color: rgb(2 6 23);
   background-image:
+    radial-gradient(1100px 420px at 8% -8%, rgba(30, 90, 138, 0.28), transparent 60%),
+    radial-gradient(900px 380px at 92% 0%, rgba(245, 158, 11, 0.12), transparent 55%),
     linear-gradient(rgba(59, 130, 246, 0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgba(59, 130, 246, 0.06) 1px, transparent 1px);
+  background-size: auto, auto, 40px 40px, 40px 40px;
 }
 
 /* Top header — logistics strip with amber accent */

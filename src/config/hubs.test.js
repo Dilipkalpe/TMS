@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { accountingCards } from '../config/accountingHub'
+import { accountingCards, accountingHubSections } from '../config/accountingHub'
 import { lrWorkflowCards, operationsCards, operationsHubSections } from '../config/operationsHub'
-import { reportCards } from '../config/reportsHub'
+import { reportCards, reportsHubSections } from '../config/reportsHub'
 import { mastersCards } from '../config/mastersHub'
-import { settingsCards } from '../config/settingsHub'
+import { settingsCards, settingsHubSections } from '../config/settingsHub'
 import { hrPayrollHubSections } from '../config/hrPayrollHub'
 import { shipmentManagementCards } from '../config/shipmentManagementHub'
 import { deliveryManagementCards } from '../config/deliveryManagementHub'
@@ -23,6 +23,8 @@ describe('hub navigation config', () => {
   it('accounting hub cards have unique paths', () => {
     expectUniquePaths(accountingCards)
     expectCardShape(accountingCards)
+    expect(accountingHubSections.length).toBeGreaterThan(1)
+    expect(accountingHubSections.every((s) => s.cards?.length > 0)).toBe(true)
   })
 
   it('operations hub cards have required fields', () => {
@@ -61,6 +63,10 @@ describe('hub navigation config', () => {
 
   it('reports hub includes cash flow report', () => {
     expect(reportCards.some((c) => c.path === '/reports/cash-flow')).toBe(true)
+    expect(reportsHubSections.map((s) => s.title)).toEqual([
+      'Operations reports',
+      'Finance reports',
+    ])
   })
 
   it('masters hub cards cover master data', () => {
@@ -77,6 +83,7 @@ describe('hub navigation config', () => {
     expect(settingsCards[0].path).toBe('/settings/general')
     expect(settingsCards.some((c) => c.path === '/settings/print-templates')).toBe(true)
     expect(settingsCards.some((c) => c.path === '/settings/data-cleanup')).toBe(true)
+    expect(settingsHubSections).toHaveLength(3)
   })
 
   it('sidebar navigation is flat hub roots only', () => {

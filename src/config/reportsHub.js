@@ -1,4 +1,6 @@
-export const reportCards = [
+import { hubSection, withHubTheme } from './hubTheme'
+
+export const reportCards = withHubTheme([
   { title: 'Trip Report', path: '/reports/trips', icon: 'Route', description: 'Trip-wise freight, expense & profit analysis' },
   { title: 'Vehicle Report', path: '/reports/vehicles', icon: 'Truck', description: 'Vehicle utilization and performance' },
   { title: 'Driver Report', path: '/reports/drivers', icon: 'UserCircle', description: 'Driver trips, salary and advances' },
@@ -13,4 +15,28 @@ export const reportCards = [
   { title: 'Balance Sheet', path: '/accounting/balance-sheet', icon: 'Scale', description: 'Assets, liabilities and capital' },
   { title: 'Profit & Loss', path: '/accounting/profit-loss', icon: 'PieChart', description: 'Income and expense statement' },
   { title: 'Trial Balance', path: '/accounting/trial-balance', icon: 'Calculator', description: 'Debit and credit trial balance' },
+])
+
+const byPath = Object.fromEntries(reportCards.map((c) => [c.path, c]))
+const pick = (...paths) => paths.map((p) => byPath[p]).filter(Boolean)
+
+export const reportsHubSections = [
+  hubSection('Operations reports', 'Trips, fleet, drivers, and bookings', pick(
+    '/reports/trips',
+    '/reports/vehicles',
+    '/reports/drivers',
+    '/reports/customers',
+    '/reports/booking-pl',
+    '/reports/broker-outstanding',
+    '/reports/vendors',
+  ), { chip: 'Ops' }),
+  hubSection('Finance reports', 'Income, expense, cash, and statements', pick(
+    '/reports/income',
+    '/reports/expenses',
+    '/reports/cash-flow',
+    '/accounting/ledger-report',
+    '/accounting/trial-balance',
+    '/accounting/profit-loss',
+    '/accounting/balance-sheet',
+  ), { chip: 'Finance' }),
 ]
