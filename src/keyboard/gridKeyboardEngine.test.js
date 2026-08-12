@@ -124,4 +124,24 @@ describe('gridKeyboardEngine', () => {
     engine.handleKeyDown(key(first, 'Tab', { shiftKey: true }), container)
     expect(document.activeElement).toBe(document.getElementById('preview'))
   })
+
+  it('does not handle Enter when focus is inside a modal/popup', () => {
+    const container = buildContainer(`
+      <div id="grid" data-kbd-grid="true">
+        <div data-grid-row="0" data-grid-col="0"><input id="c0" /></div>
+        <div data-kbd-popup="true" role="dialog">
+          <input id="modal-field" />
+        </div>
+      </div>
+    `)
+    const engine = createGridKeyboardEngine({
+      getRows: () => rows,
+      setRows,
+      createEmptyRow: () => ({ description: '', qty: '' }),
+      fieldKeys: ['description', 'qty'],
+    })
+    const modal = document.getElementById('modal-field')
+    modal.focus()
+    expect(engine.handleKeyDown(key(modal, 'Enter'), container)).toBe(false)
+  })
 })

@@ -271,6 +271,10 @@ function LoadingSlipForm({
       businessType: process?.businessType || anchor?.businessType || 'FTL',
       lrNumbers: rows.map((r) => r.lrNumber),
       vehicleNumber: form.vehicleNo,
+      vehicleId: form.vehicleId || undefined,
+      driverName: form.driver || undefined,
+      driverId: form.driverId || undefined,
+      tripNo: form.tripNo || undefined,
       loaderName: form.loader,
       supervisorName: form.supervisor || form.plannedBy,
       sealNumber: form.sealNo,
@@ -281,6 +285,8 @@ function LoadingSlipForm({
         meta: {
           ...extended.meta,
           vehicleType: form.vehicleType,
+          driver: form.driver,
+          driverId: form.driverId,
           driverMobile: form.driverMobile,
           transporter: form.transporter,
           tripNo: form.tripNo,
@@ -351,8 +357,10 @@ function LoadingSlipForm({
     try {
       await saveFn()
       toast({ title: message, type: 'success' })
-      setSearchParams({ lr: anchor })
       if (andPrint) await printSlipDocument()
+      // Stay on entry screen with all controls cleared for the next slip
+      handleClear()
+      setSearchParams({})
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
     }

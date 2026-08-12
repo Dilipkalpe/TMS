@@ -280,6 +280,10 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
     transitType: form.transitType,
     expectedDelivery: form.expectedDelivery || undefined,
     remarks: form.remarks,
+    vehicleNumber: lr.vehicle || loadingSheet?.vehicleNumber || pass?.vehicleNumber || undefined,
+    driverName: lr.driver || loadingSheet?.extendedData?.meta?.driver || pass?.driverName || undefined,
+    routeFrom: lr.from || undefined,
+    routeTo: lr.to || undefined,
     extendedData: mergeExtendedData(pass?.extendedData, { signatures: extended.signatures }),
   })
 
@@ -400,8 +404,8 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
             <Input label="Branch" value={lr.branchName || '—'} readOnly />
             <Input label="From" value={lr.from || '—'} readOnly />
             <Input label="To" value={lr.to || '—'} readOnly />
-            <Input label="Vehicle No." value={lr.vehicle || pass?.vehicleNumber || '—'} readOnly />
-            <Input label="Driver" value={lr.driver || pass?.driverName || '—'} readOnly />
+            <Input label="Vehicle No." value={lr.vehicle || pass?.vehicleNumber || loadingSheet?.vehicleNumber || '—'} readOnly />
+            <Input label="Driver" value={lr.driver || pass?.driverName || loadingSheet?.extendedData?.meta?.driver || '—'} readOnly />
             <Input label="Pass Status" value={passStatus} readOnly />
           </div>
         </PassSection>
@@ -417,8 +421,8 @@ function TransitPassForm({ lrNumber, lr, process, saving, runSave, onBack }) {
           </PassSection>
           <PassSection title="Vehicle & Driver" subtitle="From loading slip / LR" icon={Truck}>
             <div className="loading-slip-field-grid">
-              <Input label="Vehicle No." value={lr.vehicle || '—'} readOnly />
-              <Input label="Driver Name" value={lr.driver || '—'} readOnly />
+              <Input label="Vehicle No." value={lr.vehicle || pass?.vehicleNumber || loadingSheet?.vehicleNumber || '—'} readOnly />
+              <Input label="Driver Name" value={lr.driver || pass?.driverName || loadingSheet?.extendedData?.meta?.driver || '—'} readOnly />
             </div>
           </PassSection>
         </div>

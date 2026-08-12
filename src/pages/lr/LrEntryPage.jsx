@@ -14,11 +14,11 @@ import { usePrint } from '../../context/PrintContext'
 import { useAuth } from '../../context/AuthContext'
 import { printModuleDocument } from '../../services/printService'
 import { PRINT_MODULE_CODES } from '../../config/printModules'
-import { lrProcessPath } from '../../utils/docPath'
 import FormValidationPopup from '../../components/ui/FormValidationPopup'
 import { scrollToFirstFieldError, focusFirstFieldError } from '../../utils/formValidationFocus'
 import { syncLrRouteFields } from '../../utils/partyMasterLr'
 import { useKeyboardPageActions, useAutoFocus } from '../../hooks/useKeyboardPageActions'
+import { clearControlsAfterSave } from '../../utils/formResetAfterSave'
 
 function buildFieldErrors(form) {
   const errors = {}
@@ -149,14 +149,21 @@ export default function LrEntryPage() {
           documentData: { lr },
         })
       }
-      navigate(lrProcessPath(created.lrNumber))
+      clearControlsAfterSave({
+        reset: () => {
+          setForm({ ...emptyLrEntryForm(), branchName: user?.branchName || '' })
+          setFieldErrors({})
+          setValidationOpen(false)
+        },
+        formRoot: formRef.current,
+      })
     } catch (err) {
       setValidationOpen(false)
       toast({ title: 'Save failed', message: err.message, type: 'error' })
     } finally {
       setSaving(false)
     }
-  }, [form, company, navigate, print, toast])
+  }, [form, company, print, toast, user?.branchName])
 
   const handlePreview = useCallback(() => {
     printModuleDocument({

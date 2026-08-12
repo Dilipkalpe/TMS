@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card, { CardHeader } from '../../components/ui/Card'
@@ -6,8 +6,26 @@ import Button from '../../components/ui/Button'
 import Input, { Select } from '../../components/ui/Input'
 import { useToast } from '../../context/ToastContext'
 import { Save, ArrowLeft, Loader2 } from 'lucide-react'
+import { clearControlsAfterSave } from '../../utils/formResetAfterSave'
 
 const STATUS_OPTIONS = ['Active', 'Inactive']
+
+const EMPTY_PARTY = {
+  name: '',
+  companyName: '',
+  contact: '',
+  phone: '',
+  email: '',
+  gst: '',
+  pan: '',
+  address: '',
+  city: '',
+  state: '',
+  pincode: '',
+  defaultFromLocation: '',
+  defaultToLocation: '',
+  status: 'Active',
+}
 
 export default function PartyMasterForm({
   module,
@@ -21,22 +39,10 @@ export default function PartyMasterForm({
 }) {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const formRootRef = useRef(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    name: '',
-    companyName: '',
-    contact: '',
-    phone: '',
-    email: '',
-    gst: '',
-    pan: '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: '',
-    defaultFromLocation: '',
-    defaultToLocation: '',
-    status: 'Active',
+    ...EMPTY_PARTY,
     ...initial,
   })
 
@@ -53,7 +59,14 @@ export default function PartyMasterForm({
       if (isEdit) await api.update(initial.id, payload)
       else await api.create(payload)
       toast({ title: 'Saved', message: `${form.name} saved successfully.`, type: 'success' })
-      navigate(listPath)
+      if (isEdit) {
+        navigate(listPath)
+      } else {
+        clearControlsAfterSave({
+          reset: () => setForm({ ...EMPTY_PARTY }),
+          formRoot: formRootRef.current,
+        })
+      }
     } catch (err) {
       toast({ title: 'Save failed', message: err.message, type: 'error' })
     } finally {
@@ -69,7 +82,7 @@ export default function PartyMasterForm({
     <ERPContentPage module={module} title={title}>
       <Card>
         <CardHeader title={title} subtitle="Master record details" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div ref={formRootRef} data-kbd-form-root className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Input label={kind === 'consignor' ? 'Consignor Name' : 'Consignee Name'} value={form.name} onChange={(e) => update('name', e.target.value)} />
           <Input label="Company Name" value={form.companyName} onChange={(e) => update('companyName', e.target.value)} />
           <Input label="Contact Person" value={form.contact} onChange={(e) => update('contact', e.target.value)} />

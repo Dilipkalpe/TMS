@@ -51,18 +51,19 @@ export function useSearchableDropdownKeyboard({
   }, [open, setActiveIndex, ...resetIndexOn])
 
   const confirmSelection = useCallback(() => {
-    if (suppressConfirmRef.current || loading) return
+    if (suppressConfirmRef.current) return
+    // Let parent decide (e.g. open Add popup or advance focus) even while a search is in flight.
+    if (loading) {
+      onEnterNoSelection?.()
+      return
+    }
     if (activeIndex >= 0 && activeIndex < options.length) {
       pick(options[activeIndex], { advanceFocus: true })
       return
     }
     // Highlighted non-option row (e.g. "Record not found") or no highlight — do not invent a pick.
-    if (activeIndex >= 0 && count > 0) {
-      onEnterNoSelection?.()
-      return
-    }
     onEnterNoSelection?.()
-  }, [activeIndex, count, loading, onEnterNoSelection, options, pick])
+  }, [activeIndex, loading, onEnterNoSelection, options, pick])
 
   usePopupKeyboard({
     id: popupId,

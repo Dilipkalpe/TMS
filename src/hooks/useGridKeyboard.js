@@ -49,7 +49,12 @@ export function useGridKeyboard({
       onKeyDown: (e) => {
         const container = containerRef.current
         const engine = engineRef.current
-        if (!container?.contains(document.activeElement) || !engine) return false
+        if (!container || !engine) return false
+        // Modal/lookup popups are portaled (or nested); never let the grid steal their keys.
+        if (e.target instanceof HTMLElement && e.target.closest('[data-kbd-popup], [role="dialog"]')) {
+          return false
+        }
+        if (!container.contains(document.activeElement) && !container.contains(e.target)) return false
         const handled = engine.handleKeyDown(e, container)
         if (handled) {
           e.preventDefault()

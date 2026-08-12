@@ -231,12 +231,17 @@ export default function UltraLrEntryPage() {
         persistRememberedCommon(common)
         setTodayCount((n) => n + successes.length)
         const successIdx = new Set(successes.map((s) => s.idx))
-        setRows((prev) => {
-          const failedOrBlank = prev.filter((row, i) => !successIdx.has(i))
-          const stillFilled = failedOrBlank.filter(isBulkRowFilled)
-          if (!stillFilled.length) return createEmptyBulkRows(BLANK_ROWS_AFTER_SAVE)
-          return [...stillFilled, ...createEmptyBulkRows(2)]
-        })
+        const remaining = rows.filter((_, i) => !successIdx.has(i))
+        const stillFilled = remaining.filter(isBulkRowFilled)
+        if (!stillFilled.length) {
+          if (!common.rememberLast) setCommon(emptyBulkCommon())
+          setRemarks('')
+          setDocuments([])
+          setCommonErrors({})
+          setRows(createEmptyBulkRows(BLANK_ROWS_AFTER_SAVE))
+        } else {
+          setRows([...stillFilled, ...createEmptyBulkRows(2)])
+        }
       }
 
       if (failures.length === 0) {

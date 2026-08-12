@@ -44,6 +44,8 @@ export class KeyboardNavigationService {
       const target = e.target
       if (target instanceof HTMLElement && isEditableTarget(target)) {
         if (target.closest('[data-kbd-grid]')) return false
+        // Modals / lookup add popups own Enter-as-Tab within the dialog.
+        if (target.closest('[data-kbd-popup], [role="dialog"]')) return false
         if (target.tagName === 'TEXTAREA' && e.shiftKey) return false
         // Comboboxes own Enter (open list / select highlight). Do not treat as Tab.
         if (target.getAttribute('role') === 'combobox') return false

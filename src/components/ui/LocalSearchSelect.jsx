@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import OutlinedField, { OUTLINED_CONTROL_CLASS } from './OutlinedField'
 import SearchableDropdownPanel from './SearchableDropdownPanel'
 import { useSearchableDropdownKeyboard } from '../../hooks/useSearchableDropdownKeyboard'
+import { useLookupAdvanceOnEnter } from '../../hooks/useLookupNotFoundEnter'
 import { buildLookupCountText } from '../../utils/lookupDropdownUtils'
 import { focusNextEditable } from '../../keyboard/keyUtils'
 
@@ -73,6 +74,8 @@ export default function LocalSearchSelect({
     }
   }, [getOptionLabel, getOptionValue, onChange])
 
+  const handleEnterNoSelection = useLookupAdvanceOnEnter({ setOpen, inputRef })
+
   const { handleKeyDown, pick } = useSearchableDropdownKeyboard({
     popupId,
     open: open && !disabled,
@@ -88,7 +91,7 @@ export default function LocalSearchSelect({
       setQuery('')
     },
     onPick: (opt) => onPick(opt, { advanceFocus: true }),
-    onEnterNoSelection: () => setOpen(false),
+    onEnterNoSelection: handleEnterNoSelection,
   })
 
   return (
@@ -134,7 +137,7 @@ export default function LocalSearchSelect({
         activeIndex={activeIndex}
       >
         {filtered.length === 0 && (
-          <li className="lookup-dropdown-empty">No records found</li>
+          <li className="lookup-dropdown-empty">{q ? 'No records found' : 'Type to search…'}</li>
         )}
         {filtered.map((opt, idx) => (
           <li key={`${String(getOptionValue(opt))}-${idx}`}>

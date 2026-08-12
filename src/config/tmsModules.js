@@ -33,7 +33,7 @@ export const TMS_MODULES = {
     addPath: '/operations/dispatch',
     summaryKey: 'dispatch',
     listKey: 'dispatch',
-    remark: 'Confirm vehicle gate-out and dispatch from transit pass.',
+    remark: 'Recorded vehicle dispatches (confirmed only). Pending work is done from Transit Pass → Dispatch entry.',
   },
   inTransit: {
     id: 'in-transit',
@@ -110,6 +110,7 @@ export const TRANSIT_PASS_COLUMNS = [
 
 export const DISPATCH_COLUMNS = [
   { key: 'transitPassNo', label: 'Transit Pass No.' },
+  { key: 'dispatchNo', label: 'Dispatch No.' },
   { key: 'lrNumber', label: 'LR No.' },
   { key: 'dispatchDate', label: 'Date' },
   { key: 'vehicleNumber', label: 'Vehicle' },

@@ -29,6 +29,7 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
                 label="Consignor *"
                 variant="dense"
                 api={consignorsApi}
+                masterKey="consignors"
                 valueId={common.consignorId}
                 displayValue={common.consignor}
                 onSelect={(row) => {
@@ -49,6 +50,7 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
                 label="Consignee *"
                 variant="dense"
                 api={consigneesApi}
+                masterKey="consignees"
                 valueId={common.consigneeId}
                 displayValue={common.consignee}
                 onSelect={(row) => {

@@ -86,7 +86,7 @@ export default function DispatchListPageContent() {
     navigate(`/operations/dispatch?lr=${encodeURIComponent(row.lrNumber)}`)
   }, [navigate])
 
-  const rows = useMemo(() => paged.items.map((r) => ({ ...r, status: r.status || 'Pending' })), [paged.items])
+  const rows = useMemo(() => paged.items.map((r) => ({ ...r, status: r.status || 'Dispatched' })), [paged.items])
 
   const kpiCards = useMemo(() => (MODULE_KPI_MAP.dispatch || []).map((k) => ({
     label: k.label,

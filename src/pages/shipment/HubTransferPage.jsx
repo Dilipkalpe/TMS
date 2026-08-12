@@ -201,6 +201,8 @@ export default function HubTransferPage() {
       toast({ title: 'Success', message: 'Hub receipt saved', type: 'success' })
       setReceiveOpen(false)
       setInboundPreview(null)
+      setReceiveForm({ loadingSheetNo: '', vehicleNo: '', hubBranchId: '', remarks: '' })
+      setInboundSelected(new Set())
       refreshList()
     } catch (err) {
       toast({ title: 'Error', message: err.message || 'Receive failed', type: 'error' })
@@ -256,6 +258,7 @@ export default function HubTransferPage() {
       })
       toast({ title: 'Success', message: `Re-manifest ${manifest.manifestNo} created`, type: 'success' })
       setReManifestOpen(false)
+      setReManifestForm({ hubBranchId: '', toDestination: '', vehicleId: '', driverId: '', remarks: '' })
       refreshList()
       if (manifest.id && vehicle) {
         setDispatchManifestId(manifest.id)

@@ -63,6 +63,7 @@ export default function LrEntryPartiesSection({
               <PartyMasterSelect
                 label={false}
                 api={consignorsApi}
+                masterKey="consignors"
                 valueId={form.consignorId}
                 displayValue={form.consignor}
                 placeholder="Search by name, city, GSTIN, mobile…"
@@ -92,6 +93,7 @@ export default function LrEntryPartiesSection({
               <PartyMasterSelect
                 label={false}
                 api={consigneesApi}
+                masterKey="consignees"
                 valueId={form.consigneeId}
                 displayValue={form.consignee}
                 placeholder="Search by name, city, GSTIN, mobile…"
@@ -151,6 +153,7 @@ export default function LrEntryPartiesSection({
                 <PartyMasterSelect
                   label={false}
                   api={customersApi}
+                  masterKey="customers"
                   valueId={form.billingPartyId}
                   displayValue={form.billingParty}
                   placeholder="Search billing party…"

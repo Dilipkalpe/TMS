@@ -10,8 +10,27 @@ import { Save, ArrowLeft, Loader2 } from 'lucide-react'
 import { bookingsApi, freightRatesApi, lrApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { useDocumentFlow } from '../../hooks/useDocumentFlow'
+import { clearControlsAfterSave } from '../../utils/formResetAfterSave'
 
 const paymentStatuses = ['Unpaid', 'Partial', 'Paid']
+
+const EMPTY_BOOKING = {
+  date: new Date().toISOString().slice(0, 10),
+  customer: '',
+  consignor: '',
+  consignee: '',
+  from: '',
+  to: '',
+  material: '',
+  quantity: '',
+  vehicle: '',
+  driver: '',
+  freight: '',
+  advance: '',
+  payment: 'Unpaid',
+  remarks: '',
+  lrNumber: '',
+}
 
 export default function NewBooking() {
   const navigate = useNavigate()
@@ -21,20 +40,8 @@ export default function NewBooking() {
   const [saving, setSaving] = useState(false)
   const [unlinkedLrs, setUnlinkedLrs] = useState([])
   const [form, setForm] = useState({
+    ...EMPTY_BOOKING,
     date: new Date().toISOString().slice(0, 10),
-    customer: '',
-    consignor: '',
-    consignee: '',
-    from: '',
-    to: '',
-    material: '',
-    quantity: '',
-    vehicle: '',
-    driver: '',
-    freight: '',
-    advance: '',
-    payment: 'Unpaid',
-    remarks: '',
     lrNumber: searchParams.get('lrNumber') || '',
   })
 
@@ -146,7 +153,12 @@ export default function NewBooking() {
         lrNumber: form.lrNumber || undefined,
       })
       toast({ title: 'Booking saved', type: 'success' })
-      navigate('/bookings')
+      clearControlsAfterSave({
+        reset: () => setForm({
+          ...EMPTY_BOOKING,
+          date: new Date().toISOString().slice(0, 10),
+        }),
+      })
     } catch (err) {
       toast({ title: 'Save failed', message: err.message, type: 'error' })
     } finally {

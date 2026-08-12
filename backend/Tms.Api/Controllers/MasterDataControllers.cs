@@ -713,8 +713,9 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         q = ApplyLrSort(q, sortColumn, sortDirection);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal, ct);
-        return Ok(new PagedResult<LrDto>(
-            items.Select(l => EntityMappers.ToDto(l)).ToList(), total, p, size, hasMore, approx));
+        var dtos = items.Select(l => EntityMappers.ToDto(l)).ToList();
+        await LrProcessService.FillVehicleFromLoadingSheetAsync(db, dtos, ct);
+        return Ok(new PagedResult<LrDto>(dtos, total, p, size, hasMore, approx));
     }
 
     static IQueryable<LorryReceipt> ApplyLrSort(IQueryable<LorryReceipt> q, string? sortColumn, string? sortDirection)
@@ -780,7 +781,14 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var l = await db.LorryReceipts.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.LrNumber == lrNumber);
         if (l == null || !TenantScope.CanAccessBranchEntity(tenants, branches, l)) return NotFound();
-        return Ok(EntityMappers.ToDto(l));
+        var dto = EntityMappers.ToDto(l);
+        if (string.IsNullOrWhiteSpace(dto.Vehicle))
+        {
+            var map = await LrProcessService.LoadVehicleByLrAsync(db, [dto.LrNumber]);
+            if (map.TryGetValue(dto.LrNumber, out var vehicle))
+                dto = dto with { Vehicle = vehicle };
+        }
+        return Ok(dto);
     }
 
     [HttpGet("eligible-for-loading")]

@@ -181,7 +181,22 @@ export default function EmployeeDetails() {
       }
       await hrApi.saveEmployee(body)
       toast({ title: 'Saved', message: 'Employee saved successfully.', type: 'success' })
-      navigate('/hr/employees')
+      if (isNew) {
+        setForm({
+          employeeCode: '', name: '', employeeType: 'Staff', employmentType: 'Permanent',
+          departmentId: '', designationId: '', driverId: '',
+          email: '', phone: '', dateOfJoining: '', dateOfBirth: '', contractEndDate: '',
+          gender: '', address: '', bankAccount: '', bankIfsc: '', pan: '',
+          basicSalary: 0, dailyWage: 0, hra: 0, da: 0, conveyance: 0, otherAllowance: 0,
+          advance: 0, pfApplicable: true, esiApplicable: true, insuranceApplicable: true,
+          insuranceAmount: 500, status: 'Active',
+          licenseNumber: '', licenseExpiry: '', assignedVehicleId: '',
+          routeAllowance: 0, fuelAllowance: 0, loadingAllowance: 0,
+          haltingAllowance: 0, driverBhatta: 0,
+        })
+      } else {
+        navigate('/hr/employees')
+      }
     } catch (err) {
       toast({ title: 'Save failed', message: err.message, type: 'error' })
     } finally {

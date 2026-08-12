@@ -81,7 +81,7 @@ export default function LeaveManagement() {
         days: Number(form.days),
       })
       toast({ title: 'Leave applied', type: 'success' })
-      setShowForm(false)
+      setForm({ employeeId: '', leaveTypeId: '', fromDate: '', toDate: '', days: 1, reason: '' })
       refresh()
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })

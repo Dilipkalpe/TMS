@@ -237,6 +237,27 @@ public class LrProcessController(
         if (oldItems.Count > 0)
             db.LrLoadingSheetItems.RemoveRange(oldItems);
 
+        var driverName = ApiParseHelper.BodyString(body, "driverName");
+        var driverId = ApiParseHelper.BodyString(body, "driverId");
+        if (string.IsNullOrWhiteSpace(driverName) && !string.IsNullOrWhiteSpace(driverId))
+        {
+            var driver = await TenantScope.FindDriverByRefAsync(db, tenants, branches, driverId);
+            driverName = driver?.Name;
+            driverId = driver?.Id ?? driverId;
+        }
+        else if (!string.IsNullOrWhiteSpace(driverName) || !string.IsNullOrWhiteSpace(driverId))
+        {
+            var driver = await TenantScope.FindDriverByRefAsync(db, tenants, branches, driverId ?? driverName!);
+            if (driver != null)
+            {
+                driverId = driver.Id;
+                driverName = driver.Name;
+            }
+        }
+
+        var resolvedVehicleId = vehicle?.Id ?? vehicleId;
+        var resolvedVehicleNo = vehicle?.Number ?? vehicleNum;
+
         var sort = 0;
         foreach (var row in lrs)
         {
@@ -253,6 +274,19 @@ public class LrProcessController(
                 SortOrder = sort++,
                 CreatedAt = DateTime.UtcNow,
             });
+
+            // Keep LR list / print / next ops steps in sync with assigned vehicle & driver
+            if (!string.IsNullOrWhiteSpace(resolvedVehicleNo) || !string.IsNullOrWhiteSpace(resolvedVehicleId))
+            {
+                row.VehicleId = resolvedVehicleId;
+                row.VehicleNumber = resolvedVehicleNo;
+            }
+            if (!string.IsNullOrWhiteSpace(driverName) || !string.IsNullOrWhiteSpace(driverId))
+            {
+                row.DriverId = driverId;
+                row.DriverName = driverName;
+            }
+            row.UpdatedAt = DateTime.UtcNow;
         }
 
         if (existing.LoadingStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase))
@@ -351,10 +385,22 @@ public class LrProcessController(
 
         var linkedLrs = loadingSheet?.Items.Select(i => i.LrNumber).ToList() ?? [lr.LrNumber];
 
+        var (resolvedVehicle, resolvedDriver) = ResolveTransitVehicleDriver(body, lr, loadingSheet);
+
         if (existing != null)
         {
             var passExtUpdate = ParseExt(existing.ExtendedDataJson);
             var wasCancelled = passExtUpdate["passStatus"]?.GetValue<string>() == "Cancelled";
+
+            if (string.IsNullOrWhiteSpace(existing.VehicleNumber) && !string.IsNullOrWhiteSpace(resolvedVehicle))
+                existing.VehicleNumber = resolvedVehicle;
+            else if (!string.IsNullOrWhiteSpace(ApiParseHelper.BodyString(body, "vehicleNumber")))
+                existing.VehicleNumber = ApiParseHelper.BodyString(body, "vehicleNumber");
+
+            if (string.IsNullOrWhiteSpace(existing.DriverName) && !string.IsNullOrWhiteSpace(resolvedDriver))
+                existing.DriverName = resolvedDriver;
+            else if (!string.IsNullOrWhiteSpace(ApiParseHelper.BodyString(body, "driverName")))
+                existing.DriverName = ApiParseHelper.BodyString(body, "driverName");
 
             existing.ViaPoints = ApiParseHelper.BodyString(body, "viaPoints") ?? existing.ViaPoints;
             existing.SealNumber = ApiParseHelper.BodyString(body, "sealNumber") ?? existing.SealNumber;
@@ -386,6 +432,7 @@ public class LrProcessController(
                 }
             }
 
+            await SyncLrVehicleDriverAsync(linkedLrs, lr.CompanyId, resolvedVehicle, resolvedDriver);
             await db.SaveChangesAsync();
             return Ok(MapTransit(existing, loadingSheet?.Items));
         }
@@ -411,8 +458,8 @@ public class LrProcessController(
             LrNumber = lr.LrNumber,
             LoadingSheetId = loadingSheet?.Id,
             PassNumber = passNumber,
-            VehicleNumber = ApiParseHelper.BodyString(body, "vehicleNumber") ?? lr.VehicleNumber,
-            DriverName = ApiParseHelper.BodyString(body, "driverName") ?? lr.DriverName,
+            VehicleNumber = resolvedVehicle,
+            DriverName = resolvedDriver,
             RouteFrom = ApiParseHelper.BodyString(body, "routeFrom") ?? lr.FromCity,
             RouteTo = ApiParseHelper.BodyString(body, "routeTo") ?? lr.ToCity,
             ViaPoints = ApiParseHelper.BodyString(body, "viaPoints"),
@@ -437,6 +484,8 @@ public class LrProcessController(
             if (row == null) continue;
             RecordStatusChange(db, row, LrStatuses.TransitPassGenerated, CurrentUser(), "Transit pass generated");
         }
+
+        await SyncLrVehicleDriverAsync(linkedLrs, lr.CompanyId, resolvedVehicle, resolvedDriver);
 
         var passExt = ParseExt(pass.ExtendedDataJson);
         if (passExt["passStatus"] == null)
@@ -1327,6 +1376,58 @@ public class LrProcessController(
             ChangedAt = DateTime.UtcNow,
             Remarks = remarks,
         });
+    }
+
+    static (string? Vehicle, string? Driver) ResolveTransitVehicleDriver(
+        Dictionary<string, object?> body, LorryReceipt lr, LrLoadingSheet? sheet)
+    {
+        var vehicle = FirstNonEmpty(
+            ApiParseHelper.BodyString(body, "vehicleNumber"),
+            lr.VehicleNumber,
+            sheet?.VehicleNumber);
+        var driver = FirstNonEmpty(
+            ApiParseHelper.BodyString(body, "driverName"),
+            lr.DriverName,
+            DriverFromLoadingSheet(sheet));
+        return (vehicle, driver);
+    }
+
+    static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+    static string? DriverFromLoadingSheet(LrLoadingSheet? sheet)
+    {
+        if (sheet == null) return null;
+        var ext = ParseExt(sheet.ExtendedDataJson);
+        return FirstNonEmpty(
+            ext["meta"]?["driver"]?.GetValue<string>(),
+            ext["driverName"]?.GetValue<string>(),
+            ext["driver"]?.GetValue<string>());
+    }
+
+    async Task SyncLrVehicleDriverAsync(
+        IEnumerable<string> lrNumbers, Guid companyId, string? vehicleNumber, string? driverName)
+    {
+        if (string.IsNullOrWhiteSpace(vehicleNumber) && string.IsNullOrWhiteSpace(driverName))
+            return;
+
+        foreach (var num in lrNumbers.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var row = await db.LorryReceipts.FirstOrDefaultAsync(l => l.LrNumber == num && l.CompanyId == companyId);
+            if (row == null) continue;
+            var changed = false;
+            if (!string.IsNullOrWhiteSpace(vehicleNumber) && string.IsNullOrWhiteSpace(row.VehicleNumber))
+            {
+                row.VehicleNumber = vehicleNumber;
+                changed = true;
+            }
+            if (!string.IsNullOrWhiteSpace(driverName) && string.IsNullOrWhiteSpace(row.DriverName))
+            {
+                row.DriverName = driverName;
+                changed = true;
+            }
+            if (changed) row.UpdatedAt = DateTime.UtcNow;
+        }
     }
 
     static object MapLoading(LrLoadingSheet s) => new

@@ -50,7 +50,8 @@ export function isFocusableEditable(el) {
   if (style.display === 'none' || style.visibility === 'hidden') return false
   if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return false
   if (el.hasAttribute('readonly') || el.getAttribute('aria-readonly') === 'true') return false
-  if (el.tabIndex < 0 && !isEditableTarget(el)) return false
+  if (el.tabIndex < 0 && !isEditableTarget(el) && el.getAttribute('data-kbd-focus') !== 'true') return false
+  if (el.getAttribute('data-kbd-focus') === 'true') return true
   return isEditableTarget(el) || (el.tabIndex >= 0 && !['BUTTON'].includes(el.tagName))
 }
 
@@ -66,9 +67,9 @@ export function getEditableElements(root = document) {
   return [...root.querySelectorAll(selector)].filter((el) => isFocusableEditable(/** @type {HTMLElement} */ (el)))
 }
 
-/** @param {HTMLElement} el @param {boolean} reverse */
-export function focusNextEditable(el, reverse = false) {
-  const root = el.closest('[data-kbd-form-root]') ?? document
+/** @param {HTMLElement} el @param {boolean} reverse @param {ParentNode|null} [rootOverride] */
+export function focusNextEditable(el, reverse = false, rootOverride = null) {
+  const root = rootOverride ?? el.closest('[data-kbd-form-root]') ?? document
   const all = getEditableElements(root)
   const idx = all.indexOf(el)
   if (idx === -1) {

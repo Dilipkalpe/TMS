@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ERPContentPage from '../ui/ERPContentPage'
 import Card from '../ui/Card'
@@ -6,6 +6,15 @@ import Button from '../ui/Button'
 import Input, { Select } from '../ui/Input'
 import { Save, ArrowLeft, Loader2 } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
+import { clearControlsAfterSave } from '../../utils/formResetAfterSave'
+
+function buildEmptyForm(fields, initialValues = {}) {
+  return fields.reduce((acc, f) => {
+    const key = f.name || f.label.toLowerCase().replace(/\s+/g, '')
+    acc[key] = initialValues[key] ?? f.defaultValue ?? ''
+    return acc
+  }, {})
+}
 
 export default function NewRecordForm({
   module,
@@ -18,13 +27,8 @@ export default function NewRecordForm({
 }) {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const [form, setForm] = useState(() =>
-    fields.reduce((acc, f) => {
-      const key = f.name || f.label.toLowerCase().replace(/\s+/g, '')
-      acc[key] = initialValues[key] ?? f.defaultValue ?? ''
-      return acc
-    }, {}),
-  )
+  const formRootRef = useRef(null)
+  const [form, setForm] = useState(() => buildEmptyForm(fields, initialValues))
   const [saving, setSaving] = useState(false)
 
   const setField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }))
@@ -38,7 +42,10 @@ export default function NewRecordForm({
     try {
       await onSubmit(form)
       toast({ title: 'Saved', message: `${saveLabel} created successfully.`, type: 'success' })
-      navigate(listPath)
+      clearControlsAfterSave({
+        reset: () => setForm(buildEmptyForm(fields)),
+        formRoot: formRootRef.current,
+      })
     } catch (err) {
       toast({ title: 'Save failed', message: err.message || 'Could not save record.', type: 'error' })
     } finally {
@@ -49,7 +56,7 @@ export default function NewRecordForm({
   return (
     <ERPContentPage module={module} title={title}>
       <Card>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div ref={formRootRef} data-kbd-form-root className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {fields.map((field) => {
             const key = field.name || field.label.toLowerCase().replace(/\s+/g, '')
             return field.type === 'select' ? (

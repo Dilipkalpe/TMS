@@ -198,6 +198,7 @@ export const bookingsApi = {
 }
 
 export const vehiclesApi = {
+  masterKey: 'vehicles',
   list: (params = {}) => apiRequest(`/vehicles?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/vehicles/${id}`),
   create: (data) => apiRequest('/vehicles', { method: 'POST', body: data }),
@@ -206,6 +207,7 @@ export const vehiclesApi = {
 }
 
 export const driversApi = {
+  masterKey: 'drivers',
   list: (params = {}) => apiRequest(`/drivers?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/drivers/${id}`),
   create: (data) => apiRequest('/drivers', { method: 'POST', body: data }),
@@ -214,6 +216,7 @@ export const driversApi = {
 }
 
 export const customersApi = {
+  masterKey: 'customers',
   list: (params = {}) => apiRequest(`/customers?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/customers/${id}`),
   create: (data) => apiRequest('/customers', { method: 'POST', body: data }),
@@ -253,6 +256,7 @@ export const freightInvoicesApi = {
 }
 
 export const vendorsApi = {
+  masterKey: 'vendors',
   list: (params = {}) => apiRequest(`/vendors?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/vendors/${id}`),
   create: (data) => apiRequest('/vendors', { method: 'POST', body: data }),
@@ -261,6 +265,7 @@ export const vendorsApi = {
 }
 
 export const consignorsApi = {
+  masterKey: 'consignors',
   list: (params = {}) => apiRequest(`/consignors?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/consignors/${id}`),
   create: (data) => apiRequest('/consignors', { method: 'POST', body: data }),
@@ -269,6 +274,7 @@ export const consignorsApi = {
 }
 
 export const consigneesApi = {
+  masterKey: 'consignees',
   list: (params = {}) => apiRequest(`/consignees?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/consignees/${id}`),
   create: (data) => apiRequest('/consignees', { method: 'POST', body: data }),
@@ -277,6 +283,7 @@ export const consigneesApi = {
 }
 
 export const itemsApi = {
+  masterKey: 'items',
   list: (params = {}) => apiRequest(`/items?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/items/${id}`),
   create: (data) => apiRequest('/items', { method: 'POST', body: data }),

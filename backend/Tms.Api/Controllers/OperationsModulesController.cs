@@ -117,7 +117,9 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
     {
         var q = from p in tenants.Filter(db.LrTransitPasses.AsNoTracking())
                 join lr in ScopedLrs() on p.LrNumber equals lr.LrNumber
-                select new { Pass = p, Lr = lr };
+                join s in tenants.Filter(db.LrLoadingSheets.AsNoTracking()) on p.LoadingSheetId equals s.Id into sj
+                from sheet in sj.DefaultIfEmpty()
+                select new { Pass = p, Lr = lr, Sheet = sheet };
 
         if (dateFrom.HasValue) q = q.Where(x => x.Pass.IssueDate >= dateFrom);
         if (dateTo.HasValue) q = q.Where(x => x.Pass.IssueDate <= dateTo);
@@ -127,12 +129,16 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             q = q.Where(x =>
                 EF.Functions.ILike(x.Pass.PassNumber, s) ||
                 EF.Functions.ILike(x.Pass.LrNumber, s) ||
-                EF.Functions.ILike(x.Pass.VehicleNumber ?? "", s));
+                EF.Functions.ILike(x.Pass.VehicleNumber ?? "", s) ||
+                EF.Functions.ILike(x.Lr.VehicleNumber ?? "", s) ||
+                EF.Functions.ILike(x.Sheet.VehicleNumber ?? "", s) ||
+                EF.Functions.ILike(x.Pass.DriverName ?? "", s) ||
+                EF.Functions.ILike(x.Lr.DriverName ?? "", s));
         }
 
         q = q.OrderByDescending(x => x.Pass.IssueDate);
         var (pNo, size) = QueryExtensions.NormalizePaging(page, pageSize);
-        var (items, total, hasMore, approx) = await q.Select(x => new
+        var (pageItems, total, hasMore, approx) = await q.Select(x => new
         {
             id = x.Pass.Id,
             passNumber = x.Pass.PassNumber,
@@ -142,8 +148,9 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             tripNo = x.Pass.TripNo ?? x.Pass.VehicleNumber,
             fromBranch = x.Pass.RouteFrom,
             toBranch = x.Pass.RouteTo,
-            vehicleNumber = x.Pass.VehicleNumber ?? x.Lr.VehicleNumber,
+            vehicleNumber = x.Pass.VehicleNumber ?? x.Lr.VehicleNumber ?? x.Sheet.VehicleNumber,
             driver = x.Pass.DriverName ?? x.Lr.DriverName,
+            sheetExt = x.Sheet.ExtendedDataJson,
             validFrom = x.Pass.IssueDate,
             validTo = x.Pass.ExpectedDelivery ?? x.Pass.IssueDate.AddDays(3),
             status = x.Lr.Status == LrStatuses.InTransit ? "In Transit" :
@@ -155,7 +162,40 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             branchName = x.Lr.Branch != null ? x.Lr.Branch.Name : null,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
-        return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
+        var missingVehicle = pageItems
+            .Where(x => string.IsNullOrWhiteSpace(x.vehicleNumber))
+            .Select(x => x.lrNumber)
+            .Distinct()
+            .ToList();
+        var vehicleMap = missingVehicle.Count > 0
+            ? await LrProcessService.LoadVehicleByLrAsync(db, missingVehicle, ct)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var items = pageItems.Select(x => (object)new
+        {
+            x.id,
+            x.passNumber,
+            x.passDate,
+            x.lrNumber,
+            x.loadingSheetId,
+            x.tripNo,
+            x.fromBranch,
+            x.toBranch,
+            vehicleNumber = !string.IsNullOrWhiteSpace(x.vehicleNumber)
+                ? x.vehicleNumber
+                : vehicleMap.GetValueOrDefault(x.lrNumber),
+            driver = !string.IsNullOrWhiteSpace(x.driver)
+                ? x.driver
+                : DriverFromLoadingExt(x.sheetExt),
+            x.validFrom,
+            x.validTo,
+            x.status,
+            x.lrStatus,
+            x.createdBy,
+            x.branchName,
+        }).ToList();
+
+        return Ok(new PagedResult<object>(items, total, pNo, size, hasMore, approx));
     }
 
     [HttpGet("dispatch/summary")]
@@ -182,13 +222,29 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
         [FromQuery] bool includeTotal = true,
         CancellationToken ct = default)
     {
+        // Only recorded dispatches — exclude pending (Transit Pass Generated / not yet confirmed)
         var q = from p in tenants.Filter(db.LrTransitPasses.AsNoTracking())
                 join lr in ScopedLrs() on p.LrNumber equals lr.LrNumber
-                where lr.Status == LrStatuses.TransitPassGenerated
-                select new { Pass = p, Lr = lr };
+                join d in tenants.Filter(db.LrDeliverySheets.AsNoTracking()) on p.LrNumber equals d.LrNumber
+                join s in tenants.Filter(db.LrLoadingSheets.AsNoTracking()) on p.LoadingSheetId equals s.Id into sj
+                from sheet in sj.DefaultIfEmpty()
+                where d.TripNo != null && d.TripNo != ""
+                      && lr.Status != LrStatuses.TransitPassGenerated
+                select new { Pass = p, Lr = lr, Sheet = sheet, Delivery = d };
 
         if (dateFrom.HasValue) q = q.Where(x => x.Pass.IssueDate >= dateFrom);
         if (dateTo.HasValue) q = q.Where(x => x.Pass.IssueDate <= dateTo);
+        if (!string.IsNullOrWhiteSpace(status) && !string.Equals(status, "(All)", StringComparison.OrdinalIgnoreCase))
+        {
+            var st = status.Trim();
+            if (st.Equals("Dispatched", StringComparison.OrdinalIgnoreCase)
+                || st.Equals("In Transit", StringComparison.OrdinalIgnoreCase))
+                q = q.Where(x => x.Lr.Status == LrStatuses.InTransit
+                    || x.Delivery.ShipmentStatus == "In Transit");
+            else if (st.Equals("Delivered", StringComparison.OrdinalIgnoreCase))
+                q = q.Where(x => x.Lr.Status == LrStatuses.DeliveryCompleted
+                    || x.Lr.Status == LrStatuses.PodUploaded);
+        }
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = $"%{search.Trim()}%";
@@ -196,30 +252,66 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
                 EF.Functions.ILike(x.Pass.PassNumber, s) ||
                 EF.Functions.ILike(x.Pass.LrNumber, s) ||
                 EF.Functions.ILike(x.Pass.VehicleNumber ?? "", s) ||
-                EF.Functions.ILike(x.Pass.DriverName ?? "", s));
+                EF.Functions.ILike(x.Lr.VehicleNumber ?? "", s) ||
+                EF.Functions.ILike(x.Pass.DriverName ?? "", s) ||
+                EF.Functions.ILike(x.Lr.DriverName ?? "", s) ||
+                EF.Functions.ILike(x.Delivery.TripNo ?? "", s));
         }
 
-        q = q.OrderByDescending(x => x.Pass.IssueDate);
+        q = q.OrderByDescending(x => x.Delivery.UpdatedAt).ThenByDescending(x => x.Pass.IssueDate);
         var (pNo, size) = QueryExtensions.NormalizePaging(page, pageSize);
-        var (items, total, hasMore, approx) = await q.Select(x => new
+        var (pageItems, total, hasMore, approx) = await q.Select(x => new
         {
             id = x.Pass.Id,
-            dispatchNo = (string?)null,
+            dispatchNo = x.Delivery.TripNo,
             transitPassNo = x.Pass.PassNumber,
             passNumber = x.Pass.PassNumber,
             lrNumber = x.Pass.LrNumber,
             dispatchDate = x.Pass.IssueDate,
-            vehicleNumber = x.Pass.VehicleNumber ?? x.Lr.VehicleNumber,
+            vehicleNumber = x.Pass.VehicleNumber ?? x.Lr.VehicleNumber ?? x.Sheet.VehicleNumber,
             driver = x.Pass.DriverName ?? x.Lr.DriverName,
+            sheetExt = x.Sheet.ExtendedDataJson,
             from = x.Pass.RouteFrom,
             to = x.Pass.RouteTo,
             destination = x.Pass.RouteTo,
             lrCount = 1,
-            status = "Pending",
+            lrStatus = x.Lr.Status,
+            shipmentStatus = x.Delivery.ShipmentStatus,
             createdBy = x.Pass.CreatedBy,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
-        return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
+        var missingVehicle = pageItems
+            .Where(x => string.IsNullOrWhiteSpace(x.vehicleNumber))
+            .Select(x => x.lrNumber)
+            .Distinct()
+            .ToList();
+        var vehicleMap = missingVehicle.Count > 0
+            ? await LrProcessService.LoadVehicleByLrAsync(db, missingVehicle, ct)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var items = pageItems.Select(x => (object)new
+        {
+            x.id,
+            x.dispatchNo,
+            x.transitPassNo,
+            x.passNumber,
+            x.lrNumber,
+            x.dispatchDate,
+            vehicleNumber = !string.IsNullOrWhiteSpace(x.vehicleNumber)
+                ? x.vehicleNumber
+                : vehicleMap.GetValueOrDefault(x.lrNumber),
+            driver = !string.IsNullOrWhiteSpace(x.driver)
+                ? x.driver
+                : DriverFromLoadingExt(x.sheetExt),
+            x.from,
+            x.to,
+            x.destination,
+            x.lrCount,
+            status = ResolveDispatchListStatus(x.lrStatus, x.shipmentStatus, x.dispatchNo),
+            x.createdBy,
+        }).ToList();
+
+        return Ok(new PagedResult<object>(items, total, pNo, size, hasMore, approx));
     }
 
     [HttpGet("in-transit/summary")]
@@ -580,5 +672,47 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
+    }
+
+    static string ResolveDispatchListStatus(string? lrStatus, string? shipmentStatus, string? dispatchNo)
+    {
+        if (string.IsNullOrWhiteSpace(dispatchNo) && lrStatus == LrStatuses.TransitPassGenerated)
+            return "Pending";
+        if (lrStatus == LrStatuses.DeliveryCompleted || lrStatus == LrStatuses.PodUploaded)
+            return "Delivered";
+        if (lrStatus == LrStatuses.InTransit
+            || string.Equals(shipmentStatus, "In Transit", StringComparison.OrdinalIgnoreCase))
+            return "Dispatched";
+        return shipmentStatus ?? "Dispatched";
+    }
+
+    static string? DriverFromLoadingExt(string? extendedJson)
+    {
+        if (string.IsNullOrWhiteSpace(extendedJson) || extendedJson == "{}") return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(extendedJson);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("meta", out var meta) && meta.TryGetProperty("driver", out var driver))
+            {
+                var name = driver.GetString();
+                if (!string.IsNullOrWhiteSpace(name)) return name;
+            }
+            if (root.TryGetProperty("driverName", out var driverName))
+            {
+                var name = driverName.GetString();
+                if (!string.IsNullOrWhiteSpace(name)) return name;
+            }
+            if (root.TryGetProperty("driver", out var driverProp))
+            {
+                var name = driverProp.GetString();
+                if (!string.IsNullOrWhiteSpace(name)) return name;
+            }
+        }
+        catch
+        {
+            /* ignore malformed extended json */
+        }
+        return null;
     }
 }

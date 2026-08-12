@@ -7,7 +7,10 @@ export function buildLookupCountText({
   showNotFound,
 }) {
   if (loading) return 'Searching…'
-  if (showNotFound || optionCount === 0) return 'No records found'
+  if (showNotFound) return 'No match — press Enter to add'
+  if (optionCount === 0) {
+    return query?.trim() ? 'No records found' : 'Type to search…'
+  }
 
   const q = query?.trim()
   if (q) {

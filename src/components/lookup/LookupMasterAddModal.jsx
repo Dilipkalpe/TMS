@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
@@ -24,7 +24,10 @@ export default function LookupMasterAddModal({
 }) {
   const formRootRef = useRef(null)
   const { toast } = useToast()
-  const config = lookupKey ? getLookupMasterConfig(lookupKey, { employeeType }) : null
+  const config = useMemo(
+    () => (lookupKey ? getLookupMasterConfig(lookupKey, { employeeType }) : null),
+    [lookupKey, employeeType],
+  )
 
   const [form, setForm] = useState({})
   const [fieldErrors, setFieldErrors] = useState({})
@@ -32,14 +35,17 @@ export default function LookupMasterAddModal({
   const [duplicate, setDuplicate] = useState(null)
   const [saving, setSaving] = useState(false)
 
+  // Reset only when the dialog opens or the lookup context changes — not on every keystroke.
   useEffect(() => {
-    if (!open || !config) return
-    setForm(buildMasterInitialForm(config, searchText))
+    if (!open || !lookupKey) return
+    const nextConfig = getLookupMasterConfig(lookupKey, { employeeType })
+    if (!nextConfig) return
+    setForm(buildMasterInitialForm(nextConfig, searchText))
     setFieldErrors({})
     setFormError('')
     setDuplicate(null)
     setSaving(false)
-  }, [open, config, searchText, lookupKey])
+  }, [open, lookupKey, employeeType, searchText])
 
   if (!config) return null
 
@@ -122,8 +128,25 @@ export default function LookupMasterAddModal({
     const tag = e.target?.tagName
     if (tag === 'TEXTAREA') return
     if (e.target instanceof HTMLButtonElement) return
+    if (!(e.target instanceof HTMLElement)) return
+
+    // Ctrl/Cmd+Enter always saves.
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      handleSave()
+      return
+    }
+
+    // Plain Enter → next control inside this popup only
+    // (e.g. Item Name → HSN → Package Type → Unit → Save).
+    const target = e.target
     e.preventDefault()
-    handleSave()
+    e.stopPropagation()
+
+    const dialog = formRootRef.current?.closest('[role="dialog"]') ?? formRootRef.current
+    if (focusNextEditable(target, false, dialog)) return
+    dialog?.querySelector('[data-kbd-save]')?.focus()
   }
 
   return (
@@ -142,13 +165,13 @@ export default function LookupMasterAddModal({
           <Button size="sm" variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
+          <Button size="sm" onClick={handleSave} disabled={saving} data-kbd-save data-kbd-focus="true">
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
       )}
     >
-      <div ref={formRootRef} data-kbd-form-root onKeyDown={handleFormKeyDown}>
+      <div ref={formRootRef} onKeyDown={handleFormKeyDown}>
         {formError ? (
           <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
             {formError}
@@ -174,6 +197,7 @@ export default function LookupMasterAddModal({
               error={fieldErrors[field.key]}
               placeholder={field.placeholder}
               className={field.key === 'address' ? 'sm:col-span-2' : ''}
+              data-kbd-focus="true"
             />
           ))}
         </div>

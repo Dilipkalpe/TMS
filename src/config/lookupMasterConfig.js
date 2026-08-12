@@ -228,6 +228,7 @@ export function resolveLookupMasterKey(type, employeeType) {
 
 /** Map party master API to config key. */
 export function resolvePartyMasterKey(api) {
+  if (api?.masterKey) return api.masterKey
   if (api === consignorsApi) return 'consignors'
   if (api === consigneesApi) return 'consignees'
   if (api === customersApi) return 'customers'

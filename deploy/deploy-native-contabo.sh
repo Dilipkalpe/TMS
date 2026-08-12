@@ -29,18 +29,26 @@ backup_database() {
   local stamp
   stamp="$(date +%Y%m%d_%H%M%S)"
   local out="${BACKUP_DIR}/tms_${PG_DB}_${stamp}.dump"
-  # Try common ports: native 5432 then legacy Contabo/Coolify 5433
-  if command -v pg_dump >/dev/null 2>&1; then
-    if PGPASSWORD="${PG_PASSWORD:-}" pg_dump -h 127.0.0.1 -p 5432 -U "$PG_USER" -Fc -f "$out" "$PG_DB" 2>/dev/null \
-      || PGPASSWORD="${PG_PASSWORD:-}" pg_dump -h 127.0.0.1 -p 5433 -U "$PG_USER" -Fc -f "$out" "$PG_DB" 2>/dev/null \
-      || sudo -u postgres pg_dump -Fc -f "$out" "$PG_DB" 2>/dev/null; then
-      echo "Backup: $out ($(du -h "$out" | awk '{print $1}'))"
-    else
-      echo "WARNING: pg_dump failed — continuing only if you accept risk. Check DB credentials."
-    fi
-  else
+  if ! command -v pg_dump >/dev/null 2>&1; then
     echo "WARNING: pg_dump not installed"
+    return 0
   fi
+
+  # Prefer local peer auth (no password hang). Use timeouts so a bad host/password cannot block deploy.
+  if sudo -u postgres pg_dump -Fc -f "$out" "$PG_DB" 2>/dev/null; then
+    echo "Backup: $out ($(du -h "$out" | awk '{print $1}'))"
+    return 0
+  fi
+  if timeout 60 env PGPASSWORD="${PG_PASSWORD:-}" pg_dump -h 127.0.0.1 -p 5432 -U "$PG_USER" -Fc -f "$out" "$PG_DB" 2>/dev/null; then
+    echo "Backup: $out ($(du -h "$out" | awk '{print $1}'))"
+    return 0
+  fi
+  if timeout 60 env PGPASSWORD="${PG_PASSWORD:-}" pg_dump -h 127.0.0.1 -p 5433 -U "$PG_USER" -Fc -f "$out" "$PG_DB" 2>/dev/null; then
+    echo "Backup: $out ($(du -h "$out" | awk '{print $1}'))"
+    return 0
+  fi
+  echo "WARNING: pg_dump failed — continuing only if you accept risk. Check DB credentials."
+  rm -f "$out"
 }
 
 disable_old_8080() {

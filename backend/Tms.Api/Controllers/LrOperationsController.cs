@@ -70,6 +70,21 @@ public class LrOperationsController(TmsDbContext db, ITenantContext tenants, IBr
                 LrOperationsService.ResolveProcessStep(normalized) ?? step);
         }).ToList();
 
+        var missingVehicle = dtos
+            .Where(d => string.IsNullOrWhiteSpace(d.Vehicle))
+            .Select(d => d.LrNumber)
+            .ToList();
+        if (missingVehicle.Count > 0)
+        {
+            var map = await LrProcessService.LoadVehicleByLrAsync(db, missingVehicle, ct);
+            for (var i = 0; i < dtos.Count; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(dtos[i].Vehicle)) continue;
+                if (map.TryGetValue(dtos[i].LrNumber, out var vehicle))
+                    dtos[i] = dtos[i] with { Vehicle = vehicle };
+            }
+        }
+
         return Ok(new PagedResult<LrQueueItemDto>(dtos, total, p, size, hasMore, approx));
     }
 }

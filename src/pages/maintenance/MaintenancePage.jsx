@@ -142,8 +142,8 @@ export default function MaintenancePage() {
         lastServiceAt: new Date().toISOString(),
       })
       toast({ title: 'Service schedule created', type: 'success' })
+      setSchedForm({ vehicleId: '', serviceType: 'Engine Oil Change', intervalKm: '10000', intervalDays: '180' })
       load()
-      setTab('schedules')
     } catch (err) {
       toast({ title: 'Failed to create schedule', message: err.message, type: 'error' })
     }
@@ -161,8 +161,8 @@ export default function MaintenancePage() {
         vendor: recForm.vendor || undefined,
       })
       toast({ title: 'Maintenance record saved', type: 'success' })
+      setRecForm({ vehicleId: '', type: 'SCHEDULED', description: '', cost: '', odometer: '', vendor: '' })
       load()
-      setTab('records')
     } catch (err) {
       toast({ title: 'Failed to save record', message: err.message, type: 'error' })
     }
@@ -181,7 +181,6 @@ export default function MaintenancePage() {
       toast({ title: 'Spare part saved', type: 'success' })
       setPartForm({ sku: '', name: '', unitCost: '', stockQty: '0', minStock: '5' })
       load()
-      setTab('parts')
     } catch (err) {
       toast({ title: 'Failed to save part', message: err.message, type: 'error' })
     }
@@ -194,7 +193,6 @@ export default function MaintenancePage() {
       toast({ title: 'Work order created', type: 'success' })
       setWoForm({ vehicleId: '', title: '', component: 'Engine', priority: 'NORMAL', assignedTo: '' })
       load()
-      setTab('work-orders')
     } catch (err) {
       toast({ title: 'Failed to create work order', message: err.message, type: 'error' })
     }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import OutlinedField, { OUTLINED_CONTROL_CLASS } from '../ui/OutlinedField'
 import SearchableDropdownPanel from '../ui/SearchableDropdownPanel'
 import { useSearchableDropdownKeyboard } from '../../hooks/useSearchableDropdownKeyboard'
+import { useLookupAdvanceOnEnter } from '../../hooks/useLookupNotFoundEnter'
 import { focusNextEditable } from '../../keyboard/keyUtils'
 import { useBranch } from '../../context/BranchContext'
 
@@ -59,6 +60,8 @@ export default function BranchMasterSelect({
     }
   }, [onSelect])
 
+  const handleEnterNoSelection = useLookupAdvanceOnEnter({ setOpen, inputRef })
+
   const { handleKeyDown, pick } = useSearchableDropdownKeyboard({
     popupId,
     open,
@@ -73,14 +76,14 @@ export default function BranchMasterSelect({
     resetIndexOn: [query],
     onOpen: () => setOpen(true),
     onPick: (row) => onPick(row, { advanceFocus: true }),
-    onEnterNoSelection: () => setOpen(false),
+    onEnterNoSelection: handleEnterNoSelection,
   })
 
   const countText = loading
     ? 'Loading branches…'
     : options.length
       ? `${options.length} branch${options.length === 1 ? '' : 'es'}`
-      : 'No branches found'
+      : (query.trim() ? 'No branches found' : 'Type to search…')
 
   return (
     <div className={`relative ${className}`}>
@@ -115,7 +118,7 @@ export default function BranchMasterSelect({
       >
         {loading && <li className="lookup-dropdown-empty">Loading…</li>}
         {!loading && options.length === 0 && (
-          <li className="lookup-dropdown-empty">No branches found</li>
+          <li className="lookup-dropdown-empty">{query.trim() ? 'No branches found' : 'Type to search…'}</li>
         )}
         {!loading && options.map((row, idx) => {
           const { primary, secondary } = displayLines(row)

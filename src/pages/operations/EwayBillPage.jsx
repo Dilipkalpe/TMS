@@ -185,7 +185,6 @@ export default function EwayBillPage() {
       toast({ title: 'Saved', message: 'E-Way bill registered.', type: 'success' })
       setEditingId(null)
       setForm(emptyForm())
-      setTab('list')
       load()
     } catch (err) {
       toast({ title: 'Save failed', message: err.message, type: 'error' })

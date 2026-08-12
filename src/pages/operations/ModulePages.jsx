@@ -82,8 +82,8 @@ export function FuelPage() {
         stationName: form.stationName || undefined,
       })
       toast({ title: 'Fuel entry saved', type: 'success' })
+      setForm({ vehicleId: '', liters: '', costPerLiter: '95', odometer: '', stationName: '' })
       load()
-      setTab('entries')
     } catch (err) {
       toast({ title: 'Save failed', message: err.message, type: 'error' })
     }
@@ -463,7 +463,6 @@ export function CustomerPortalPage() {
       })
       toast({ title: 'Customer booking created', type: 'success' })
       setForm({ origin: '', destination: '', customerName: '', freightAmount: '', material: '' })
-      setTab('shipments')
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -596,7 +595,6 @@ export function TripsPage() {
       })
       toast({ title: 'Trip created', type: 'success' })
       setForm({ origin: '', destination: '', vehicleId: '', driverId: '', plannedStart: '', plannedEnd: '' })
-      setTab('list')
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -764,7 +762,7 @@ export function FinanceModulePage() {
         lines: [{ description: form.description || 'Freight', quantity: 1, unitPrice: Number(form.amount || 0) }],
       })
       toast({ title: 'Invoice created', type: 'success' })
-      setTab('invoices')
+      setForm({ customerId: '', amount: '', taxAmount: '0', description: 'Freight charges' })
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -854,7 +852,7 @@ export function DocumentsPage() {
         expiresAt: form.expiresAt || undefined,
       })
       toast({ title: 'Document saved', type: 'success' })
-      setTab('all')
+      setForm({ entityType: 'Vehicle', entityId: '', docType: 'Insurance', title: '', fileUrl: '', expiresAt: '' })
       load()
     } catch (e) {
       toast({ title: 'Save failed', message: e.message, type: 'error' })
@@ -953,6 +951,7 @@ export function NotificationsPage() {
     try {
       await notificationsApi.sendTest(test)
       toast({ title: 'Test sent', type: 'success' })
+      setTest({ channel: 'IN_APP', to: '', message: 'TMS Pro test notification' })
       load()
     } catch (e) {
       toast({ title: 'Send failed', message: e.message, type: 'error' })
@@ -1083,7 +1082,7 @@ export function MarketplacePage() {
         capacityKg: form.capacityKg ? Number(form.capacityKg) : undefined,
       })
       toast({ title: 'Listing created', type: 'success' })
-      setTab('listings')
+      setForm({ listingType: 'LOAD', origin: '', destination: '', rate: '', capacityKg: '' })
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -1095,7 +1094,7 @@ export function MarketplacePage() {
     try {
       await marketplaceApi.bid(bidForm.listingId, { bidderName: bidForm.bidderName, amount: Number(bidForm.amount) })
       toast({ title: 'Bid placed', type: 'success' })
-      setTab('listings')
+      setBidForm({ listingId: '', bidderName: '', amount: '' })
       load()
     } catch (e) {
       toast({ title: 'Bid failed', message: e.message, type: 'error' })
@@ -1162,7 +1161,7 @@ export function WarehousePage() {
     try {
       await warehouseApi.create({ name: form.name, address: form.address || undefined, capacityCbm: form.capacityCbm ? Number(form.capacityCbm) : undefined })
       toast({ title: 'Warehouse created', type: 'success' })
-      setTab('list')
+      setForm({ name: '', address: '', capacityCbm: '' })
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -1179,7 +1178,7 @@ export function WarehousePage() {
         weightKg: Number(inv.weightKg || 0),
       })
       toast({ title: 'Inventory added', type: 'success' })
-      setTab('list')
+      setInv((prev) => ({ warehouseId: prev.warehouseId, sku: '', description: '', quantity: '', weightKg: '' }))
       load()
     } catch (e) {
       toast({ title: 'Add failed', message: e.message, type: 'error' })
@@ -1267,7 +1266,7 @@ export function IotPage() {
         vehicleId: form.vehicleId || undefined,
       })
       toast({ title: 'Device registered', type: 'success' })
-      setTab('devices')
+      setForm({ deviceType: 'GPS', deviceSerial: '', vehicleId: '' })
       load()
     } catch (e) {
       toast({ title: 'Register failed', message: e.message, type: 'error' })
@@ -1283,7 +1282,7 @@ export function IotPage() {
         unit: reading.unit || undefined,
       })
       toast({ title: 'Reading saved', type: 'success' })
-      setTab('devices')
+      setReading((prev) => ({ deviceId: prev.deviceId, metric: 'temperature', value: '', unit: 'C' }))
       load()
     } catch (e) {
       toast({ title: 'Reading failed', message: e.message, type: 'error' })

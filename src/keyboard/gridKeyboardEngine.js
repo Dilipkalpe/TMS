@@ -169,6 +169,10 @@ export function createGridKeyboardEngine({
 
   const handleKeyDown = (e, container) => {
     if (!container?.contains(e.target)) return false
+    // Popups/modals (Add Item, Add Consignor, etc.) own Enter / arrows — never treat as grid nav.
+    if (e.target instanceof HTMLElement && e.target.closest('[data-kbd-popup], [role="dialog"]')) {
+      return false
+    }
 
     syncActiveCellFromTarget(e.target)
 

@@ -224,8 +224,8 @@ export default function LrEntryFormLayout({
         </div>
         <div className="lr-entry-section shrink-0">
           <div className="grid grid-cols-2 gap-x-2 gap-y-1 lg:grid-cols-4 xl:grid-cols-8">
-            <PartyMasterSelect label="Consignor *" api={consignorsApi} valueId={form.consignorId} displayValue={form.consignor} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row) }))} />
-            <PartyMasterSelect label="Consignee *" api={consigneesApi} valueId={form.consigneeId} displayValue={form.consignee} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row) }))} />
+            <PartyMasterSelect label="Consignor *" api={consignorsApi} masterKey="consignors" valueId={form.consignorId} displayValue={form.consignor} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsignorToLrForm(row) }))} />
+            <PartyMasterSelect label="Consignee *" api={consigneesApi} masterKey="consignees" valueId={form.consigneeId} displayValue={form.consignee} onSelect={(row) => setForm((prev) => ({ ...prev, ...applyConsigneeToLrForm(row) }))} />
             <Input label="From *" value={form.from} onChange={(e) => update('from', e.target.value)} />
             <Input label="To *" value={form.to} onChange={(e) => update('to', e.target.value)} />
             <VehicleMasterSelect

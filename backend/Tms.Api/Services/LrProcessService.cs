@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tms.Api.Data;
+using Tms.Api.DTOs;
 using Tms.Api.Models;
 
 namespace Tms.Api.Services;
@@ -84,5 +85,54 @@ public static class LrProcessService
             var required = allowedPriorStatuses.FirstOrDefault(s => order.IndexOf(s) == minRequired) ?? allowedPriorStatuses[0];
             throw new InvalidOperationException($"Complete prior step first. Required status: {required}. Current: {lr.Status}.");
         }
+    }
+
+    /// <summary>
+    /// For LRs that have a loading sheet vehicle but blank LR.VehicleNumber (legacy saves),
+    /// fill the DTO vehicle from the loading sheet so LR List shows the assigned vehicle.
+    /// </summary>
+    public static async Task FillVehicleFromLoadingSheetAsync(
+        TmsDbContext db, List<LrDto> dtos, CancellationToken ct = default)
+    {
+        var missing = dtos
+            .Where(d => string.IsNullOrWhiteSpace(d.Vehicle))
+            .Select(d => d.LrNumber)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (missing.Count == 0) return;
+
+        var map = await LoadVehicleByLrAsync(db, missing, ct);
+        if (map.Count == 0) return;
+
+        for (var i = 0; i < dtos.Count; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(dtos[i].Vehicle)) continue;
+            if (map.TryGetValue(dtos[i].LrNumber, out var vehicle))
+                dtos[i] = dtos[i] with { Vehicle = vehicle };
+        }
+    }
+
+    public static async Task<Dictionary<string, string>> LoadVehicleByLrAsync(
+        TmsDbContext db, IReadOnlyList<string> lrNumbers, CancellationToken ct = default)
+    {
+        if (lrNumbers.Count == 0)
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var rows = await (
+            from i in db.LrLoadingSheetItems.AsNoTracking()
+            join s in db.LrLoadingSheets.AsNoTracking() on i.LoadingSheetId equals s.Id
+            where lrNumbers.Contains(i.LrNumber)
+                  && s.VehicleNumber != null && s.VehicleNumber != ""
+            orderby s.UpdatedAt descending
+            select new { i.LrNumber, s.VehicleNumber }
+        ).ToListAsync(ct);
+
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            if (!map.ContainsKey(row.LrNumber))
+                map[row.LrNumber] = row.VehicleNumber!;
+        }
+        return map;
     }
 }

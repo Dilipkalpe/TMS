@@ -10,8 +10,8 @@ import LookupNotFoundOption from '../lookup/LookupNotFoundOption'
 import OutlinedField, { OUTLINED_CONTROL_CLASS } from './OutlinedField'
 import SearchableDropdownPanel from './SearchableDropdownPanel'
 import { useSearchableDropdownKeyboard } from '../../hooks/useSearchableDropdownKeyboard'
+import { useLookupNotFoundEnter } from '../../hooks/useLookupNotFoundEnter'
 import { useKeyboardShortcutsOptional } from '../../context/KeyboardShortcutContext'
-import { focusNextEditable } from '../../keyboard/keyUtils'
 
 const FETCHERS = {
   vehicles: lookupsApi.vehicles,
@@ -91,19 +91,6 @@ export default function LookupSelect({
   const popupId = useRef(`lookup-${type}-${employeeType ?? 'default'}-${Math.random().toString(36).slice(2)}`).current
   const kbd = useKeyboardShortcutsOptional()
 
-  const showNotFound = Boolean(
-    allowCreate && masterConfig && !loading && open && query.trim() && options.length === 0,
-  )
-
-  const navigableCount = showNotFound ? 1 : options.length
-
-  const countText = buildLookupCountText({
-    loading,
-    query,
-    optionCount: options.length,
-    showNotFound,
-  })
-
   const loadOptions = useCallback(async (searchText) => {
     if (!fetcher) return []
     setLoading(true)
@@ -154,17 +141,6 @@ export default function LookupSelect({
     return () => window.removeEventListener(LOOKUP_CREATED_EVENT, onCreated)
   }, [type, employeeType])
 
-  const pick = useCallback((item, { advanceFocus = false } = {}) => {
-    onChange?.(item)
-    setQuery(item)
-    setOpen(false)
-    setMasterAddOpen(false)
-    setMasterSearchText('')
-    if (advanceFocus && inputRef.current) {
-      requestAnimationFrame(() => focusNextEditable(inputRef.current))
-    }
-  }, [onChange])
-
   const openMasterAdd = useCallback((text) => {
     const trimmed = text.trim()
     if (!trimmed || !allowCreate || !masterConfig) {
@@ -180,12 +156,40 @@ export default function LookupSelect({
     setOpen(false)
   }, [allowCreate, masterConfig, onChange])
 
-  const handleEnterNoSelection = useCallback(() => {
-    if (loading) return
-    if (showNotFound) {
-      openMasterAdd(query)
-    }
-  }, [loading, showNotFound, openMasterAdd, query])
+  const {
+    showNotFound,
+    navigableCount,
+    handleEnterNoSelection,
+    emptyListMessage,
+    advanceFocus,
+  } = useLookupNotFoundEnter({
+    allowCreate,
+    masterConfig,
+    loading,
+    open,
+    query,
+    optionsLength: options.length,
+    setActiveIndex,
+    setOpen,
+    inputRef,
+    openMasterAdd,
+  })
+
+  const countText = buildLookupCountText({
+    loading,
+    query,
+    optionCount: options.length,
+    showNotFound,
+  })
+
+  const pick = useCallback((item, { advanceFocus: goNext = false } = {}) => {
+    onChange?.(item)
+    setQuery(item)
+    setOpen(false)
+    setMasterAddOpen(false)
+    setMasterSearchText('')
+    if (goNext) advanceFocus()
+  }, [onChange, advanceFocus])
 
   const { handleKeyDown, pick: pickWithFocus, openList } = useSearchableDropdownKeyboard({
     popupId,
@@ -339,7 +343,7 @@ export default function LookupSelect({
             />
           )}
           {!loading && !showNotFound && options.length === 0 && (
-            <li className="lookup-dropdown-empty">No records found</li>
+            <li className="lookup-dropdown-empty">{emptyListMessage}</li>
           )}
           {!loading && options.map((opt, idx) => (
             <li key={opt}>

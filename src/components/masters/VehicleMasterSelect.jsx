@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import OutlinedField, { OUTLINED_CONTROL_CLASS } from '../ui/OutlinedField'
 import { useToast } from '../../context/ToastContext'
 import { useSearchableDropdownKeyboard } from '../../hooks/useSearchableDropdownKeyboard'
-import { focusNextEditable } from '../../keyboard/keyUtils'
+import { useLookupNotFoundEnter } from '../../hooks/useLookupNotFoundEnter'
 import { buildLookupCountText } from '../../utils/lookupDropdownUtils'
 import LookupMasterAddModal from '../lookup/LookupMasterAddModal'
 import LookupNotFoundOption from '../lookup/LookupNotFoundOption'
@@ -48,18 +48,6 @@ export default function VehicleMasterSelect({
   const popupId = useRef(`vehicle-master-${Math.random().toString(36).slice(2)}`).current
   const { toast } = useToast()
 
-  const showNotFound = Boolean(
-    allowCreate && masterConfig && !loading && open && query.trim() && options.length === 0,
-  )
-  const navigableCount = showNotFound ? 1 : options.length
-  const countText = buildLookupCountText({
-    loading,
-    query,
-    optionCount: options.length,
-    totalCount,
-    showNotFound,
-  })
-
   useEffect(() => {
     setQuery(displayValue || '')
   }, [displayValue])
@@ -93,15 +81,6 @@ export default function VehicleMasterSelect({
     return () => clearTimeout(t)
   }, [open, query, loadOptions])
 
-  const onPick = useCallback((row, { advanceFocus = false } = {}) => {
-    setQuery(formatLabel(row))
-    setOpen(false)
-    onSelect?.(row)
-    if (advanceFocus && inputRef.current) {
-      requestAnimationFrame(() => focusNextEditable(inputRef.current))
-    }
-  }, [onSelect])
-
   const openMasterAdd = useCallback((text) => {
     const trimmed = text.trim()
     if (!trimmed || !allowCreate || !masterConfig) {
@@ -113,11 +92,39 @@ export default function VehicleMasterSelect({
     setOpen(false)
   }, [allowCreate, masterConfig])
 
-  const handleEnterNoSelection = useCallback(() => {
-    if (loading) return
-    if (showNotFound) openMasterAdd(query)
-    else setOpen(false)
-  }, [loading, showNotFound, openMasterAdd, query])
+  const {
+    showNotFound,
+    navigableCount,
+    handleEnterNoSelection,
+    emptyListMessage,
+    advanceFocus,
+  } = useLookupNotFoundEnter({
+    allowCreate,
+    masterConfig,
+    loading,
+    open,
+    query,
+    optionsLength: options.length,
+    setActiveIndex,
+    setOpen,
+    inputRef,
+    openMasterAdd,
+  })
+
+  const countText = buildLookupCountText({
+    loading,
+    query,
+    optionCount: options.length,
+    totalCount,
+    showNotFound,
+  })
+
+  const onPick = useCallback((row, { advanceFocus: goNext = false } = {}) => {
+    setQuery(formatLabel(row))
+    setOpen(false)
+    onSelect?.(row)
+    if (goNext) advanceFocus()
+  }, [onSelect, advanceFocus])
 
   const { handleKeyDown, pick } = useSearchableDropdownKeyboard({
     popupId,
@@ -136,7 +143,6 @@ export default function VehicleMasterSelect({
     onPick: (row) => onPick(row, { advanceFocus: true }),
     onEnterNoSelection: handleEnterNoSelection,
   })
-
   const handleMasterSaved = (result) => {
     const row = result.record ?? { id: result.id, number: result.label }
     onSelect?.(row)
@@ -197,7 +203,7 @@ export default function VehicleMasterSelect({
             />
           )}
           {!loading && !showNotFound && options.length === 0 && (
-            <li className="lookup-dropdown-empty">No records found</li>
+            <li className="lookup-dropdown-empty">{emptyListMessage}</li>
           )}
           {!loading && options.map((row, idx) => {
             const { primary, secondary } = displayLines(row)

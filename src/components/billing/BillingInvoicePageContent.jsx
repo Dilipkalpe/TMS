@@ -328,7 +328,8 @@ export default function BillingInvoicePageContent({
             },
           })
         }
-        navigate('/operations/billing/list')
+        // Fresh invoice entry — clear related page controls
+        navigate('/operations/billing/invoice', { replace: true })
       },
     )
   }
@@ -494,6 +495,7 @@ export default function BillingInvoicePageContent({
             <PartyMasterSelect
               label={false}
               api={customersApi}
+              masterKey="customers"
               valueId={customerId}
               displayValue={form.billTo}
               placeholder="Search customer by Name / GSTIN / Mobile…"
