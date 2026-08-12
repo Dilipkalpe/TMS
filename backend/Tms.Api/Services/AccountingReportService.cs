@@ -120,28 +120,17 @@ public static class AccountingReportService
 
     public static async Task<List<object>> BuildTrialBalanceAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var ledger = await tenants.Filter(db.LedgerAccounts.AsQueryable()).Where(l => l.IsActive).ToListAsync(ct);
-        if (ledger.Count > 0)
-        {
-            return ledger
-                .Where(l => l.Balance != 0)
-                .Select(l => (object)new
-                {
-                    account = l.Name,
-                    debit = l.Balance > 0 ? l.Balance : 0m,
-                    credit = l.Balance < 0 ? -l.Balance : 0m
-                })
-                .ToList();
-        }
-
+        // Always build from live ops — ledger_accounts.balance holds seed/demo figures.
         var bookings = TenantScope.Bookings(db, tenants, branches);
         var cash = await AccountingBalanceService.GetCashBalanceAsync(db, tenants, branches, ct);
         var bank = await AccountingBalanceService.GetBankBalanceAsync(db, tenants, branches, ct);
         var receivable = await bookings.SumAsync(b => b.Balance, ct);
+        var income = await bookings.SumAsync(b => b.Freight, ct);
         var scopedBookingIds = bookings.Select(b => b.Id);
         var brokerPayable = await tenants.Filter(db.BookingBrokerCharges.AsQueryable()).Where(c => scopedBookingIds.Contains(c.BookingId)).SumAsync(c => c.Amount - c.PaidAmount, ct);
         var vendorPayable = await TenantScope.Vendors(db, tenants, branches).SumAsync(v => v.Outstanding, ct);
         var totalExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, branches, ct);
+        var gst = await TenantScope.LorryReceipts(db, tenants, branches).SumAsync(l => l.Gst, ct);
 
         var rows = new List<object>();
         void Add(string account, decimal debit, decimal credit)
@@ -152,10 +141,12 @@ public static class AccountingReportService
 
         Add("Cash in Hand", Math.Max(0, cash), 0);
         Add("Bank", Math.Max(0, bank), 0);
-        Add("Accounts Receivable", receivable, 0);
-        Add("Broker Payable", 0, brokerPayable);
-        Add("Vendor Payable", 0, vendorPayable);
-        Add("Operating Expenses", totalExpenses, 0);
+        Add("Accounts Receivable", Math.Max(0, receivable), 0);
+        Add("Freight Income", 0, Math.Max(0, income));
+        Add("Broker Payable", 0, Math.Max(0, brokerPayable));
+        Add("Vendor Payable", 0, Math.Max(0, vendorPayable));
+        Add("GST Payable", 0, Math.Max(0, gst));
+        Add("Operating Expenses", Math.Max(0, totalExpenses), 0);
 
         return rows;
     }
@@ -526,6 +517,61 @@ public static class AccountingReportService
                 balance
             };
         }).ToList();
+    }
+
+    /// <summary>Live ops balances by ledger code / name alias (ignores seeded ledger_accounts.balance).</summary>
+    public static async Task<Dictionary<string, decimal>> BuildLiveAccountBalancesAsync(
+        TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
+    {
+        var bookings = TenantScope.Bookings(db, tenants, branches);
+        var income = await bookings.SumAsync(b => b.Freight, ct);
+        var recv = await bookings.SumAsync(b => b.Balance, ct);
+        var cash = await AccountingBalanceService.GetCashBalanceAsync(db, tenants, branches, ct);
+        var bank = await AccountingBalanceService.GetBankBalanceAsync(db, tenants, branches, ct);
+        var operatingExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, branches, ct);
+        var vendorPay = await TenantScope.Vendors(db, tenants, branches).SumAsync(v => v.Outstanding, ct);
+        var scopedBookingIds = bookings.Select(b => b.Id);
+        var brokerPay = await tenants.Filter(db.BookingBrokerCharges.AsQueryable())
+            .Where(c => scopedBookingIds.Contains(c.BookingId))
+            .SumAsync(c => c.Amount - c.PaidAmount, ct);
+        var gst = await TenantScope.LorryReceipts(db, tenants, branches).SumAsync(l => l.Gst, ct);
+        var periodProfit = income - operatingExpenses - brokerPay;
+
+        return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["1001"] = cash,
+            ["1002"] = bank,
+            ["1003"] = 0m,
+            ["1101"] = recv,
+            ["1102"] = 0m,
+            ["1201"] = 0m,
+            ["2001"] = vendorPay,
+            ["2101"] = brokerPay,
+            ["2201"] = gst,
+            ["2202"] = 0m,
+            ["3001"] = periodProfit,
+            ["4001"] = income,
+            ["5001"] = operatingExpenses,
+            ["5002"] = 0m,
+            ["cash in hand"] = cash,
+            ["bank"] = bank,
+            ["accounts receivable"] = recv,
+            ["accounts payable"] = vendorPay,
+            ["gst payable"] = gst,
+            ["broker payable"] = brokerPay,
+            ["freight income"] = income,
+            ["operating expenses"] = operatingExpenses,
+            ["fuel expense"] = operatingExpenses,
+        };
+    }
+
+    public static decimal ResolveLiveBalance(IReadOnlyDictionary<string, decimal> live, string code, string name)
+    {
+        if (live.TryGetValue(code, out var byCode))
+            return byCode;
+        if (!string.IsNullOrWhiteSpace(name) && live.TryGetValue(name.Trim(), out var byName))
+            return byName;
+        return 0m;
     }
 
     public static DateOnly? ParseDate(string? value) =>

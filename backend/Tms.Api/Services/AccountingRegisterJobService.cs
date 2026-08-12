@@ -11,6 +11,7 @@ namespace Tms.Api.Services;
 public sealed class AccountingRegisterJobService(
     TmsDbContext db,
     ITenantContext tenants,
+    IBranchContext branches,
     IMemoryCache cache,
     IServiceScopeFactory scopeFactory,
     AccountingReadService accountingRead,
@@ -19,8 +20,10 @@ public sealed class AccountingRegisterJobService(
     public static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
     public static readonly string[] RegisterTypes = ["journal", "receipt", "payment", "purchase", "sales"];
 
-    public static string CacheKey(Guid companyId, string reportType) =>
-        $"accounting:register:{reportType}:{companyId}";
+    public static string CacheKey(Guid companyId, string reportType, Guid? branchId = null) =>
+        branchId == null
+            ? $"accounting:register:{reportType}:{companyId}"
+            : $"accounting:register:{reportType}:{companyId}:b:{branchId}";
 
     public async Task<object> GetRegisterAsync(string reportType, CancellationToken ct = default)
     {
@@ -30,31 +33,43 @@ public sealed class AccountingRegisterJobService(
         var companyId = tenants.EffectiveCompanyId;
         if (companyId == null) return Array.Empty<object>();
 
-        var key = CacheKey(companyId.Value, reportType);
+        var branchId = branches.EffectiveBranchId;
+        var key = CacheKey(companyId.Value, reportType, branchId);
+
         if (cache.TryGetValue(key, out object? cached) && cached is not null)
         {
-            _ = EnqueueRefreshIfStaleAsync(companyId.Value, reportType, ct);
+            // Company-wide background refresh only when viewing All Branches.
+            if (branchId == null)
+                _ = EnqueueRefreshIfStaleAsync(companyId.Value, reportType, ct);
             return cached;
         }
 
-        var fromJob = await TryLoadFromCompletedJobAsync(companyId.Value, reportType, ct);
-        if (fromJob != null)
+        // Branch-scoped views must not use company-wide SP / job cache (those ignore X-Branch-Id).
+        if (branchId == null)
         {
-            cache.Set(key, fromJob, CacheTtl);
-            return fromJob;
+            var fromJob = await TryLoadFromCompletedJobAsync(companyId.Value, reportType, ct);
+            if (fromJob != null)
+            {
+                cache.Set(key, fromJob, CacheTtl);
+                return fromJob;
+            }
         }
 
-        var data = await BuildRegisterAsync(reportType, companyId.Value, ct);
+        var data = await BuildRegisterAsync(reportType, companyId.Value, branches, skipStoredProc: branchId != null, ct);
         cache.Set(key, data, CacheTtl);
-        try
+
+        if (branchId == null)
         {
-            await EnqueueAsync(companyId.Value, reportType, ct);
+            try
+            {
+                await EnqueueAsync(companyId.Value, reportType, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to enqueue {ReportType} register job for company {CompanyId}", reportType, companyId);
+            }
         }
-        catch (Exception ex)
-        {
-            // Report data is already built — do not fail the request if job enqueue/cache write fails.
-            logger.LogWarning(ex, "Failed to enqueue {ReportType} register job for company {CompanyId}", reportType, companyId);
-        }
+
         return data;
     }
 
@@ -133,7 +148,8 @@ public sealed class AccountingRegisterJobService(
                 var scopedDb = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
                 var scopedRead = scope.ServiceProvider.GetRequiredService<AccountingReadService>();
                 var tenant = new FixedTenantContext(job.CompanyId);
-                var data = await BuildRegisterAsync(scopedDb, scopedRead, tenant, job.ReportType, ct);
+                // Background cache is always company-wide (All Branches).
+                var data = await BuildRegisterAsync(scopedDb, scopedRead, tenant, new AllBranchesContext(), job.ReportType, skipStoredProc: false, ct);
                 job.ResultJson = JsonSerializer.Serialize(data);
                 job.Status = "Completed";
                 job.CompletedAt = DateTime.UtcNow;
@@ -182,33 +198,36 @@ public sealed class AccountingRegisterJobService(
         return job?.ResultJson == null ? null : JsonSerializer.Deserialize<object>(job.ResultJson);
     }
 
-    Task<object> BuildRegisterAsync(string reportType, Guid companyId, CancellationToken ct)
+    Task<object> BuildRegisterAsync(string reportType, Guid companyId, IBranchContext branchCtx, bool skipStoredProc, CancellationToken ct)
     {
         var tenant = new FixedTenantContext(companyId);
-        return BuildRegisterAsync(db, accountingRead, tenant, reportType, ct);
+        return BuildRegisterAsync(db, accountingRead, tenant, branchCtx, reportType, skipStoredProc, ct);
     }
 
     static async Task<object> BuildRegisterAsync(
         TmsDbContext db,
         AccountingReadService accountingRead,
         ITenantContext tenant,
+        IBranchContext branchCtx,
         string reportType,
+        bool skipStoredProc,
         CancellationToken ct)
     {
         var companyId = tenant.EffectiveCompanyId ?? TenantContext.DefaultCompanyId;
-        var spResult = await accountingRead.TryGetRegisterAsync(companyId, reportType, ct: ct);
-        if (spResult != null)
-            return spResult;
+        if (!skipStoredProc)
+        {
+            var spResult = await accountingRead.TryGetRegisterAsync(companyId, reportType, ct: ct);
+            if (spResult != null)
+                return spResult;
+        }
 
-        // Background cache is company-wide (All Branches).
-        var allBranches = new AllBranchesContext();
         return reportType switch
         {
-            "journal" => await AccountingReportService.BuildJournalRegisterAsync(db, tenant, allBranches, ct),
-            "receipt" => await AccountingReportService.BuildReceiptRegisterAsync(db, tenant, allBranches, ct),
-            "payment" => await AccountingReportService.BuildPaymentRegisterAsync(db, tenant, allBranches, ct),
-            "purchase" => await AccountingReportService.BuildPurchaseRegisterAsync(db, tenant, allBranches, ct),
-            "sales" => await AccountingReportService.BuildSalesRegisterAsync(db, tenant, allBranches, ct),
+            "journal" => await AccountingReportService.BuildJournalRegisterAsync(db, tenant, branchCtx, ct),
+            "receipt" => await AccountingReportService.BuildReceiptRegisterAsync(db, tenant, branchCtx, ct),
+            "payment" => await AccountingReportService.BuildPaymentRegisterAsync(db, tenant, branchCtx, ct),
+            "purchase" => await AccountingReportService.BuildPurchaseRegisterAsync(db, tenant, branchCtx, ct),
+            "sales" => await AccountingReportService.BuildSalesRegisterAsync(db, tenant, branchCtx, ct),
             _ => throw new ArgumentException($"Unknown register type: {reportType}", nameof(reportType)),
         };
     }
@@ -221,25 +240,28 @@ public class AccountingReportWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = TimeSpan.FromSeconds(config.GetValue("Accounting:ReportJobIntervalSeconds", 45));
-        logger.LogInformation("Accounting report worker started (interval {Interval}s)", interval.TotalSeconds);
-
-        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-
+        var intervalSec = Math.Clamp(config.GetValue("Accounting:RegisterJobIntervalSeconds", 15), 5, 300);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var processor = scope.ServiceProvider.GetRequiredService<AccountingRegisterJobService>();
-                await processor.ProcessPendingAsync(stoppingToken);
+                var jobs = scope.ServiceProvider.GetRequiredService<AccountingRegisterJobService>();
+                await jobs.ProcessPendingAsync(stoppingToken);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Accounting report job processing failed");
+                logger.LogWarning(ex, "Accounting register worker tick failed");
             }
 
-            await Task.Delay(interval, stoppingToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(intervalSec), stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
     }
 }

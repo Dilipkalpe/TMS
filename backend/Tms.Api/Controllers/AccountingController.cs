@@ -16,11 +16,25 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
     [HttpGet("chart-of-accounts")]
     public async Task<ActionResult<object>> ChartOfAccounts()
     {
-        var list = await tenants.Filter(db.LedgerAccounts.AsQueryable()).Where(l => l.IsActive).OrderBy(l => l.Code).ToListAsync();
-        if (!list.Any()) return Ok(await BuildChartFromOperations());
-        return Ok(list.GroupBy(l => l.GroupName ?? "Other").ToDictionary(
-            g => g.Key,
-            g => g.Select(l => new { code = l.Code, name = l.Name, balance = Math.Abs(l.Balance) })));
+        // Always use live operational balances (seed ledger_accounts.balance is demo-only).
+        var live = await AccountingReportService.BuildLiveAccountBalancesAsync(db, tenants, branches);
+        var list = await tenants.Filter(db.LedgerAccounts.AsQueryable())
+            .Where(l => l.IsActive)
+            .OrderBy(l => l.Code)
+            .ToListAsync();
+
+        if (list.Count == 0)
+            return Ok(await BuildChartFromOperations(live));
+
+        return Ok(list
+            .GroupBy(l => l.GroupName ?? "Other")
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(l =>
+                {
+                    var bal = AccountingReportService.ResolveLiveBalance(live, l.Code, l.Name);
+                    return (object)new { code = l.Code, name = l.Name, balance = Math.Abs(bal) };
+                }).ToList()));
     }
 
     [HttpGet("ledger-master")]
@@ -42,12 +56,13 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
         q = q.OrderBy(l => l.Code);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var live = await AccountingReportService.BuildLiveAccountBalancesAsync(db, tenants, branches);
         var rows = items.Select(l => (object)new
         {
             code = l.Code,
             name = l.Name,
             type = l.AccountType,
-            balance = Math.Abs(l.Balance),
+            balance = Math.Abs(AccountingReportService.ResolveLiveBalance(live, l.Code, l.Name)),
         }).ToList();
         return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }
@@ -419,23 +434,29 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
     public async Task<ActionResult<object>> Gst() =>
         Ok(await AccountingReportService.BuildGstAsync(db, tenants, branches));
 
-    private async Task<object> BuildChartFromOperations()
+    private async Task<object> BuildChartFromOperations(IReadOnlyDictionary<string, decimal>? live = null)
     {
-        var income = await TenantScope.Bookings(db, tenants, branches).SumAsync(b => b.Freight);
-        var recv = await TenantScope.Bookings(db, tenants, branches).SumAsync(b => b.Balance);
-        var cash = await AccountingBalanceService.GetCashBalanceAsync(db, tenants, branches);
-        var bank = await AccountingBalanceService.GetBankBalanceAsync(db, tenants, branches);
-        var operatingExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, branches);
+        live ??= await AccountingReportService.BuildLiveAccountBalancesAsync(db, tenants, branches);
         return new Dictionary<string, object>
         {
             ["Assets"] = new[]
             {
-                new { code = "1101", name = "Accounts Receivable", balance = recv },
-                new { code = "1001", name = "Cash in Hand", balance = cash },
-                new { code = "1002", name = "Bank", balance = bank }
+                new { code = "1001", name = "Cash in Hand", balance = live.GetValueOrDefault("1001") },
+                new { code = "1002", name = "Bank", balance = live.GetValueOrDefault("1002") },
+                new { code = "1101", name = "Accounts Receivable", balance = live.GetValueOrDefault("1101") },
             },
-            ["Income"] = new[] { new { code = "4001", name = "Freight Income", balance = income } },
-            ["Expenses"] = new[] { new { code = "5001", name = "Operating Expenses", balance = operatingExpenses } }
+            ["Liabilities"] = new[]
+            {
+                new { code = "2001", name = "Accounts Payable", balance = live.GetValueOrDefault("2001") },
+                new { code = "2201", name = "GST Payable", balance = live.GetValueOrDefault("2201") },
+                new { code = "2101", name = "Broker Payable", balance = live.GetValueOrDefault("2101") },
+            },
+            ["Capital"] = new[]
+            {
+                new { code = "3001", name = "Period Profit / Capital", balance = live.GetValueOrDefault("3001") },
+            },
+            ["Income"] = new[] { new { code = "4001", name = "Freight Income", balance = live.GetValueOrDefault("4001") } },
+            ["Expenses"] = new[] { new { code = "5001", name = "Operating Expenses", balance = live.GetValueOrDefault("5001") } },
         };
     }
 }
