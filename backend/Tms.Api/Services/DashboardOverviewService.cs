@@ -166,26 +166,22 @@ public class DashboardOverviewService(TmsDbContext db, ITenantContext tenants, I
         var branchQ = tenants.Filter(db.Branches.AsNoTracking().Where(b => b.IsActive));
         if (branches.EffectiveBranchId != null)
             branchQ = branchQ.Where(b => b.Id == branches.EffectiveBranchId);
+        else if (!branches.CanAccessAllBranches && branches.AllowedBranchIds.Count > 0)
+        {
+            var allowed = branches.AllowedBranchIds.ToList();
+            branchQ = branchQ.Where(b => allowed.Contains(b.Id));
+        }
 
         var branchList = await branchQ.OrderBy(b => b.IsHeadOffice ? 0 : 1).ThenBy(b => b.Name).ToListAsync(ct);
         if (branchList.Count == 0) return [];
 
-        var companyBookings = tenants.Filter(db.Bookings.AsNoTracking());
-        var companyExpenses = tenants.Filter(db.Expenses.AsNoTracking());
-        var companyLrs = tenants.Filter(db.LorryReceipts.AsNoTracking());
-        var companyVehicles = tenants.Filter(db.Vehicles.AsNoTracking());
-        var companyDrivers = tenants.Filter(db.Drivers.AsNoTracking());
-        var companyInvoices = tenants.Filter(db.FreightInvoices.AsNoTracking());
-        if (branches.EffectiveBranchId != null)
-        {
-            var bid = branches.EffectiveBranchId;
-            companyBookings = companyBookings.Where(b => b.BranchId == bid);
-            companyExpenses = companyExpenses.Where(e => e.BranchId == bid);
-            companyLrs = companyLrs.Where(l => l.BranchId == bid);
-            companyVehicles = companyVehicles.Where(v => v.BranchId == bid);
-            companyDrivers = companyDrivers.Where(d => d.BranchId == bid);
-            companyInvoices = companyInvoices.Where(i => i.BranchId == bid);
-        }
+        // Respect All Branches vs selected branch (and allowed-branch set for scoped users).
+        var companyBookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking();
+        var companyExpenses = TenantScope.Expenses(db, tenants, branches).AsNoTracking();
+        var companyLrs = TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking();
+        var companyVehicles = TenantScope.Vehicles(db, tenants, branches).AsNoTracking();
+        var companyDrivers = TenantScope.Drivers(db, tenants, branches).AsNoTracking();
+        var companyInvoices = TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking();
 
         var bookingAggs = await companyBookings
             .Where(b => b.BranchId != null)

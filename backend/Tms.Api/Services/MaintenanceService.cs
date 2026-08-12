@@ -33,7 +33,7 @@ public static class MaintenanceRecordHelpers
         r.PerformedAt ?? DateTime.SpecifyKind(r.RecordDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
 }
 
-public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
+public class MaintenanceService(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
 {
     static readonly (string Component, string[] Keywords, int OverdueScore, int DueSoonScore, int KmOverScore)[] ComponentRules =
     [
@@ -68,7 +68,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
             await SyncKmBasedSchedulesAsync(ct);
 
         // Prefer vehicles that actually have maintenance schedules / status; hard-cap for large fleets.
-        var scheduledVehicleIds = await TenantScope.MaintenanceSchedules(db, tenants)
+        var scheduledVehicleIds = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .AsNoTracking()
             .Where(s => s.IsActive)
             .Select(s => s.VehicleId)
@@ -76,7 +76,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
             .Take(maxVehicles)
             .ToListAsync(ct);
 
-        IQueryable<Vehicle> vehicleQ = TenantScope.Vehicles(db, tenants).AsNoTracking();
+        IQueryable<Vehicle> vehicleQ = TenantScope.Vehicles(db, tenants, branches).AsNoTracking();
         if (scheduledVehicleIds.Count > 0)
         {
             vehicleQ = vehicleQ.Where(v =>
@@ -97,7 +97,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
         List<MaintenanceRecord> recentRecords = [];
         if (vehicleIds.Count > 0)
         {
-            recentRecords = await TenantScope.MaintenanceRecords(db, tenants)
+            recentRecords = await TenantScope.MaintenanceRecords(db, tenants, branches)
                 .AsNoTracking()
                 .Where(r => vehicleIds.Contains(r.VehicleId))
                 .OrderByDescending(r => r.RecordDate)
@@ -117,7 +117,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
         {
             try
             {
-                var suspiciousFuel = await TenantScope.FuelEntries(db, tenants)
+                var suspiciousFuel = await TenantScope.FuelEntries(db, tenants, branches)
                     .Where(e => e.IsSuspicious
                         && e.FilledAt >= DateTime.UtcNow.AddDays(-60)
                         && vehicleIds.Contains(e.VehicleId))
@@ -130,7 +130,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
 
             try
             {
-                var expenseRows = await tenants.Filter(db.Expenses.AsQueryable())
+                var expenseRows = await TenantScope.Expenses(db, tenants, branches)
                     .Where(e => e.Category == "Maintenance"
                         && e.VehicleId != null
                         && vehicleIds.Contains(e.VehicleId)
@@ -274,7 +274,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
 
     public async Task SyncKmBasedSchedulesAsync(CancellationToken ct = default)
     {
-        var schedules = await TenantScope.MaintenanceSchedules(db, tenants)
+        var schedules = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .Include(s => s.Vehicle)
             .Where(s => s.IsActive && s.IntervalKm != null && s.IntervalKm > 0)
             .Take(500)
@@ -282,7 +282,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
         if (schedules.Count == 0) return;
 
         var vehicleIds = schedules.Select(s => s.VehicleId).Distinct().ToList();
-        var recent = await TenantScope.MaintenanceRecords(db, tenants)
+        var recent = await TenantScope.MaintenanceRecords(db, tenants, branches)
             .AsNoTracking()
             .Where(r => vehicleIds.Contains(r.VehicleId))
             .OrderByDescending(r => r.RecordDate)
@@ -343,7 +343,7 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
     public async Task<MaintenanceAnalyticsDto> GetAnalyticsAsync(CancellationToken ct = default, IReadOnlyList<MaintenancePredictionDto>? predictions = null)
     {
         var since = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-6));
-        var costRows = await TenantScope.MaintenanceRecords(db, tenants)
+        var costRows = await TenantScope.MaintenanceRecords(db, tenants, branches)
             .AsNoTracking()
             .Where(r => r.RecordDate >= since)
             .Select(r => new { r.RecordDate, r.Cost })
@@ -379,24 +379,24 @@ public class MaintenanceService(TmsDbContext db, ITenantContext tenants)
 
     public async Task<object?> GetVehicleProfileAsync(string vehicleId, CancellationToken ct = default)
     {
-        var vehicle = await TenantScope.Vehicles(db, tenants).FirstOrDefaultAsync(v => v.Id == vehicleId, ct);
+        var vehicle = await TenantScope.Vehicles(db, tenants, branches).FirstOrDefaultAsync(v => v.Id == vehicleId, ct);
         if (vehicle == null) return null;
 
         var predictions = await ComputePredictionsAsync(ct);
         var prediction = predictions.FirstOrDefault(p => p.VehicleId == vehicleId);
 
-        var schedules = await TenantScope.MaintenanceSchedules(db, tenants)
+        var schedules = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .Where(s => s.VehicleId == vehicleId && s.IsActive)
             .OrderBy(s => s.NextDueAt)
             .ToListAsync(ct);
 
-        var records = await TenantScope.MaintenanceRecords(db, tenants)
+        var records = await TenantScope.MaintenanceRecords(db, tenants, branches)
             .Where(r => r.VehicleId == vehicleId)
             .OrderByDescending(r => r.RecordDate)
             .Take(10)
             .ToListAsync(ct);
 
-        var workOrders = await TenantScope.MaintenanceWorkOrders(db, tenants)
+        var workOrders = await TenantScope.MaintenanceWorkOrders(db, tenants, branches)
             .Where(w => w.VehicleId == vehicleId && w.Status != "COMPLETED" && w.Status != "CANCELLED")
             .OrderBy(w => w.DueAt)
             .ToListAsync(ct);

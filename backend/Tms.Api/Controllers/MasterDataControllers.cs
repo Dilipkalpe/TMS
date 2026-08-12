@@ -1037,7 +1037,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     {
         lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var lr = await db.LorryReceipts.FindAsync(lrNumber);
-        if (lr == null || !TenantScope.CanAccessTenantEntity(tenants, lr)) return NotFound();
+        if (lr == null || !TenantScope.CanAccessBranchEntity(tenants, branches, lr)) return NotFound();
 
         if (body.ContainsKey("lrDate"))
             lr.LrDate = ApiParseHelper.BodyDate(body, "lrDate", lr.LrDate);
@@ -1150,7 +1150,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     {
         lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var lr = await db.LorryReceipts.FindAsync(lrNumber);
-        if (lr == null || !TenantScope.CanAccessTenantEntity(tenants, lr)) return NotFound();
+        if (lr == null || !TenantScope.CanAccessBranchEntity(tenants, branches, lr)) return NotFound();
         db.LorryReceipts.Remove(lr);
         await db.SaveChangesAsync();
         return NoContent();

@@ -67,7 +67,7 @@ public class CustomerPortalController(TmsDbContext db, ITenantContext tenants, I
             .FirstOrDefaultAsync(t => t.BookingId == id);
         GpsTrack? track = null;
         if (booking.VehicleId != null)
-            track = await TenantScope.GpsTracks(db, tenants).Where(g => g.VehicleId == booking.VehicleId)
+            track = await TenantScope.GpsTracks(db, tenants, branches).Where(g => g.VehicleId == booking.VehicleId)
                 .OrderByDescending(g => g.RecordedAt).FirstOrDefaultAsync();
         var pod = await TenantScope.FindPodForBookingAsync(db, tenants, id);
         return Ok(new { booking, trip, lastGps = track, pod });
@@ -233,7 +233,7 @@ public class TripsController(TmsDbContext db, IBranchContext branches, ITenantCo
 [Authorize]
 [ApiController]
 [Route("api/documents")]
-public class DocumentsController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class DocumentsController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     // Use explicit "list" path — bare GET /api/documents collides with POST Save and can yield 405.
     [HttpGet("list")]
@@ -254,7 +254,7 @@ public class DocumentsController(TmsDbContext db, ITenantContext tenants) : Cont
             .Where(d => d.ExpiresAt != null && d.ExpiresAt <= horizon)
             .OrderBy(d => d.ExpiresAt).ToListAsync();
 
-        var vehicleDocs = await TenantScope.Vehicles(db, tenants).Where(v =>
+        var vehicleDocs = await TenantScope.Vehicles(db, tenants, branches).Where(v =>
             (v.Insurance != null && v.Insurance <= horizon) ||
             (v.Fitness != null && v.Fitness <= horizon) ||
             (v.Permit != null && v.Permit <= horizon) ||
@@ -270,7 +270,7 @@ public class DocumentsController(TmsDbContext db, ITenantContext tenants) : Cont
     {
         if (body.EntityType.Equals("Vehicle", StringComparison.OrdinalIgnoreCase))
         {
-            var vehicle = await TenantScope.Vehicles(db, tenants).FirstOrDefaultAsync(v => v.Id == body.EntityId);
+            var vehicle = await TenantScope.Vehicles(db, tenants, branches).FirstOrDefaultAsync(v => v.Id == body.EntityId);
             if (vehicle == null) return NotFound(new { message = "Vehicle not found" });
         }
 
@@ -547,7 +547,7 @@ public class WarehouseController(TmsDbContext db, ITenantContext tenants) : Cont
 [Authorize]
 [ApiController]
 [Route("api/iot")]
-public class IotController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class IotController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     [HttpGet("devices")]
     public async Task<IActionResult> Devices() =>
@@ -566,7 +566,7 @@ public class IotController(TmsDbContext db, ITenantContext tenants) : Controller
     {
         if (!string.IsNullOrEmpty(body.VehicleId))
         {
-            var vehicle = await TenantScope.Vehicles(db, tenants).FirstOrDefaultAsync(v => v.Id == body.VehicleId);
+            var vehicle = await TenantScope.Vehicles(db, tenants, branches).FirstOrDefaultAsync(v => v.Id == body.VehicleId);
             if (vehicle == null) return NotFound(new { message = "Vehicle not found" });
         }
 

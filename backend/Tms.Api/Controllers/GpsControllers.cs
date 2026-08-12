@@ -81,7 +81,7 @@ public class GpsController(
 [Authorize]
 [ApiController]
 [Route("api/geofences")]
-public class GeofenceController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class GeofenceController(TmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List()
@@ -198,7 +198,7 @@ public class GeofenceController(TmsDbContext db, ITenantContext tenants) : Contr
         [FromQuery] string? eventType, [FromQuery] bool? acknowledged,
         [FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] int limit = 50)
     {
-        var q = TenantScope.GeofenceEvents(db, tenants).AsNoTracking()
+        var q = TenantScope.GeofenceEvents(db, tenants, branches).AsNoTracking()
             .Include(e => e.Geofence).Include(e => e.Vehicle).AsQueryable();
         if (!string.IsNullOrEmpty(vehicleId)) q = q.Where(e => e.VehicleId == vehicleId);
         if (geofenceId != null) q = q.Where(e => e.GeofenceId == geofenceId);
@@ -222,7 +222,7 @@ public class GeofenceController(TmsDbContext db, ITenantContext tenants) : Contr
     {
         var e = await db.GeofenceEvents.FindAsync(id);
         if (e == null) return NotFound();
-        var inScope = await TenantScope.GeofenceEvents(db, tenants).AnyAsync(x => x.Id == id);
+        var inScope = await TenantScope.GeofenceEvents(db, tenants, branches).AnyAsync(x => x.Id == id);
         if (!inScope) return NotFound();
         e.Acknowledged = true;
         e.AcknowledgedBy = User.Identity?.Name;
@@ -255,7 +255,7 @@ public class GeofenceController(TmsDbContext db, ITenantContext tenants) : Contr
     {
         if (!appliesToAll && vehicleIds?.Count > 0)
         {
-            if (!await TenantScope.ValidateVehicleIdsAsync(db, tenants, vehicleIds))
+            if (!await TenantScope.ValidateVehicleIdsAsync(db, tenants, branches, vehicleIds))
                 throw new InvalidOperationException("One or more vehicles are not in your company.");
         }
 

@@ -26,7 +26,7 @@ public record FleetHistoryDto(
 public record FleetHistoryPointDto(decimal Lat, decimal Lng, decimal? SpeedKmh, decimal? Heading, DateTime RecordedAt);
 public record FleetHistorySummaryDto(int PointCount, decimal? MaxSpeedKmh, decimal? AvgSpeedKmh, decimal DistanceKm);
 
-public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IConfiguration config)
+public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IBranchContext branches, IConfiguration config)
 {
     int StaleMinutes => config.GetValue("Gps:StaleThresholdMinutes", 15);
     int MaxHistory => config.GetValue("Gps:MaxHistoryPoints", 5000);
@@ -34,7 +34,7 @@ public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IConfigur
     public async Task<List<FleetLiveItemDto>> GetLiveAsync(string? statusFilter, CancellationToken ct = default)
     {
         var staleCutoff = DateTime.UtcNow.AddMinutes(-StaleMinutes);
-        var q = TenantScope.Vehicles(db, tenants).AsNoTracking().AsQueryable();
+        var q = TenantScope.Vehicles(db, tenants, branches).AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(statusFilter))
             q = q.Where(v => v.Status == statusFilter);
         else
@@ -56,7 +56,7 @@ public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IConfigur
             .GroupBy(s => s.VehicleId)
             .ToDictionary(g => g.Key, g => g.Select(s => new GeofenceNameDto(s.GeofenceId, s.Geofence!.Name)).ToList());
 
-        var activeTrips = await TenantScope.Trips(db, tenants).AsNoTracking()
+        var activeTrips = await TenantScope.Trips(db, tenants, branches).AsNoTracking()
             .Include(t => t.Driver)
             .Where(t => t.VehicleId != null && vehicleIds.Contains(t.VehicleId!) &&
                         (t.Status == "IN_TRANSIT" || t.Status == "ASSIGNED"))
@@ -83,7 +83,7 @@ public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IConfigur
     public async Task<FleetHistoryDto?> GetHistoryAsync(
         string vehicleId, DateTime? from, DateTime? to, int? limit, CancellationToken ct = default)
     {
-        var vehicle = await TenantScope.Vehicles(db, tenants).AsNoTracking()
+        var vehicle = await TenantScope.Vehicles(db, tenants, branches).AsNoTracking()
             .FirstOrDefaultAsync(v => v.Id == vehicleId, ct);
         if (vehicle == null) return null;
 
@@ -91,7 +91,7 @@ public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IConfigur
         var start = from ?? end.AddHours(-24);
         var take = Math.Min(limit ?? 2000, MaxHistory);
 
-        var points = await TenantScope.GpsTracks(db, tenants).AsNoTracking()
+        var points = await TenantScope.GpsTracks(db, tenants, branches).AsNoTracking()
             .Where(t => t.VehicleId == vehicleId && t.RecordedAt >= start && t.RecordedAt <= end)
             .OrderBy(t => t.RecordedAt)
             .Take(take)
@@ -119,14 +119,14 @@ public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IConfigur
     {
         var staleCutoff = DateTime.UtcNow.AddMinutes(-StaleMinutes);
         var activeStatuses = new[] { "Active", "On Trip" };
-        var vehicleQ = TenantScope.Vehicles(db, tenants);
+        var vehicleQ = TenantScope.Vehicles(db, tenants, branches);
         var vehicleIds = await vehicleQ.Select(v => v.Id).ToListAsync(ct);
 
         var totalActive = await vehicleQ.CountAsync(v => activeStatuses.Contains(v.Status), ct);
         var onTrip = await vehicleQ.CountAsync(v => v.Status == "On Trip", ct);
         var withRecent = await db.VehicleLastPositions.CountAsync(p => vehicleIds.Contains(p.VehicleId) && p.RecordedAt >= staleCutoff, ct);
         var stale = await db.VehicleLastPositions.CountAsync(p => vehicleIds.Contains(p.VehicleId) && p.RecordedAt < staleCutoff, ct);
-        var unack = await TenantScope.GeofenceEvents(db, tenants).CountAsync(e => !e.Acknowledged, ct);
+        var unack = await TenantScope.GeofenceEvents(db, tenants, branches).CountAsync(e => !e.Acknowledged, ct);
         return new { totalActive, onTrip, withRecentGps = withRecent, staleGps = stale, unackGeofenceEvents = unack };
     }
 }

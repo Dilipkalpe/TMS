@@ -20,13 +20,13 @@ public static class AccountingReportService
 
     public static async Task<List<object>> BuildCustomerLedgerAsync(
         TmsDbContext db,
-        ITenantContext tenants,
+        ITenantContext tenants, IBranchContext branches,
         string? customerId = null,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
         CancellationToken ct = default)
     {
-        var bookingsQ = tenants.Filter(db.Bookings.AsQueryable());
+        var bookingsQ = TenantScope.Bookings(db, tenants, branches);
         if (!string.IsNullOrWhiteSpace(customerId))
             bookingsQ = bookingsQ.Where(b => b.CustomerId == customerId);
         if (fromDate.HasValue)
@@ -71,7 +71,7 @@ public static class AccountingReportService
 
     public static async Task<List<object>> BuildLedgerReportAsync(
         TmsDbContext db,
-        ITenantContext tenants,
+        ITenantContext tenants, IBranchContext branches,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
         CancellationToken ct = default)
@@ -84,7 +84,7 @@ public static class AccountingReportService
         foreach (var p in await paymentsQ.ToListAsync(ct))
             lines.Add(new LedgerLine(p.PaymentDate, p.BookingId, $"Receipt · {p.PaymentMode} · {p.BookingId}", 0, p.Amount));
 
-        var expensesQ = tenants.Filter(db.Expenses.AsQueryable());
+        var expensesQ = TenantScope.Expenses(db, tenants, branches);
         if (fromDate.HasValue) expensesQ = expensesQ.Where(e => e.ExpenseDate >= fromDate.Value);
         if (toDate.HasValue) expensesQ = expensesQ.Where(e => e.ExpenseDate <= toDate.Value);
         foreach (var e in await expensesQ.ToListAsync(ct))
@@ -118,7 +118,7 @@ public static class AccountingReportService
         return ToRunningBalance(lines.OrderBy(l => l.Date).ThenBy(l => l.Voucher).ToList(), receivableStyle: false);
     }
 
-    public static async Task<List<object>> BuildTrialBalanceAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<List<object>> BuildTrialBalanceAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
         var ledger = await tenants.Filter(db.LedgerAccounts.AsQueryable()).Where(l => l.IsActive).ToListAsync(ct);
         if (ledger.Count > 0)
@@ -134,14 +134,14 @@ public static class AccountingReportService
                 .ToList();
         }
 
-        var bookings = tenants.Filter(db.Bookings.AsQueryable());
-        var cash = await AccountingBalanceService.GetCashBalanceAsync(db, tenants, ct);
-        var bank = await AccountingBalanceService.GetBankBalanceAsync(db, tenants, ct);
+        var bookings = TenantScope.Bookings(db, tenants, branches);
+        var cash = await AccountingBalanceService.GetCashBalanceAsync(db, tenants, branches, ct);
+        var bank = await AccountingBalanceService.GetBankBalanceAsync(db, tenants, branches, ct);
         var receivable = await bookings.SumAsync(b => b.Balance, ct);
         var scopedBookingIds = bookings.Select(b => b.Id);
         var brokerPayable = await tenants.Filter(db.BookingBrokerCharges.AsQueryable()).Where(c => scopedBookingIds.Contains(c.BookingId)).SumAsync(c => c.Amount - c.PaidAmount, ct);
-        var vendorPayable = await tenants.Filter(db.Vendors.AsQueryable()).SumAsync(v => v.Outstanding, ct);
-        var totalExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, new AllBranchesContext(), ct);
+        var vendorPayable = await TenantScope.Vendors(db, tenants, branches).SumAsync(v => v.Outstanding, ct);
+        var totalExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, branches, ct);
 
         var rows = new List<object>();
         void Add(string account, decimal debit, decimal credit)
@@ -160,10 +160,10 @@ public static class AccountingReportService
         return rows;
     }
 
-    public static async Task<object> BuildProfitLossAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<object> BuildProfitLossAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var income = await tenants.Filter(db.Bookings.AsQueryable()).SumAsync(b => b.Freight, ct);
-        var expenses = (await DashboardMetricsService.ExpenseBreakdownAsync(db, tenants, new AllBranchesContext(), ct))
+        var income = await TenantScope.Bookings(db, tenants, branches).SumAsync(b => b.Freight, ct);
+        var expenses = (await DashboardMetricsService.ExpenseBreakdownAsync(db, tenants, branches, ct))
             .Where(e => e.Amount > 0)
             .Select(e => new { name = e.Label, amount = e.Amount })
             .Cast<object>()
@@ -176,9 +176,9 @@ public static class AccountingReportService
         };
     }
 
-    public static async Task<object> BuildGstAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<object> BuildGstAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var lrs = tenants.Filter(db.LorryReceipts.AsQueryable());
+        var lrs = TenantScope.LorryReceipts(db, tenants, branches);
         var hasGst = await lrs.AnyAsync(l => l.Gst > 0, ct);
         if (!hasGst)
         {
@@ -213,11 +213,11 @@ public static class AccountingReportService
         };
     }
 
-    public static Task<List<object>> BuildCashFlowAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default) =>
-        BuildCashFlowAsync(db, tenants, null, null, ct);
+    public static Task<List<object>> BuildCashFlowAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default) =>
+        BuildCashFlowAsync(db, tenants, branches, null, null, ct);
 
     public static async Task<List<object>> BuildCashFlowAsync(
-        TmsDbContext db, ITenantContext tenants, string? fromDate, string? toDate, CancellationToken ct = default)
+        TmsDbContext db, ITenantContext tenants, IBranchContext branches, string? fromDate, string? toDate, CancellationToken ct = default)
     {
         var months = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
         var from = ParseDate(fromDate) ?? new DateOnly(DateTime.UtcNow.Year, 1, 1);
@@ -229,13 +229,13 @@ public static class AccountingReportService
             .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(p => p.Amount) })
             .ToListAsync(ct);
 
-        var advanceIn = await tenants.Filter(db.Bookings.AsQueryable())
+        var advanceIn = await TenantScope.Bookings(db, tenants, branches)
             .Where(b => b.Advance > 0 && b.BookingDate >= from && b.BookingDate <= to)
             .GroupBy(b => new { b.BookingDate.Year, b.BookingDate.Month })
             .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(b => b.Advance) })
             .ToListAsync(ct);
 
-        var globalExp = await tenants.Filter(db.Expenses.AsQueryable())
+        var globalExp = await TenantScope.Expenses(db, tenants, branches)
             .Where(e => e.ExpenseDate >= from && e.ExpenseDate <= to)
             .GroupBy(e => new { e.ExpenseDate.Year, e.ExpenseDate.Month })
             .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(e => e.Amount) })
@@ -282,7 +282,7 @@ public static class AccountingReportService
         }).ToList();
     }
 
-    public static async Task<object> BuildCashFlowDetailsAsync(TmsDbContext db, ITenantContext tenants, int month, int year, CancellationToken ct = default)
+    public static async Task<object> BuildCashFlowDetailsAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, int month, int year, CancellationToken ct = default)
     {
         var inflows = new List<object>();
         var outflows = new List<object>();
@@ -304,7 +304,7 @@ public static class AccountingReportService
             });
         }
 
-        foreach (var b in await tenants.Filter(db.Bookings.AsQueryable())
+        foreach (var b in await TenantScope.Bookings(db, tenants, branches)
             .Where(x => x.BookingDate.Month == month && x.BookingDate.Year == year && x.Advance > 0)
             .OrderBy(x => x.BookingDate)
             .ToListAsync(ct))
@@ -321,7 +321,7 @@ public static class AccountingReportService
             });
         }
 
-        foreach (var e in await tenants.Filter(db.Expenses.AsQueryable())
+        foreach (var e in await TenantScope.Expenses(db, tenants, branches)
             .Where(x => x.ExpenseDate.Month == month && x.ExpenseDate.Year == year)
             .OrderBy(x => x.ExpenseDate)
             .ToListAsync(ct))
@@ -388,9 +388,9 @@ public static class AccountingReportService
         };
     }
 
-    public static async Task<List<object>> BuildVehicleLedgerAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<List<object>> BuildVehicleLedgerAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var vehicles = await tenants.Filter(db.Vehicles.AsNoTracking()).ToListAsync(ct);
+        var vehicles = await TenantScope.Vehicles(db, tenants, branches).AsNoTracking().ToListAsync(ct);
         var byNumber = vehicles.ToDictionary(v => v.Number, v => v, StringComparer.OrdinalIgnoreCase);
         var byId = vehicles.ToDictionary(v => v.Id, v => v, StringComparer.OrdinalIgnoreCase);
 
@@ -410,13 +410,13 @@ public static class AccountingReportService
         var numbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var v in vehicles) numbers.Add(v.Number);
 
-        var bookingLinks = await tenants.Filter(db.Bookings.AsNoTracking())
+        var bookingLinks = await TenantScope.Bookings(db, tenants, branches).AsNoTracking()
             .Where(b => b.VehicleNumber != null || b.VehicleId != null)
             .Select(b => new { b.Id, b.VehicleNumber, b.VehicleId, b.Freight })
             .ToListAsync(ct);
         foreach (var b in bookingLinks) AddNumber(numbers, b.VehicleNumber, b.VehicleId);
 
-        var lrLinks = await tenants.Filter(db.LorryReceipts.AsNoTracking())
+        var lrLinks = await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking()
             .Where(l => l.VehicleNumber != null || l.VehicleId != null)
             .Select(l => new { l.VehicleNumber, l.VehicleId, l.Freight })
             .ToListAsync(ct);
@@ -428,7 +428,7 @@ public static class AccountingReportService
 
         var fuelByVehicle = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         var maintByVehicle = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        foreach (var e in await tenants.Filter(db.Expenses.AsNoTracking())
+        foreach (var e in await TenantScope.Expenses(db, tenants, branches).AsNoTracking()
             .Where(x => (x.VehicleNumber != null || x.VehicleId != null)
                 && (x.Category == "Fuel" || x.Category == "Maintenance"))
             .Select(x => new { x.VehicleNumber, x.VehicleId, x.Category, x.Amount })
@@ -531,24 +531,24 @@ public static class AccountingReportService
     public static DateOnly? ParseDate(string? value) =>
         DateOnly.TryParse(value, out var d) ? d : null;
 
-    public static async Task<object> BuildJournalRegisterAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default) =>
+    public static async Task<object> BuildJournalRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default) =>
         (await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Journal").ToListAsync(ct))
             .Select(v => new { date = v.VoucherDate.ToString("yyyy-MM-dd"), voucherNo = v.VoucherNo, debitLedger = "GST Input", creditLedger = "GST Output", amount = v.TotalAmount, narration = v.Narration })
             .ToList();
 
-    public static async Task<object> BuildReceiptRegisterAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default) =>
+    public static async Task<object> BuildReceiptRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default) =>
         (await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Receipt").ToListAsync(ct))
             .Select(v => new { date = v.VoucherDate.ToString("yyyy-MM-dd"), voucherNo = v.VoucherNo, party = v.PartyName, mode = v.Mode, amount = v.TotalAmount, narration = v.Narration })
             .ToList();
 
-    public static async Task<object> BuildPaymentRegisterAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default) =>
+    public static async Task<object> BuildPaymentRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default) =>
         (await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Payment").ToListAsync(ct))
             .Select(v => new { date = v.VoucherDate.ToString("yyyy-MM-dd"), voucherNo = v.VoucherNo, party = v.PartyName, mode = v.Mode, amount = v.TotalAmount, narration = v.Narration })
             .ToList();
 
-    public static async Task<object> BuildPurchaseRegisterAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<object> BuildPurchaseRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var exps = await tenants.Filter(db.Expenses.AsNoTracking()).Where(e => e.VendorName != null).OrderByDescending(e => e.ExpenseDate).ToListAsync(ct);
+        var exps = await TenantScope.Expenses(db, tenants, branches).AsNoTracking().Where(e => e.VendorName != null).OrderByDescending(e => e.ExpenseDate).ToListAsync(ct);
         return exps.Select(e =>
         {
             var gst = Math.Round(e.Amount * 0.18m, 0);
@@ -556,11 +556,11 @@ public static class AccountingReportService
         }).ToList();
     }
 
-    public static async Task<object> BuildSalesRegisterAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<object> BuildSalesRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
         try
         {
-            var invoices = await tenants.Filter(db.FreightInvoices.AsNoTracking())
+            var invoices = await TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking()
                 .Where(i => i.Status != "Cancelled")
                 .OrderByDescending(i => i.InvoiceDate)
                 .Take(500)
@@ -588,7 +588,7 @@ public static class AccountingReportService
             // freight_invoices may not exist yet on older deployments — fall through to LR register.
         }
 
-        return (await tenants.Filter(db.LorryReceipts.AsNoTracking()).OrderByDescending(l => l.LrDate).ToListAsync(ct))
+        return (await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking().OrderByDescending(l => l.LrDate).ToListAsync(ct))
             .Select(l => new
             {
                 date = l.LrDate.ToString("yyyy-MM-dd"),

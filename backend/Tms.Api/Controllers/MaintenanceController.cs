@@ -18,16 +18,16 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
         // Fast path: counts + due lists. Predictions capped / no fuel-expense scans.
         // Keep queries sequential — DbContext is not thread-safe.
         var lowStock = await tenants.Filter(db.SpareParts.AsNoTracking()).CountAsync(p => p.StockQty <= p.MinStock, ct);
-        var totalCost = await TenantScope.MaintenanceRecords(db, tenants).SumAsync(r => (decimal?)r.Cost, ct) ?? 0;
+        var totalCost = await TenantScope.MaintenanceRecords(db, tenants, branches).SumAsync(r => (decimal?)r.Cost, ct) ?? 0;
         var inMaint = await TenantScope.Vehicles(db, tenants, branches)
             .CountAsync(v => v.Status != null && v.Status.ToLower() == "maintenance", ct);
-        var openWorkOrders = await TenantScope.MaintenanceWorkOrders(db, tenants)
+        var openWorkOrders = await TenantScope.MaintenanceWorkOrders(db, tenants, branches)
             .CountAsync(w => w.Status == "OPEN" || w.Status == "SCHEDULED", ct);
-        var activeSchedules = await TenantScope.MaintenanceSchedules(db, tenants).CountAsync(s => s.IsActive, ct);
-        var totalRecords = await TenantScope.MaintenanceRecords(db, tenants).CountAsync(ct);
+        var activeSchedules = await TenantScope.MaintenanceSchedules(db, tenants, branches).CountAsync(s => s.IsActive, ct);
+        var totalRecords = await TenantScope.MaintenanceRecords(db, tenants, branches).CountAsync(ct);
 
         var horizon = DateTime.UtcNow.AddDays(30);
-        var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants)
+        var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .AsNoTracking()
             .Include(s => s.Vehicle)
             .Where(s => s.IsActive && (s.NextDueAt == null || s.NextDueAt <= horizon))
@@ -139,7 +139,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
             return Ok(new { sent = true, type = "MAINT_HIGH_RISK" });
         }
 
-        var due = await TenantScope.MaintenanceSchedules(db, tenants)
+        var due = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .Where(s => s.VehicleId == vehicleId && s.IsActive && s.NextDueAt != null)
             .OrderBy(s => s.NextDueAt)
             .FirstOrDefaultAsync();
@@ -165,7 +165,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     {
         var predictions = await maintenance.ComputePredictionsAsync(ct, syncKm: false, includeExternalSignals: false, maxVehicles: 200);
         var horizon = DateTime.UtcNow.AddDays(30);
-        var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants)
+        var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .AsNoTracking()
             .Include(s => s.Vehicle)
             .Where(s => s.IsActive && (s.NextDueAt == null || s.NextDueAt <= horizon))
@@ -224,7 +224,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     public async Task<IActionResult> Schedules([FromQuery] int limit = 500)
     {
         var take = Math.Min(Math.Max(limit, 1), 1000);
-        var items = await TenantScope.MaintenanceSchedules(db, tenants)
+        var items = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .Include(s => s.Vehicle)
             .OrderBy(s => s.NextDueAt)
             .Take(take)
@@ -304,7 +304,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     [HttpGet("records")]
     public async Task<IActionResult> Records()
     {
-        var rows = await TenantScope.MaintenanceRecords(db, tenants)
+        var rows = await TenantScope.MaintenanceRecords(db, tenants, branches)
             .Include(r => r.Vehicle)
             .OrderByDescending(r => r.RecordDate)
             .Take(100)
@@ -367,7 +367,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
             vehicle.Status = "Maintenance";
         vehicle.UpdatedAt = DateTime.UtcNow;
 
-        var schedules = await TenantScope.MaintenanceSchedules(db, tenants)
+        var schedules = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .Where(s => s.VehicleId == body.VehicleId && s.IsActive)
             .ToListAsync();
         foreach (var sch in schedules.Where(s =>
@@ -396,7 +396,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     [HttpGet("work-orders")]
     public async Task<IActionResult> WorkOrders([FromQuery] string? status)
     {
-        var q = TenantScope.MaintenanceWorkOrders(db, tenants).Include(w => w.Vehicle).AsQueryable();
+        var q = TenantScope.MaintenanceWorkOrders(db, tenants, branches).Include(w => w.Vehicle).AsQueryable();
         if (!string.IsNullOrWhiteSpace(status)) q = q.Where(w => w.Status == status.ToUpperInvariant());
         var rows = await q.OrderByDescending(w => w.CreatedAt).Take(100).ToListAsync();
         return Ok(rows.Select(w => new
@@ -461,7 +461,7 @@ public class MaintenanceController(TmsDbContext db, MaintenanceService maintenan
     {
         var wo = await db.MaintenanceWorkOrders.FindAsync(id);
         if (wo == null) return NotFound();
-        var inScope = await TenantScope.MaintenanceWorkOrders(db, tenants).AnyAsync(w => w.Id == id);
+        var inScope = await TenantScope.MaintenanceWorkOrders(db, tenants, branches).AnyAsync(w => w.Id == id);
         if (!inScope) return NotFound();
         wo.Status = body.Status.ToUpperInvariant();
         if (wo.Status is "COMPLETED" or "CANCELLED") wo.CompletedAt = DateTime.UtcNow;

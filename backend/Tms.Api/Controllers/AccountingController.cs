@@ -11,7 +11,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/accounting")]
-public class AccountingController(TmsDbContext db, ITenantContext tenants, AccountingRegisterJobService registers, AccountingReadService accountingRead) : ControllerBase
+public class AccountingController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, AccountingRegisterJobService registers, AccountingReadService accountingRead) : ControllerBase
 {
     [HttpGet("chart-of-accounts")]
     public async Task<ActionResult<object>> ChartOfAccounts()
@@ -137,7 +137,7 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true) =>
         Ok(PagingHelper.PageRows(
-            PagingHelper.AsObjectList(await AccountingBalanceService.BuildCashBookAsync(db, tenants)),
+            PagingHelper.AsObjectList(await AccountingBalanceService.BuildCashBookAsync(db, tenants, branches)),
             page, pageSize, search, includeTotal));
 
     [HttpGet("bank-book")]
@@ -147,7 +147,7 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true) =>
         Ok(PagingHelper.PageRows(
-            PagingHelper.AsObjectList(await AccountingBalanceService.BuildBankBookAsync(db, tenants)),
+            PagingHelper.AsObjectList(await AccountingBalanceService.BuildBankBookAsync(db, tenants, branches)),
             page, pageSize, search, includeTotal));
 
     [HttpGet("day-book")]
@@ -249,7 +249,7 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
         if (spRows != null)
             return Ok(spRows);
 
-        return Ok(await AccountingReportService.BuildLedgerReportAsync(db, tenants, from, to));
+        return Ok(await AccountingReportService.BuildLedgerReportAsync(db, tenants, branches, from, to));
     }
 
     [HttpGet("customer-ledger")]
@@ -267,13 +267,13 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
             return Ok(spRows);
 
         return Ok(await AccountingReportService.BuildCustomerLedgerAsync(
-            db, tenants, customerId, from, to));
+            db, tenants, branches, customerId, from, to));
     }
 
     [HttpGet("vendor-ledger")]
     public async Task<ActionResult<object>> VendorLedger()
     {
-        var exps = await tenants.Filter(db.Expenses.AsNoTracking())
+        var exps = await TenantScope.Expenses(db, tenants, branches).AsNoTracking()
             .Where(e => e.VendorName != null)
             .OrderByDescending(e => e.ExpenseDate)
             .Take(500)
@@ -287,7 +287,7 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var midMonth = new DateOnly(today.Year, today.Month, 15);
-        var drivers = await tenants.Filter(db.Drivers.AsNoTracking()).OrderBy(d => d.Name).Take(200).ToListAsync();
+        var drivers = await TenantScope.Drivers(db, tenants, branches).AsNoTracking().OrderBy(d => d.Name).Take(200).ToListAsync();
         return Ok(drivers.SelectMany(d => new[]
         {
             new { date = new DateOnly(today.Year, today.Month, 1).ToString("yyyy-MM-dd"), type = "Opening", salary = 0m, advance = d.Advance, deduction = 0m, balance = d.Advance },
@@ -297,15 +297,15 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
 
     [HttpGet("vehicle-ledger")]
     public async Task<ActionResult<object>> VehicleLedger() =>
-        Ok(await AccountingReportService.BuildVehicleLedgerAsync(db, tenants));
+        Ok(await AccountingReportService.BuildVehicleLedgerAsync(db, tenants, branches));
 
     [HttpGet("trial-balance")]
     public async Task<ActionResult<object>> TrialBalance() =>
-        Ok(await AccountingReportService.BuildTrialBalanceAsync(db, tenants));
+        Ok(await AccountingReportService.BuildTrialBalanceAsync(db, tenants, branches));
 
     [HttpGet("profit-loss")]
     public async Task<ActionResult<object>> ProfitLoss() =>
-        Ok(await AccountingReportService.BuildProfitLossAsync(db, tenants));
+        Ok(await AccountingReportService.BuildProfitLossAsync(db, tenants, branches));
 
     [HttpGet("balance-sheet")]
     public async Task<ActionResult<object>> BalanceSheet([FromQuery] int? month, [FromQuery] int? year)
@@ -315,18 +315,18 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
             refDate = new DateOnly(year.Value, month.Value, DateTime.DaysInMonth(year.Value, month.Value));
 
         var periodStart = new DateOnly(refDate.Year, refDate.Month, 1);
-        var bookings = tenants.Filter(db.Bookings.AsQueryable());
+        var bookings = TenantScope.Bookings(db, tenants, branches);
         var bookingsInPeriod = bookings.Where(b => b.BookingDate >= periodStart && b.BookingDate <= refDate);
         var income = await bookingsInPeriod.SumAsync(b => b.Freight);
         var recv = await bookings.SumAsync(b => b.Balance);
-        var pay = await tenants.Filter(db.Vendors.AsQueryable()).SumAsync(v => v.Outstanding);
+        var pay = await TenantScope.Vendors(db, tenants, branches).SumAsync(v => v.Outstanding);
         var scopedBookingIds = bookings.Select(b => b.Id);
         var brokerPay = await tenants.Filter(db.BookingBrokerCharges.AsQueryable()).Where(c => scopedBookingIds.Contains(c.BookingId)).SumAsync(c => c.Amount - c.PaidAmount);
-        var gst = await tenants.Filter(db.LorryReceipts.AsQueryable()).Where(l => l.LrDate >= periodStart && l.LrDate <= refDate).SumAsync(l => l.Gst);
-        var cashBal = await AccountingBalanceService.GetCashBalanceAsync(db, tenants);
-        var bankBal = await AccountingBalanceService.GetBankBalanceAsync(db, tenants);
-        var expenses = await tenants.Filter(db.BookingExpenses.AsQueryable()).Where(e => e.ExpenseDate >= periodStart && e.ExpenseDate <= refDate).SumAsync(e => e.Amount)
-            + await tenants.Filter(db.Expenses.AsQueryable()).Where(e => e.ExpenseDate >= periodStart && e.ExpenseDate <= refDate).SumAsync(e => e.Amount);
+        var gst = await TenantScope.LorryReceipts(db, tenants, branches).Where(l => l.LrDate >= periodStart && l.LrDate <= refDate).SumAsync(l => l.Gst);
+        var cashBal = await AccountingBalanceService.GetCashBalanceAsync(db, tenants, branches);
+        var bankBal = await AccountingBalanceService.GetBankBalanceAsync(db, tenants, branches);
+        var expenses = await tenants.Filter(db.BookingExpenses.AsQueryable()).Where(e => e.ExpenseDate >= periodStart && e.ExpenseDate <= refDate && scopedBookingIds.Contains(e.BookingId)).SumAsync(e => e.Amount)
+            + await TenantScope.Expenses(db, tenants, branches).Where(e => e.ExpenseDate >= periodStart && e.ExpenseDate <= refDate).SumAsync(e => e.Amount);
         var periodProfit = income - expenses - brokerPay;
 
         return Ok(new
@@ -363,7 +363,7 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
         var from = AccountingReportService.ParseDate(fromDate);
         var to = AccountingReportService.ParseDate(toDate);
 
-        var bookingsQ = tenants.Filter(db.Bookings.AsQueryable()).Where(b => b.Balance > 0);
+        var bookingsQ = TenantScope.Bookings(db, tenants, branches).Where(b => b.Balance > 0);
         if (from.HasValue) bookingsQ = bookingsQ.Where(b => b.BookingDate >= from.Value);
         if (to.HasValue) bookingsQ = bookingsQ.Where(b => b.BookingDate <= to.Value);
         if (!string.IsNullOrWhiteSpace(customerId)) bookingsQ = bookingsQ.Where(b => b.CustomerId == customerId);
@@ -380,7 +380,7 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
             .OrderByDescending(r => r.amount)
             .ToListAsync();
 
-        var vendorsQ = tenants.Filter(db.Vendors.AsQueryable()).Where(v => v.Outstanding > 0);
+        var vendorsQ = TenantScope.Vendors(db, tenants, branches).Where(v => v.Outstanding > 0);
         if (!string.IsNullOrWhiteSpace(vendorId)) vendorsQ = vendorsQ.Where(v => v.Id == vendorId);
 
         var vendors = await vendorsQ
@@ -417,15 +417,15 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, Accou
 
     [HttpGet("gst")]
     public async Task<ActionResult<object>> Gst() =>
-        Ok(await AccountingReportService.BuildGstAsync(db, tenants));
+        Ok(await AccountingReportService.BuildGstAsync(db, tenants, branches));
 
     private async Task<object> BuildChartFromOperations()
     {
-        var income = await tenants.Filter(db.Bookings.AsQueryable()).SumAsync(b => b.Freight);
-        var recv = await tenants.Filter(db.Bookings.AsQueryable()).SumAsync(b => b.Balance);
-        var cash = await AccountingBalanceService.GetCashBalanceAsync(db, tenants);
-        var bank = await AccountingBalanceService.GetBankBalanceAsync(db, tenants);
-        var operatingExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, new AllBranchesContext());
+        var income = await TenantScope.Bookings(db, tenants, branches).SumAsync(b => b.Freight);
+        var recv = await TenantScope.Bookings(db, tenants, branches).SumAsync(b => b.Balance);
+        var cash = await AccountingBalanceService.GetCashBalanceAsync(db, tenants, branches);
+        var bank = await AccountingBalanceService.GetBankBalanceAsync(db, tenants, branches);
+        var operatingExpenses = await DashboardMetricsService.TotalExpensesAsync(db, tenants, branches);
         return new Dictionary<string, object>
         {
             ["Assets"] = new[]

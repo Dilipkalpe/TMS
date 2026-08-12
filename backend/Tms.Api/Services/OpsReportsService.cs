@@ -212,7 +212,9 @@ public class OpsReportsService(ReadOnlyTmsDbContext db, ITenantContext tenants, 
     {
         var from = ParseDate(fromDate);
         var to = ParseDate(toDate);
-        var sheets = tenants.Filter(db.LrLoadingSheets.AsNoTracking()).AsQueryable();
+        var scopedLr = Lrs().Select(l => l.LrNumber);
+        var sheets = tenants.Filter(db.LrLoadingSheets.AsNoTracking())
+            .Where(s => scopedLr.Contains(s.LrNumber));
         if (from != null)
         {
             var fromDt = from.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -366,7 +368,9 @@ public class OpsReportsService(ReadOnlyTmsDbContext db, ITenantContext tenants, 
     {
         var from = ParseDate(fromDate);
         var to = ParseDate(toDate);
-        var sheetLr = tenants.Filter(db.LrDeliverySheets.AsNoTracking()).Select(d => d.LrNumber);
+        var sheetLr = tenants.Filter(db.LrDeliverySheets.AsNoTracking())
+            .Where(d => Lrs().Select(l => l.LrNumber).Contains(d.LrNumber))
+            .Select(d => d.LrNumber);
         var q = Lrs().Where(l =>
             l.Status == LrStatuses.DeliveryCompleted
             || l.Status == LrStatuses.PodUploaded
@@ -613,7 +617,7 @@ public class OpsReportsService(ReadOnlyTmsDbContext db, ITenantContext tenants, 
             .Select(g => new { name = g.Key, bills = g.Count(), amount = g.Sum(x => x.Amount) })
             .ToListAsync(ct);
 
-        var masters = await tenants.Filter(db.Vendors.AsNoTracking()).ToListAsync(ct);
+        var masters = await TenantScope.Vendors(db, tenants, branches).AsNoTracking().ToListAsync(ct);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
@@ -755,12 +759,16 @@ public class OpsReportsService(ReadOnlyTmsDbContext db, ITenantContext tenants, 
             .Select(e => new { e.ExpenseDate.Year, e.ExpenseDate.Month, e.Category, e.Amount })
             .ToListAsync(ct);
 
+        var scopedLrNos = Lrs().Select(l => l.LrNumber);
         var lrExp = await tenants.Filter(db.LrExpenses.AsNoTracking())
+            .Where(e => scopedLrNos.Contains(e.LrNumber))
             .Where(e => e.ExpenseDate >= from && e.ExpenseDate <= to && e.Status != "Rejected")
             .Select(e => new { e.ExpenseDate.Year, e.ExpenseDate.Month, Category = "LR:" + e.Category, e.Amount })
             .ToListAsync(ct);
 
+        var scopedBookingIds = TenantScope.Bookings(db, tenants, branches).Select(b => b.Id);
         var bookingExp = await tenants.Filter(db.BookingExpenses.AsNoTracking())
+            .Where(e => scopedBookingIds.Contains(e.BookingId))
             .Where(e => e.ExpenseDate >= from && e.ExpenseDate <= to)
             .Select(e => new { e.ExpenseDate.Year, e.ExpenseDate.Month, Category = "Booking:" + e.Category, e.Amount })
             .ToListAsync(ct);

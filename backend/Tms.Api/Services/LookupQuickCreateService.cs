@@ -56,7 +56,7 @@ public class LookupQuickCreateService(
 
     async Task<QuickCreateResult> CreateVendorAsync(string name, CancellationToken ct)
     {
-        var existing = await tenants.Filter(db.Vendors.AsQueryable())
+        var existing = await BranchAccess.FilterForLookup(branches, tenants.Filter(db.Vendors.AsQueryable()))
             .FirstOrDefaultAsync(v => v.Name.ToLower() == name.ToLower(), ct);
         if (existing != null) return new QuickCreateResult(existing.Name, false, existing.Id);
 
@@ -65,6 +65,7 @@ public class LookupQuickCreateService(
             Id = await IdGenerator.NextVendorId(db),
             Name = name,
             Category = "General",
+            BranchId = branches.AssignBranchId,
             CompanyId = TenantScope.ResolveCompanyId(tenants),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,

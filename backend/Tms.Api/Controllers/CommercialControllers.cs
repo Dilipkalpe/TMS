@@ -401,7 +401,7 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
         string? customerId = q.CustomerId;
         if (string.IsNullOrEmpty(customerId))
         {
-            var cust = await tenants.Filter(db.Customers.AsQueryable())
+            var cust = await TenantScope.Customers(db, tenants, branches)
                 .FirstOrDefaultAsync(c => c.Name == q.CustomerName);
             customerId = cust?.Id;
         }
@@ -532,7 +532,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
     public async Task<ActionResult<object>> Get(Guid id)
     {
         var inv = await db.FreightInvoices.FindAsync(id);
-        if (inv == null || !TenantAccess.CanAccess(tenants, inv)) return NotFound();
+        if (inv == null || !TenantScope.CanAccessBranchEntity(tenants, branches, inv)) return NotFound();
         var lines = await db.FreightInvoiceLines.Where(l => l.FreightInvoiceId == id).OrderBy(l => l.SortOrder).ToListAsync();
         var payments = await db.BookingPayments.Where(p => p.FreightInvoiceId == id)
             .OrderByDescending(p => p.PaymentDate).ToListAsync();
@@ -669,7 +669,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
     public async Task<ActionResult<object>> Cancel(Guid id)
     {
         var inv = await db.FreightInvoices.FindAsync(id);
-        if (inv == null || !TenantAccess.CanAccess(tenants, inv)) return NotFound();
+        if (inv == null || !TenantScope.CanAccessBranchEntity(tenants, branches, inv)) return NotFound();
         if (inv.Status == "Cancelled")
             return BadRequest(new ApiError("Invoice is already cancelled."));
         if (inv.AmountPaid > 0)
@@ -687,7 +687,7 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
     public async Task<ActionResult<object>> RecordPayment(Guid id, [FromBody] Dictionary<string, object?> body)
     {
         var inv = await db.FreightInvoices.FindAsync(id);
-        if (inv == null || !TenantAccess.CanAccess(tenants, inv)) return NotFound();
+        if (inv == null || !TenantScope.CanAccessBranchEntity(tenants, branches, inv)) return NotFound();
         if (inv.Status == "Cancelled")
             return BadRequest(new ApiError("Cannot pay a cancelled invoice."));
         if (inv.Balance <= 0)

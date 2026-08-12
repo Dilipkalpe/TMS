@@ -15,59 +15,35 @@ public static class TenantScope
         where T : class, ITenantScoped
         => tenants.Filter(query);
 
-    public static IQueryable<Vehicle> Vehicles(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.Vehicles.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<Vehicle> Vehicles(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.Vehicles.AsQueryable()));
 
-    public static IQueryable<Driver> Drivers(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.Drivers.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<Driver> Drivers(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.Drivers.AsQueryable()));
 
-    public static IQueryable<Customer> Customers(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.Customers.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<Customer> Customers(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.Customers.AsQueryable()));
 
-    public static IQueryable<Vendor> Vendors(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.Vendors.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<Vendor> Vendors(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.Vendors.AsQueryable()));
 
-    public static IQueryable<LorryReceipt> LorryReceipts(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.LorryReceipts.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<LorryReceipt> LorryReceipts(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.LorryReceipts.AsQueryable()));
 
     public static IQueryable<Broker> Brokers(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.Brokers.AsQueryable());
 
-    public static IQueryable<Booking> Bookings(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.Bookings.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<Booking> Bookings(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.Bookings.AsQueryable()));
 
     public static IQueryable<Document> Documents(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.Documents.AsQueryable());
 
-    public static IQueryable<EwayBill> EwayBills(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.EwayBills.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<EwayBill> EwayBills(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.EwayBills.AsQueryable()));
 
-    public static IQueryable<HubManifest> HubManifests(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.HubManifests.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<HubManifest> HubManifests(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.HubManifests.AsQueryable()));
 
     public static IQueryable<LrMovement> LrMovements(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.LrMovements.AsQueryable());
@@ -84,47 +60,50 @@ public static class TenantScope
     public static IQueryable<AiChatSession> AiChatSessions(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.AiChatSessions.AsQueryable());
 
-    public static IQueryable<FuelEntry> FuelEntries(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    public static IQueryable<FuelEntry> FuelEntries(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
     {
         var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
         return db.FuelEntries.Where(f => vehicles.Contains(f.VehicleId));
     }
 
-    public static IQueryable<GpsTrack> GpsTracks(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    public static IQueryable<GpsTrack> GpsTracks(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
     {
         var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
         return db.GpsTracks.Where(t => vehicles.Contains(t.VehicleId));
     }
 
-    public static IQueryable<GeofenceEvent> GeofenceEvents(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    public static IQueryable<GeofenceEvent> GeofenceEvents(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
     {
         var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
         return db.GeofenceEvents.Where(e => vehicles.Contains(e.VehicleId));
     }
 
-    public static IQueryable<MaintenanceRecord> MaintenanceRecords(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    public static IQueryable<MaintenanceRecord> MaintenanceRecords(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
     {
         var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
         return db.MaintenanceRecords.Where(m => vehicles.Contains(m.VehicleId));
     }
 
-    public static IQueryable<MaintenanceSchedule> MaintenanceSchedules(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    public static IQueryable<MaintenanceSchedule> MaintenanceSchedules(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
     {
         var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
         return db.MaintenanceSchedules.Where(m => vehicles.Contains(m.VehicleId));
     }
 
-    public static IQueryable<MaintenanceWorkOrder> MaintenanceWorkOrders(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
+    public static IQueryable<MaintenanceWorkOrder> MaintenanceWorkOrders(TmsDbContext db, ITenantContext tenants, IBranchContext branches)
     {
         var vehicles = Vehicles(db, tenants, branches).Select(v => v.Id);
         return db.MaintenanceWorkOrders.Where(m => vehicles.Contains(m.VehicleId));
     }
 
-    public static IQueryable<Trip> Trips(TmsDbContext db, ITenantContext tenants, IBranchContext? branches = null)
-    {
-        var q = tenants.Filter(db.Trips.AsQueryable());
-        return branches != null ? branches.Filter(q) : q;
-    }
+    public static IQueryable<Trip> Trips(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.Trips.AsQueryable()));
+
+    public static IQueryable<Expense> Expenses(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.Expenses.AsQueryable()));
+
+    public static IQueryable<FreightInvoice> FreightInvoices(TmsDbContext db, ITenantContext tenants, IBranchContext branches) =>
+        tenants.Filter(branches.Filter(db.FreightInvoices.AsQueryable()));
 
     public static IQueryable<RouteOptimizationJob> RouteOptimizationJobs(TmsDbContext db, ITenantContext tenants) =>
         tenants.Filter(db.RouteOptimizationJobs.AsQueryable());
@@ -143,8 +122,10 @@ public static class TenantScope
     {
         if (string.IsNullOrWhiteSpace(vehicleRef)) return null;
         var trimmed = vehicleRef.Trim();
-        return await Vehicles(db, tenants, branches)
-            .AsNoTracking()
+        var q = branches == null
+            ? tenants.Filter(db.Vehicles.AsQueryable())
+            : Vehicles(db, tenants, branches);
+        return await q.AsNoTracking()
             .FirstOrDefaultAsync(v => v.Number == trimmed || v.Id == trimmed, ct);
     }
 
@@ -153,8 +134,10 @@ public static class TenantScope
     {
         if (string.IsNullOrWhiteSpace(driverRef)) return null;
         var trimmed = driverRef.Trim();
-        return await Drivers(db, tenants, branches)
-            .AsNoTracking()
+        var q = branches == null
+            ? tenants.Filter(db.Drivers.AsQueryable())
+            : Drivers(db, tenants, branches);
+        return await q.AsNoTracking()
             .FirstOrDefaultAsync(d => d.Name == trimmed || d.Id == trimmed, ct);
     }
 
@@ -162,8 +145,10 @@ public static class TenantScope
         TmsDbContext db, ITenantContext tenants, IBranchContext? branches, string? name, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
-        return await Customers(db, tenants, branches)
-            .AsNoTracking()
+        var q = branches == null
+            ? tenants.Filter(db.Customers.AsQueryable())
+            : Customers(db, tenants, branches);
+        return await q.AsNoTracking()
             .FirstOrDefaultAsync(c => c.Name == name.Trim(), ct);
     }
 
@@ -175,11 +160,11 @@ public static class TenantScope
     }
 
     public static async Task<Vendor?> FindVendorByRefAsync(
-        TmsDbContext db, ITenantContext tenants, string? vendorRef, CancellationToken ct = default)
+        TmsDbContext db, ITenantContext tenants, IBranchContext branches, string? vendorRef, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(vendorRef)) return null;
         var trimmed = vendorRef.Trim();
-        return await Vendors(db, tenants)
+        return await Vendors(db, tenants, branches)
             .AsNoTracking()
             .FirstOrDefaultAsync(v => v.Name == trimmed || v.Id == trimmed, ct);
     }
@@ -235,12 +220,12 @@ public static class TenantScope
     }
 
     public static async Task<bool> ValidateVehicleIdsAsync(
-        TmsDbContext db, ITenantContext tenants, IEnumerable<string>? vehicleIds, CancellationToken ct = default)
+        TmsDbContext db, ITenantContext tenants, IBranchContext branches, IEnumerable<string>? vehicleIds, CancellationToken ct = default)
     {
         var ids = vehicleIds?.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList() ?? [];
         if (ids.Count == 0) return true;
 
-        var scopedCount = await Vehicles(db, tenants)
+        var scopedCount = await Vehicles(db, tenants, branches)
             .Where(v => ids.Contains(v.Id))
             .CountAsync(ct);
         return scopedCount == ids.Count;

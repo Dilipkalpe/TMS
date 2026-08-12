@@ -15,7 +15,7 @@ public class FuelController(TmsDbContext db, FuelService fuelService, ITenantCon
     [HttpGet("entries")]
     public async Task<IActionResult> Entries([FromQuery] string? vehicleId, [FromQuery] bool? suspicious)
     {
-        var q = TenantScope.FuelEntries(db, tenants).Include(e => e.Vehicle).AsQueryable();
+        var q = TenantScope.FuelEntries(db, tenants, branches).Include(e => e.Vehicle).AsQueryable();
         if (!string.IsNullOrEmpty(vehicleId)) q = q.Where(e => e.VehicleId == vehicleId);
         if (suspicious == true) q = q.Where(e => e.IsSuspicious);
         var items = await q.OrderByDescending(e => e.FilledAt).Take(200)
@@ -40,7 +40,7 @@ public class FuelController(TmsDbContext db, FuelService fuelService, ITenantCon
         decimal? mileageKmpl = null;
         if (body.Odometer != null)
         {
-            var prev = await TenantScope.FuelEntries(db, tenants)
+            var prev = await TenantScope.FuelEntries(db, tenants, branches)
                 .Where(e => e.VehicleId == body.VehicleId && e.Odometer != null)
                 .OrderByDescending(e => e.FilledAt).FirstOrDefaultAsync();
             if (prev?.Odometer != null && body.Odometer > prev.Odometer)
@@ -76,7 +76,7 @@ public class FuelController(TmsDbContext db, FuelService fuelService, ITenantCon
     [HttpGet("analytics")]
     public async Task<IActionResult> Analytics()
     {
-        var entries = await TenantScope.FuelEntries(db, tenants).AsNoTracking()
+        var entries = await TenantScope.FuelEntries(db, tenants, branches).AsNoTracking()
             .Include(e => e.Vehicle)
             .OrderByDescending(e => e.FilledAt)
             .Take(5000)
@@ -116,7 +116,7 @@ public class FuelController(TmsDbContext db, FuelService fuelService, ITenantCon
 
     [HttpGet("suspicious")]
     public async Task<IActionResult> Suspicious([FromQuery] int limit = 200) =>
-        Ok(await TenantScope.FuelEntries(db, tenants).Include(e => e.Vehicle).Where(e => e.IsSuspicious)
+        Ok(await TenantScope.FuelEntries(db, tenants, branches).Include(e => e.Vehicle).Where(e => e.IsSuspicious)
             .OrderByDescending(e => e.FilledAt).Take(Math.Min(limit, 500)).Select(e => new
             {
                 e.Id, e.Liters, e.TotalCost, e.FilledAt,

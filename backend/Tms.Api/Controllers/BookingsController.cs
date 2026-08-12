@@ -78,7 +78,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
             LorryReceipt? linkedLr = null;
             if (!string.IsNullOrWhiteSpace(req.LrNumber))
             {
-                linkedLr = await tenants.Filter(db.LorryReceipts)
+                linkedLr = await TenantScope.LorryReceipts(db, tenants, branches)
                     .FirstOrDefaultAsync(l => l.LrNumber == req.LrNumber, ct);
                 if (linkedLr == null)
                     return BadRequest(new ApiError($"LR '{req.LrNumber}' was not found in your company."));
@@ -247,7 +247,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
 
     async Task<string?> ResolveLrNumberAsync(string bookingId, CancellationToken ct = default)
     {
-        return await tenants.Filter(db.LorryReceipts.AsNoTracking())
+        return await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking()
             .Where(l => l.BookingId == bookingId)
             .OrderBy(l => l.LrNumber)
             .Select(l => l.LrNumber)
@@ -257,7 +257,7 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
     async Task<Dictionary<string, string>> ResolveLrNumbersAsync(IReadOnlyList<string> bookingIds, CancellationToken ct = default)
     {
         if (bookingIds.Count == 0) return new Dictionary<string, string>();
-        var rows = await tenants.Filter(db.LorryReceipts.AsNoTracking())
+        var rows = await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking()
             .Where(l => l.BookingId != null && bookingIds.Contains(l.BookingId))
             .Select(l => new { l.BookingId, l.LrNumber })
             .ToListAsync(ct);

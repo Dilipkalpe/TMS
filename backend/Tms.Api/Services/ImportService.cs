@@ -85,7 +85,7 @@ public class ImportService(
             }
             try
             {
-                var existing = await tenants.Filter(db.Vendors.AsQueryable())
+                var existing = await BranchAccess.FilterForLookup(branches, tenants.Filter(db.Vendors.AsQueryable()))
                     .FirstOrDefaultAsync(v => v.Name == name, ct);
                 if (existing != null)
                 {
@@ -105,6 +105,7 @@ public class ImportService(
                         Contact = Get(row, "contact"),
                         Phone = Get(row, "phone"),
                         Gst = Get(row, "gst"),
+                        BranchId = branches.AssignBranchId,
                         CompanyId = TenantScope.ResolveCompanyId(tenants),
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow,

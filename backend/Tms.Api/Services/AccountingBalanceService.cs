@@ -8,7 +8,7 @@ public static class AccountingBalanceService
 {
     static readonly string[] BankPaymentModes = ["NEFT", "RTGS", "Cheque", "Bank Transfer", "UPI"];
 
-    public static async Task<decimal> GetCashBalanceAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<decimal> GetCashBalanceAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
         var receipts = await tenants.Filter(db.BookingPayments.AsQueryable())
             .Where(p => p.PaymentMode == "Cash")
@@ -20,14 +20,14 @@ public static class AccountingBalanceService
         var payments = await tenants.Filter(db.Vouchers.AsQueryable())
             .Where(v => v.VoucherType == "Payment" && v.Mode == "Cash")
             .SumAsync(v => v.TotalAmount, ct);
-        payments += await tenants.Filter(db.Expenses.AsQueryable())
+        payments += await TenantScope.Expenses(db, tenants, branches)
             .Where(e => e.PaymentMode == "Cash")
             .SumAsync(e => e.Amount, ct);
 
         return receipts - payments;
     }
 
-    public static async Task<decimal> GetBankBalanceAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<decimal> GetBankBalanceAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
         var receipts = await tenants.Filter(db.BookingPayments.AsQueryable())
             .Where(p => BankPaymentModes.Contains(p.PaymentMode))
@@ -39,14 +39,14 @@ public static class AccountingBalanceService
         var payments = await tenants.Filter(db.Vouchers.AsQueryable())
             .Where(v => v.VoucherType == "Payment" && v.Mode != null && BankPaymentModes.Contains(v.Mode))
             .SumAsync(v => v.TotalAmount, ct);
-        payments += await tenants.Filter(db.Expenses.AsQueryable())
+        payments += await TenantScope.Expenses(db, tenants, branches)
             .Where(e => e.PaymentMode != null && BankPaymentModes.Contains(e.PaymentMode))
             .SumAsync(e => e.Amount, ct);
 
         return receipts - payments;
     }
 
-    public static async Task<List<object>> BuildCashBookAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<List<object>> BuildCashBookAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
         var lines = new List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular)>();
 
@@ -61,13 +61,13 @@ public static class AccountingBalanceService
                 lines.Add((v.VoucherDate, 0, v.TotalAmount, v.Narration ?? v.PartyName ?? v.VoucherType));
         }
 
-        foreach (var e in await tenants.Filter(db.Expenses.AsQueryable()).Where(x => x.PaymentMode == "Cash").ToListAsync(ct))
+        foreach (var e in await TenantScope.Expenses(db, tenants, branches).Where(x => x.PaymentMode == "Cash").ToListAsync(ct))
             lines.Add((e.ExpenseDate, 0, e.Amount, e.Description ?? e.Category));
 
         return RunningBalance(lines);
     }
 
-    public static async Task<List<object>> BuildBankBookAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static async Task<List<object>> BuildBankBookAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
         var lines = new List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular)>();
 
@@ -82,7 +82,7 @@ public static class AccountingBalanceService
                 lines.Add((v.VoucherDate, 0, v.TotalAmount, v.Narration ?? v.PartyName ?? v.VoucherType));
         }
 
-        foreach (var e in await tenants.Filter(db.Expenses.AsQueryable()).Where(x => x.PaymentMode != null && BankPaymentModes.Contains(x.PaymentMode)).ToListAsync(ct))
+        foreach (var e in await TenantScope.Expenses(db, tenants, branches).Where(x => x.PaymentMode != null && BankPaymentModes.Contains(x.PaymentMode)).ToListAsync(ct))
             lines.Add((e.ExpenseDate, 0, e.Amount, e.Description ?? e.Category));
 
         return RunningBalance(lines, depositKey: true);

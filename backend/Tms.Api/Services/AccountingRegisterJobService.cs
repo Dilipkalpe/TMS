@@ -200,13 +200,15 @@ public sealed class AccountingRegisterJobService(
         if (spResult != null)
             return spResult;
 
+        // Background cache is company-wide (All Branches).
+        var allBranches = new AllBranchesContext();
         return reportType switch
         {
-            "journal" => await AccountingReportService.BuildJournalRegisterAsync(db, tenant, ct),
-            "receipt" => await AccountingReportService.BuildReceiptRegisterAsync(db, tenant, ct),
-            "payment" => await AccountingReportService.BuildPaymentRegisterAsync(db, tenant, ct),
-            "purchase" => await AccountingReportService.BuildPurchaseRegisterAsync(db, tenant, ct),
-            "sales" => await AccountingReportService.BuildSalesRegisterAsync(db, tenant, ct),
+            "journal" => await AccountingReportService.BuildJournalRegisterAsync(db, tenant, allBranches, ct),
+            "receipt" => await AccountingReportService.BuildReceiptRegisterAsync(db, tenant, allBranches, ct),
+            "payment" => await AccountingReportService.BuildPaymentRegisterAsync(db, tenant, allBranches, ct),
+            "purchase" => await AccountingReportService.BuildPurchaseRegisterAsync(db, tenant, allBranches, ct),
+            "sales" => await AccountingReportService.BuildSalesRegisterAsync(db, tenant, allBranches, ct),
             _ => throw new ArgumentException($"Unknown register type: {reportType}", nameof(reportType)),
         };
     }

@@ -227,7 +227,7 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
 
         var vendorName = ApiParseHelper.BodyString(body, "vendorName");
         var vendor = !string.IsNullOrEmpty(vendorName)
-            ? await TenantScope.FindVendorByRefAsync(db, tenants, vendorName)
+            ? await TenantScope.FindVendorByRefAsync(db, tenants, branches, vendorName)
             : null;
 
         var expense = new BookingExpense

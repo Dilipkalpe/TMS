@@ -229,7 +229,8 @@ public class NotificationOutboxProcessor(
         foreach (var companyId in companyIds)
         {
             var tenant = new FixedTenantContext(companyId);
-            var maintenance = new MaintenanceService(db, tenant);
+            var allBranches = new AllBranchesContext();
+            var maintenance = new MaintenanceService(db, tenant, allBranches);
 
             var predictions = await maintenance.ComputePredictionsAsync(ct);
             foreach (var p in predictions.Where(x => x.RiskLevel == "HIGH").Take(3))
@@ -250,7 +251,7 @@ public class NotificationOutboxProcessor(
             }
 
             var horizon = DateTime.UtcNow.AddDays(7);
-            var due = await TenantScope.MaintenanceSchedules(db, tenant)
+            var due = await TenantScope.MaintenanceSchedules(db, tenant, allBranches)
                 .Include(s => s.Vehicle)
                 .Where(s => s.IsActive && s.NextDueAt != null && s.NextDueAt <= horizon)
                 .OrderBy(s => s.NextDueAt)

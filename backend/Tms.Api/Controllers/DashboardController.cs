@@ -135,8 +135,8 @@ public class DashboardController(
             totalIncome,
             totalExpenses,
             totalIncome - totalExpenses,
-            await AccountingBalanceService.GetCashBalanceAsync(db, tenants),
-            await AccountingBalanceService.GetBankBalanceAsync(db, tenants),
+            await AccountingBalanceService.GetCashBalanceAsync(db, tenants, branches),
+            await AccountingBalanceService.GetBankBalanceAsync(db, tenants, branches),
             outstanding,
             pendingDelivery);
     }
@@ -357,7 +357,7 @@ public class DashboardController(
 
         try
         {
-            var geoEvents = await TenantScope.GeofenceEvents(db, tenants)
+            var geoEvents = await TenantScope.GeofenceEvents(db, tenants, branches)
                 .Include(e => e.Vehicle).Include(e => e.Geofence)
                 .Where(e => !e.Acknowledged)
                 .OrderByDescending(e => e.RecordedAt).Take(6).ToListAsync();
@@ -392,7 +392,7 @@ public class DashboardController(
     {
         var now = DateTime.UtcNow;
         var horizon = now.AddDays(30);
-        var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants)
+        var dueSchedules = await TenantScope.MaintenanceSchedules(db, tenants, branches)
             .Include(s => s.Vehicle)
             .Where(s => s.IsActive && s.NextDueAt != null && s.NextDueAt <= horizon)
             .OrderBy(s => s.NextDueAt)
@@ -567,7 +567,7 @@ public class LookupsController(
 [Authorize]
 [ApiController]
 [Route("api/reports")]
-public class ReportsController(OpsReportsService reports, ReadOnlyTmsDbContext db, ITenantContext tenants) : ControllerBase
+public class ReportsController(OpsReportsService reports, ReadOnlyTmsDbContext db, ITenantContext tenants, IBranchContext branches) : ControllerBase
 {
     [HttpGet("trips")]
     public async Task<ActionResult<object>> Trips(
@@ -696,12 +696,12 @@ public class ReportsController(OpsReportsService reports, ReadOnlyTmsDbContext d
         [FromQuery] string? fromDate,
         [FromQuery] string? toDate,
         CancellationToken ct = default) =>
-        Ok(await AccountingReportService.BuildCashFlowAsync(db, tenants, fromDate, toDate, ct));
+        Ok(await AccountingReportService.BuildCashFlowAsync(db, tenants, branches, fromDate, toDate, ct));
 
     [HttpGet("cash-flow/details")]
     public async Task<ActionResult<object>> CashFlowDetails([FromQuery] int month, [FromQuery] int? year)
     {
         if (month is < 1 or > 12) return BadRequest(new { message = "Month must be 1–12." });
-        return Ok(await AccountingReportService.BuildCashFlowDetailsAsync(db, tenants, month, year ?? DateTime.UtcNow.Year));
+        return Ok(await AccountingReportService.BuildCashFlowDetailsAsync(db, tenants, branches, month, year ?? DateTime.UtcNow.Year));
     }
 }
