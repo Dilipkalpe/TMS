@@ -317,7 +317,7 @@ export default function OutstandingReport() {
           showVendor
           value={filters}
           onChange={setFilters}
-          onApply={() => setQuery(toReportQuery(filters))}
+          onApply={(next) => setQuery(toReportQuery(next))}
         />
         <Card className="!p-2.5 sm:!p-3">
           {loading ? <p className="p-4 text-sm text-slate-500">Loading…</p> : <Tabs tabs={tabs} fill />}

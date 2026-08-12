@@ -43,7 +43,7 @@ export default function CustomerLedgerReport() {
           showCustomer
           value={filters}
           onChange={setFilters}
-          onApply={() => setQuery(toReportQuery(filters))}
+          onApply={(next) => setQuery(toReportQuery(next))}
         />
       )}
     />

@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Filter } from 'lucide-react'
 import Input, { Select } from './Input'
 import Button from './Button'
+import SlideDrawer from './SlideDrawer'
 import { branchesApi, customersApi, vendorsApi } from '../../services/api'
 import {
   DELIVERY_POD_STATUSES,
@@ -9,6 +11,59 @@ import {
   WORKFLOW_OPTIONS,
 } from '../../utils/reportQuery'
 
+function emptyFilters() {
+  return {
+    fromDate: '',
+    toDate: '',
+    ledger: '',
+    customerId: '',
+    vendorId: '',
+    status: '',
+    vehicle: '',
+    hubBranchId: '',
+    workflow: '',
+  }
+}
+
+function formatDisplayDate(iso) {
+  if (!iso) return ''
+  const [y, m, d] = String(iso).slice(0, 10).split('-')
+  if (!y || !m || !d) return iso
+  return `${d}/${m}/${y}`
+}
+
+function countActiveFilters(v = {}) {
+  let n = 0
+  if (v.fromDate) n += 1
+  if (v.toDate) n += 1
+  if (v.ledger) n += 1
+  if (v.customerId) n += 1
+  if (v.vendorId) n += 1
+  if (v.status) n += 1
+  if (v.vehicle) n += 1
+  if (v.hubBranchId) n += 1
+  if (v.workflow) n += 1
+  return n
+}
+
+function summarizeFilters(v = {}) {
+  const parts = []
+  if (v.fromDate || v.toDate) {
+    parts.push(`${formatDisplayDate(v.fromDate) || '…'} – ${formatDisplayDate(v.toDate) || '…'}`)
+  }
+  if (v.status) parts.push(v.status)
+  if (v.workflow) {
+    const label = WORKFLOW_OPTIONS.find((o) => o.value === v.workflow)?.label ?? v.workflow
+    parts.push(label)
+  }
+  if (v.vehicle) parts.push(v.vehicle)
+  return parts.join(' · ')
+}
+
+/**
+ * Shared report/register filters: Filter button opens a right-side panel.
+ * `inline` is accepted for backward compatibility but uses the same drawer UX.
+ */
 export default function ReportFilterRow({
   showLedger,
   showCustomer,
@@ -18,11 +73,15 @@ export default function ReportFilterRow({
   showHub,
   showWorkflow,
   statusOptions,
-  inline = false,
+  inline: _inline = false,
   value,
   onChange,
   onApply,
+  title = 'Filters',
 }) {
+  const applied = value ?? emptyFilters()
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(applied)
   const [customers, setCustomers] = useState([])
   const [vendors, setVendors] = useState([])
   const [hubs, setHubs] = useState([])
@@ -45,8 +104,12 @@ export default function ReportFilterRow({
     }
   }, [showCustomer, showVendor, showHub])
 
-  const v = value ?? {}
-  const set = (patch) => onChange?.({ ...v, ...patch })
+  useEffect(() => {
+    if (!open) return
+    setDraft({ ...emptyFilters(), ...(value ?? {}) })
+  }, [open, value])
+
+  const set = (patch) => setDraft((prev) => ({ ...prev, ...patch }))
 
   const resolvedStatuses = statusOptions
     ?? (showStatus === 'hub'
@@ -55,142 +118,145 @@ export default function ReportFilterRow({
         ? DELIVERY_POD_STATUSES
         : LR_REPORT_STATUSES)
 
-  const customerOptions = [
+  const customerOptions = useMemo(() => [
     { value: '', label: '(All customers)' },
     ...customers.map((c) => ({ value: c.id, label: c.name })),
-  ]
-  const vendorOptions = [
+  ], [customers])
+
+  const vendorOptions = useMemo(() => [
     { value: '', label: '(All vendors)' },
     ...vendors.map((x) => ({ value: x.id, label: x.name })),
-  ]
-  const statusSelectOptions = [
+  ], [vendors])
+
+  const statusSelectOptions = useMemo(() => [
     { value: '', label: '(All statuses)' },
     ...resolvedStatuses.map((s) => ({ value: s, label: s })),
-  ]
-  const hubOptions = [
+  ], [resolvedStatuses])
+
+  const hubOptions = useMemo(() => [
     { value: '', label: '(All hubs)' },
     ...hubs.map((b) => ({ value: b.id, label: b.name })),
-  ]
+  ], [hubs])
 
-  const dateFields = (
-    <>
-      <Input
-        label="From Date"
-        type="date"
-        className={inline ? 'w-[11.5rem] shrink-0' : ''}
-        value={v.fromDate ?? ''}
-        onChange={(e) => set({ fromDate: e.target.value })}
-      />
-      <Input
-        label="To Date"
-        type="date"
-        className={inline ? 'w-[11.5rem] shrink-0' : ''}
-        value={v.toDate ?? ''}
-        onChange={(e) => set({ toDate: e.target.value })}
-      />
-    </>
-  )
+  const activeCount = countActiveFilters(applied)
+  const summary = summarizeFilters(applied)
 
-  const extraFields = (
-    <>
-      {showLedger && (
-        <Select
-          label="Ledger"
-          className={inline ? 'w-[11.5rem] shrink-0' : ''}
-          value={v.ledger ?? ''}
-          onChange={(e) => set({ ledger: e.target.value })}
-          options={[
-            { value: '', label: '(All)' },
-            { value: 'cash', label: 'Cash Account' },
-            { value: 'bank', label: 'Bank Account' },
-          ]}
-        />
-      )}
-      {showStatus && (
-        <Select
-          label="Status"
-          className={inline ? 'min-w-[12rem] flex-1' : ''}
-          value={v.status ?? ''}
-          onChange={(e) => set({ status: e.target.value })}
-          options={statusSelectOptions}
-        />
-      )}
-      {showWorkflow && (
-        <Select
-          label="Workflow"
-          className={inline ? 'min-w-[12rem] flex-1' : ''}
-          value={v.workflow ?? ''}
-          onChange={(e) => set({ workflow: e.target.value })}
-          options={[
-            { value: '', label: '(All workflows)' },
-            ...WORKFLOW_OPTIONS,
-          ]}
-        />
-      )}
-      {showVehicle && (
-        <Input
-          label="Vehicle"
-          className={inline ? 'w-[11.5rem] shrink-0' : ''}
-          placeholder="Vehicle no."
-          value={v.vehicle ?? ''}
-          onChange={(e) => set({ vehicle: e.target.value })}
-        />
-      )}
-      {showHub && (
-        <Select
-          label="Hub"
-          className={inline ? 'min-w-[12rem] flex-1' : ''}
-          value={v.hubBranchId ?? ''}
-          onChange={(e) => set({ hubBranchId: e.target.value })}
-          options={hubOptions}
-        />
-      )}
-      {showCustomer && (
-        <Select
-          label="Customer"
-          className={inline ? 'min-w-[12rem] flex-1' : ''}
-          value={v.customerId ?? ''}
-          onChange={(e) => set({ customerId: e.target.value })}
-          options={customerOptions}
-        />
-      )}
-      {showVendor && (
-        <Select
-          label="Vendor"
-          className={inline ? 'min-w-[12rem] flex-1' : ''}
-          value={v.vendorId ?? ''}
-          onChange={(e) => set({ vendorId: e.target.value })}
-          options={vendorOptions}
-        />
-      )}
-    </>
-  )
+  const handleClose = () => setOpen(false)
 
-  if (inline) {
-    return (
-      <div className="flex flex-wrap items-end gap-3">
-        {dateFields}
-        {extraFields}
-        {onApply && (
-          <Button size="sm" className="mb-0.5 h-[42px] shrink-0 px-5" onClick={onApply}>
-            Apply
-          </Button>
-        )}
-      </div>
-    )
+  const handleApply = () => {
+    const result = onApply?.(draft)
+    if (result === false) return
+    onChange?.(draft)
+    setOpen(false)
   }
 
+  const filterBtnClass = activeCount > 0
+    ? 'inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary/10 px-3 py-2 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 sm:text-sm'
+    : 'inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:border-primary/30 hover:bg-slate-50 sm:text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200'
+
   return (
-    <div className="space-y-2 border-t border-primary/10 pt-2">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        {dateFields}
-        {extraFields}
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className={filterBtnClass} onClick={() => setOpen(true)}>
+          <Filter className="h-4 w-4" />
+          Filter
+          {activeCount > 0 ? ` (${activeCount})` : ''}
+        </button>
+        {summary ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">{summary}</p>
+        ) : null}
       </div>
-      {onApply && (
-        <div className="flex justify-end">
-          <Button size="sm" variant="outline" onClick={onApply}>Apply Filters</Button>
+
+      <SlideDrawer
+        open={open}
+        onClose={handleClose}
+        title={title}
+        width="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={handleClose}>Cancel</Button>
+            <Button size="sm" onClick={handleApply}>Apply Filters</Button>
+          </div>
+        )}
+      >
+        <div className="grid gap-3">
+          <Input
+            label="From Date"
+            type="date"
+            value={draft.fromDate ?? ''}
+            onChange={(e) => set({ fromDate: e.target.value })}
+          />
+          <Input
+            label="To Date"
+            type="date"
+            value={draft.toDate ?? ''}
+            onChange={(e) => set({ toDate: e.target.value })}
+          />
+          {showLedger && (
+            <Select
+              label="Ledger"
+              value={draft.ledger ?? ''}
+              onChange={(e) => set({ ledger: e.target.value })}
+              options={[
+                { value: '', label: '(All)' },
+                { value: 'cash', label: 'Cash Account' },
+                { value: 'bank', label: 'Bank Account' },
+              ]}
+            />
+          )}
+          {showStatus && (
+            <Select
+              label="Status"
+              value={draft.status ?? ''}
+              onChange={(e) => set({ status: e.target.value })}
+              options={statusSelectOptions}
+            />
+          )}
+          {showWorkflow && (
+            <Select
+              label="Workflow"
+              value={draft.workflow ?? ''}
+              onChange={(e) => set({ workflow: e.target.value })}
+              options={[
+                { value: '', label: '(All workflows)' },
+                ...WORKFLOW_OPTIONS,
+              ]}
+            />
+          )}
+          {showVehicle && (
+            <Input
+              label="Vehicle"
+              placeholder="Vehicle no."
+              value={draft.vehicle ?? ''}
+              onChange={(e) => set({ vehicle: e.target.value })}
+            />
+          )}
+          {showHub && (
+            <Select
+              label="Hub"
+              value={draft.hubBranchId ?? ''}
+              onChange={(e) => set({ hubBranchId: e.target.value })}
+              options={hubOptions}
+            />
+          )}
+          {showCustomer && (
+            <Select
+              label="Customer"
+              value={draft.customerId ?? ''}
+              onChange={(e) => set({ customerId: e.target.value })}
+              options={customerOptions}
+            />
+          )}
+          {showVendor && (
+            <Select
+              label="Vendor"
+              value={draft.vendorId ?? ''}
+              onChange={(e) => set({ vendorId: e.target.value })}
+              options={vendorOptions}
+            />
+          )}
         </div>
-      )}
-    </div>
+      </SlideDrawer>
+    </>
   )
 }

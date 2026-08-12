@@ -54,7 +54,7 @@ export default function ExpenseReportPage() {
         <ReportFilterRow
           value={filters}
           onChange={setFilters}
-          onApply={() => setApplied(toReportQuery(filters))}
+          onApply={(next) => setApplied(toReportQuery(next))}
         />
       )}
     />

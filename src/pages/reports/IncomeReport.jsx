@@ -57,7 +57,7 @@ export default function IncomeReport() {
           showWorkflow
           value={filters}
           onChange={setFilters}
-          onApply={() => setApplied(toReportQuery(filters))}
+          onApply={(next) => setApplied(toReportQuery(next))}
         />
       )}
     />

@@ -29,16 +29,16 @@ export default function BrokerOutstandingReport() {
   )
   const { data: items, loading, error } = useApiResource(load, [applied.fromDate, applied.toDate])
 
-  const handleApply = () => {
-    if (!filters.fromDate || !filters.toDate) {
+  const handleApply = (next = filters) => {
+    if (!next.fromDate || !next.toDate) {
       toast({ title: 'Select dates', message: 'From Date and To Date are required.', type: 'warning' })
-      return
+      return false
     }
-    if (filters.fromDate > filters.toDate) {
+    if (next.fromDate > next.toDate) {
       toast({ title: 'Invalid range', message: 'From Date cannot be after To Date.', type: 'warning' })
-      return
+      return false
     }
-    setApplied(toReportQuery(filters))
+    setApplied(toReportQuery(next))
   }
 
   const columns = [

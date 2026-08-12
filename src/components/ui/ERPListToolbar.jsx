@@ -73,6 +73,7 @@ export default function ERPListToolbar({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+          {extra ? <div className="mr-0.5 flex items-center">{extra}</div> : null}
           {addPosition === 'end' && addButton}
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={onRefresh} className="!px-2 sm:!px-3">
             <span className="hidden min-[400px]:inline">Refresh</span>
@@ -99,7 +100,6 @@ export default function ERPListToolbar({
           )}
         </div>
       </div>
-      {extra}
       <p className="text-xs text-slate-500 sm:text-sm dark:text-slate-400">
         {recordCount.toLocaleString('en-IN')} rows found
       </p>

@@ -93,7 +93,7 @@ export default function CashFlowReport() {
           <ReportFilterRow
             value={filters}
             onChange={setFilters}
-            onApply={() => setApplied(toReportQuery(filters))}
+            onApply={(next) => setApplied(toReportQuery(next))}
           />
         )}
       />
