@@ -378,73 +378,91 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
         var from = AccountingReportService.ParseDate(fromDate);
         var to = AccountingReportService.ParseDate(toDate);
 
-        var bookingsQ = TenantScope.Bookings(db, tenants, branches).Where(b => b.Balance > 0);
-        if (from.HasValue) bookingsQ = bookingsQ.Where(b => b.BookingDate >= from.Value);
-        if (to.HasValue) bookingsQ = bookingsQ.Where(b => b.BookingDate <= to.Value);
-        if (!string.IsNullOrWhiteSpace(customerId)) bookingsQ = bookingsQ.Where(b => b.CustomerId == customerId);
+        // All open customer receivables — do not drop parties with no txn in the filter dates.
+        var bookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking().Where(b => b.Balance > 0);
+        if (!string.IsNullOrWhiteSpace(customerId))
+            bookings = bookings.Where(b => b.CustomerId == customerId);
 
-        var bookingRows = await bookingsQ
-            .GroupBy(b => new { b.CustomerId, b.CustomerName })
-            .Select(g => new
-            {
-                name = g.Key.CustomerName,
-                partyId = g.Key.CustomerId ?? "",
-                amount = g.Sum(b => b.Balance)
-            })
-            .Where(r => r.amount > 0)
+        var bookingLines = await bookings
+            .Select(b => new { partyId = b.CustomerId ?? "", name = b.CustomerName, date = b.BookingDate, amount = b.Balance })
             .ToListAsync();
 
-        // Direct LR balances (billing party) not covered by bookings.
         var invoicedLrNos = TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking()
             .Where(i => i.Status != "Cancelled" && i.LrNumber != null && i.LrNumber != "")
             .Select(i => i.LrNumber!);
-        var directLrQ = TenantScope.LorryReceipts(db, tenants, branches)
+        var directLrs = TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking()
             .Where(l => (l.BookingId == null || l.BookingId == "")
                 && l.Status != LrStatuses.Draft
                 && l.Status != LrStatuses.Closed
                 && l.Balance > 0
                 && !invoicedLrNos.Contains(l.LrNumber));
-        if (from.HasValue) directLrQ = directLrQ.Where(l => l.LrDate >= from.Value);
-        if (to.HasValue) directLrQ = directLrQ.Where(l => l.LrDate <= to.Value);
-        if (!string.IsNullOrWhiteSpace(customerId)) directLrQ = directLrQ.Where(l => l.CustomerId == customerId);
+        if (!string.IsNullOrWhiteSpace(customerId))
+            directLrs = directLrs.Where(l => l.CustomerId == customerId);
 
-        var lrRows = await directLrQ
-            .GroupBy(l => new { l.CustomerId, l.CustomerName })
-            .Select(g => new
-            {
-                name = g.Key.CustomerName ?? "Unknown",
-                partyId = g.Key.CustomerId ?? "",
-                amount = g.Sum(l => l.Balance)
-            })
-            .Where(r => r.amount > 0)
+        var lrLines = await directLrs
+            .Select(l => new { partyId = l.CustomerId ?? "", name = l.CustomerName ?? "Unknown", date = l.LrDate, amount = l.Balance })
             .ToListAsync();
 
-        var invoiceQ = TenantScope.FreightInvoices(db, tenants, branches).Where(i => i.Status != "Cancelled" && i.Balance > 0);
-        if (from.HasValue) invoiceQ = invoiceQ.Where(i => i.InvoiceDate >= from.Value);
-        if (to.HasValue) invoiceQ = invoiceQ.Where(i => i.InvoiceDate <= to.Value);
-        if (!string.IsNullOrWhiteSpace(customerId)) invoiceQ = invoiceQ.Where(i => i.CustomerId == customerId);
+        var invoices = TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking()
+            .Where(i => i.Status != "Cancelled" && i.Balance > 0);
+        if (!string.IsNullOrWhiteSpace(customerId))
+            invoices = invoices.Where(i => i.CustomerId == customerId);
 
-        var invoiceRows = await invoiceQ
-            .GroupBy(i => new { i.CustomerId, i.CustomerName })
-            .Select(g => new
-            {
-                name = g.Key.CustomerName ?? "Unknown",
-                partyId = g.Key.CustomerId ?? "",
-                amount = g.Sum(i => i.Balance)
-            })
-            .Where(r => r.amount > 0)
+        var invoiceLines = await invoices
+            .Select(i => new { partyId = i.CustomerId ?? "", name = i.CustomerName ?? "Unknown", date = i.InvoiceDate, amount = i.Balance })
             .ToListAsync();
 
-        var customers = bookingRows.Concat(lrRows).Concat(invoiceRows)
+        var allLines = bookingLines.Concat(lrLines).Concat(invoiceLines).ToList();
+
+        var customerRows = allLines
             .GroupBy(r => string.IsNullOrEmpty(r.partyId) ? r.name : r.partyId, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new
+            .Select(g =>
             {
-                name = g.Select(x => x.name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? g.Key,
-                partyId = g.Select(x => x.partyId).FirstOrDefault(id => !string.IsNullOrEmpty(id)) ?? "",
-                amount = g.Sum(x => x.amount)
+                decimal balance = 0m;     // backdated pending (before From date)
+                decimal outstanding = 0m; // selected-period / current pending
+                foreach (var line in g)
+                {
+                    var isBackdated = from.HasValue && line.date < from.Value;
+                    var inSelectedRange = (!from.HasValue || line.date >= from.Value)
+                        && (!to.HasValue || line.date <= to.Value);
+
+                    if (isBackdated)
+                        balance += line.amount;
+                    else if (inSelectedRange || (!from.HasValue && !to.HasValue))
+                        outstanding += line.amount;
+                    else if (to.HasValue && line.date > to.Value)
+                        outstanding += line.amount;
+                }
+
+                var totalPending = balance + outstanding;
+                return new
+                {
+                    name = g.Select(x => x.name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? g.Key,
+                    partyId = g.Select(x => x.partyId).FirstOrDefault(id => !string.IsNullOrEmpty(id)) ?? "",
+                    balance,
+                    outstanding,
+                    totalPending,
+                };
             })
-            .Where(r => r.amount > 0)
-            .OrderByDescending(r => r.amount)
+            .Where(r => r.totalPending > 0)
+            .OrderByDescending(r => r.totalPending)
+            .ToList();
+
+        var customers = customerRows
+            .Select((r, idx) => (object)new
+            {
+                srNo = idx + 1,
+                name = r.name,
+                partyId = r.partyId,
+                balance = r.balance,
+                outstanding = r.outstanding,
+                totalPending = r.totalPending,
+                amount = r.totalPending,
+                days0_30 = r.outstanding,
+                days30_60 = 0m,
+                days60_90 = 0m,
+                days90plus = r.balance,
+            })
             .ToList();
 
         var vendorsQ = TenantScope.Vendors(db, tenants, branches).Where(v => v.Outstanding > 0);
@@ -465,12 +483,12 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
 
         return Ok(new
         {
-            customers = customers.Select(r => ToAgingDto(r.name, r.partyId, r.amount)),
+            customers,
             vendors = vendors.Select(r => ToAgingDto(r.name, r.partyId, r.amount)),
-            parties = parties.Select(r => ToAgingDto(r.name, r.partyId, r.amount))
+            parties = parties.Select(r => ToAgingDto(r.name, r.partyId, r.amount)),
+            asOf = new { fromDate, toDate },
         });
     }
-
     static object ToAgingDto(string name, string partyId, decimal amount) => new
     {
         name,
