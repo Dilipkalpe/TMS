@@ -417,9 +417,17 @@ export function buildLrApiPayload(form) {
     branchName,
     ...apiFields
   } = form
+  // billingPartyId is a Customer id only in "Select Party" mode; consignor/consignee ids must not be sent as customerId.
+  const billingIsCustomerId = Boolean(
+    form.billingPartyId
+    && form.billingPartyId !== form.consignorId
+    && form.billingPartyId !== form.consigneeId,
+  )
   return {
     ...apiFields,
+    customerId: billingIsCustomerId ? form.billingPartyId : undefined,
     customerName: form.billingParty || form.consignor,
+    billingParty: form.billingParty || form.consignor,
     hamali: Number(form.hamali || 0) + Number(form.otherCharges || 0),
     remarks: baseRemarks + remarksExtra,
   }

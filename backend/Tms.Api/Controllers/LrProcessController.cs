@@ -1212,8 +1212,11 @@ public class LrProcessController(
             // Empty for Direct LR (no booking); never invent a fake booking PK.
             BookingId = booking?.Id ?? "",
             LrNumber = lr.LrNumber,
-            CustomerId = booking?.CustomerId,
-            CustomerName = ApiParseHelper.BodyString(body, "customerName") ?? booking?.CustomerName ?? lr.Consignor,
+            CustomerId = lr.CustomerId ?? booking?.CustomerId,
+            CustomerName = ApiParseHelper.BodyString(body, "customerName")
+                ?? lr.CustomerName
+                ?? booking?.CustomerName
+                ?? lr.Consignor,
             Gstin = ApiParseHelper.BodyString(body, "gstin"),
             PlaceOfSupply = ApiParseHelper.BodyString(body, "placeOfSupply") ?? lr.ToCity,
             BillType = billType,
@@ -1231,6 +1234,8 @@ public class LrProcessController(
         db.FreightInvoices.Add(inv);
         lr.Status = LrStatuses.InvoiceGenerated;
         lr.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        await BookingFinanceService.SyncCustomerOutstandingAsync(db, lr.CompanyId, inv.CustomerId);
         await db.SaveChangesAsync();
 
         return Ok(new

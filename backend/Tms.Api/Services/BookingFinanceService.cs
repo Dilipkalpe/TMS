@@ -46,12 +46,77 @@ public static class BookingFinanceService
         var bookingBal = await db.Bookings
             .Where(b => b.CompanyId == companyId && b.CustomerId == customerId)
             .SumAsync(b => b.Balance, ct);
+
+        // Direct LRs (no booking): include open balance until an active freight invoice takes over.
+        var invoicedLrNos = db.FreightInvoices.AsNoTracking()
+            .Where(i => i.CompanyId == companyId && i.Status != "Cancelled" && i.LrNumber != null && i.LrNumber != "")
+            .Select(i => i.LrNumber!);
+        var directLrBal = await db.LorryReceipts
+            .Where(l => l.CompanyId == companyId
+                && l.CustomerId == customerId
+                && (l.BookingId == null || l.BookingId == "")
+                && l.Status != LrStatuses.Draft
+                && l.Status != LrStatuses.Closed
+                && l.Balance > 0
+                && !invoicedLrNos.Contains(l.LrNumber))
+            .SumAsync(l => l.Balance, ct);
+
+        var invoiceBal = await db.FreightInvoices
+            .Where(i => i.CompanyId == companyId
+                && i.CustomerId == customerId
+                && i.Status != "Cancelled"
+                && i.Balance > 0)
+            .SumAsync(i => i.Balance, ct);
+
         var partyProv = await db.Provisions
             .Where(p => p.CompanyId == companyId && p.ProvisionType == "Party" && p.PartyId == customerId && !p.IsReversed)
             .SumAsync(p => p.Amount, ct);
-        customer.Outstanding = bookingBal + partyProv;
+
+        customer.Outstanding = bookingBal + directLrBal + invoiceBal + partyProv;
         customer.LedgerBalance = customer.Outstanding;
         customer.UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Resolve billing party to a Customer (by id or name). Creates a Customer when only a name is known
+    /// so Direct LR / billing-party outstanding can be tracked.
+    /// </summary>
+    public static async Task<Customer?> ResolveBillingCustomerAsync(
+        TmsDbContext db,
+        ITenantContext tenants,
+        IBranchContext branches,
+        string? customerId,
+        string? customerName,
+        CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(customerId))
+        {
+            var byId = await TenantScope.FindCustomerAsync(db, tenants, branches, customerId.Trim(), ct);
+            if (byId != null) return byId;
+        }
+
+        var name = customerName?.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        var byName = await TenantScope.FindCustomerByNameAsync(db, tenants, branches, name, ct);
+        if (byName != null) return byName;
+
+        // Name may match a customer outside branch lookup scope (null BranchId shared masters).
+        var shared = await BranchAccess.FilterForLookup(branches, tenants.Filter(db.Customers.AsQueryable()))
+            .FirstOrDefaultAsync(c => c.Name.ToLower() == name.ToLower(), ct);
+        if (shared != null) return shared;
+
+        var created = new Customer
+        {
+            Id = await IdGenerator.NextCustomerId(db),
+            Name = name,
+            BranchId = branches.AssignBranchId,
+            CompanyId = TenantScope.ResolveCompanyId(tenants),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        db.Customers.Add(created);
+        return created;
     }
 
     public static async Task SyncVendorOutstandingAsync(TmsDbContext db, Guid companyId, string? vendorId, CancellationToken ct = default)

@@ -989,6 +989,18 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
                 advance = booking.Advance + paymentsTotal;
         }
 
+        var billingCustomerId = ApiParseHelper.BodyString(body, "customerId")
+            ?? ApiParseHelper.BodyString(body, "billingPartyId");
+        var billingCustomerName = ApiParseHelper.BodyString(body, "customerName")
+            ?? ApiParseHelper.BodyString(body, "billingParty")
+            ?? booking?.CustomerName
+            ?? consignorName;
+        var billingCustomer = await BookingFinanceService.ResolveBillingCustomerAsync(
+            db, tenants, branches, billingCustomerId, billingCustomerName);
+        // Prefer explicit billing party; fall back to booking customer when unresolved.
+        if (billingCustomer == null && !string.IsNullOrEmpty(booking?.CustomerId))
+            billingCustomer = await TenantScope.FindCustomerAsync(db, tenants, branches, booking.CustomerId);
+
         var lr = new LorryReceipt
         {
             LrNumber = lrNumber,
@@ -997,8 +1009,8 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             LrDate = lrDate,
             BookingId = booking?.Id,
             BusinessType = LrBusinessTypes.Normalize(ApiParseHelper.BodyString(body, "businessType")),
-            CustomerId = booking?.CustomerId,
-            CustomerName = booking?.CustomerName,
+            CustomerId = billingCustomer?.Id ?? booking?.CustomerId,
+            CustomerName = billingCustomer?.Name ?? billingCustomerName ?? booking?.CustomerName,
             ConsignorId = consignorRow?.Id ?? consignorId,
             ConsigneeId = consigneeRow?.Id ?? consigneeId,
             Consignor = consignorName,
@@ -1027,6 +1039,8 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         };
         db.LorryReceipts.Add(lr);
         await db.SaveChangesAsync();
+        await BookingFinanceService.SyncCustomerOutstandingAsync(db, companyId, lr.CustomerId);
+        await db.SaveChangesAsync();
         try { await ewayBillSync.SyncFromLrAsync(lr); }
         catch { /* e-way sync is best-effort */ }
         return CreatedAtAction(nameof(Get), new { lrNumber }, EntityMappers.ToDto(lr));
@@ -1038,6 +1052,7 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var lr = await db.LorryReceipts.FindAsync(lrNumber);
         if (lr == null || !TenantScope.CanAccessBranchEntity(tenants, branches, lr)) return NotFound();
+        var previousCustomerId = lr.CustomerId;
 
         if (body.ContainsKey("lrDate"))
             lr.LrDate = ApiParseHelper.BodyDate(body, "lrDate", lr.LrDate);
@@ -1138,7 +1153,34 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         lr.Balance = lr.Freight + lr.Gst
             + (lr.Hamali ?? 0) + (lr.LoadingCharges ?? 0) + (lr.UnloadingCharges ?? 0) + (lr.Insurance ?? 0)
             - (lr.Advance ?? 0);
+
+        if (body.ContainsKey("customerId") || body.ContainsKey("billingPartyId")
+            || body.ContainsKey("customerName") || body.ContainsKey("billingParty"))
+        {
+            var billingCustomerId = ApiParseHelper.BodyString(body, "customerId")
+                ?? ApiParseHelper.BodyString(body, "billingPartyId");
+            var billingCustomerName = ApiParseHelper.BodyString(body, "customerName")
+                ?? ApiParseHelper.BodyString(body, "billingParty")
+                ?? lr.CustomerName
+                ?? lr.Consignor;
+            var billingCustomer = await BookingFinanceService.ResolveBillingCustomerAsync(
+                db, tenants, branches, billingCustomerId, billingCustomerName);
+            if (billingCustomer != null)
+            {
+                lr.CustomerId = billingCustomer.Id;
+                lr.CustomerName = billingCustomer.Name;
+            }
+            else if (!string.IsNullOrWhiteSpace(billingCustomerName))
+            {
+                lr.CustomerName = billingCustomerName;
+            }
+        }
+
         lr.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        await BookingFinanceService.SyncCustomerOutstandingAsync(db, lr.CompanyId, previousCustomerId);
+        if (!string.Equals(previousCustomerId, lr.CustomerId, StringComparison.OrdinalIgnoreCase))
+            await BookingFinanceService.SyncCustomerOutstandingAsync(db, lr.CompanyId, lr.CustomerId);
         await db.SaveChangesAsync();
         try { await ewayBillSync.SyncFromLrAsync(lr); }
         catch { /* e-way sync is best-effort */ }
@@ -1151,7 +1193,11 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         lrNumber = DocumentCodeRules.DecodePathId(lrNumber);
         var lr = await db.LorryReceipts.FindAsync(lrNumber);
         if (lr == null || !TenantScope.CanAccessBranchEntity(tenants, branches, lr)) return NotFound();
+        var customerId = lr.CustomerId;
+        var companyId = lr.CompanyId;
         db.LorryReceipts.Remove(lr);
+        await db.SaveChangesAsync();
+        await BookingFinanceService.SyncCustomerOutstandingAsync(db, companyId, customerId);
         await db.SaveChangesAsync();
         return NoContent();
     }
