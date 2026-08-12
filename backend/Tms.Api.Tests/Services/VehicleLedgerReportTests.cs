@@ -47,7 +47,7 @@ public class VehicleLedgerReportTests
         });
         await db.SaveChangesAsync();
 
-        var rows = await AccountingReportService.BuildVehicleLedgerAsync(db, Tenant());
+        var rows = await AccountingReportService.BuildVehicleLedgerAsync(db, Tenant(), new AllBranchesContext());
 
         rows.Should().HaveCount(2);
         var v1 = rows.Cast<dynamic>().First(r => (string)r.GetType().GetProperty("vehicle")!.GetValue(r)! == "MH01AA1111");
@@ -66,7 +66,7 @@ public class VehicleLedgerReportTests
         db.Bookings.Add(new Booking { Id = "BK-1", CompanyId = CompanyId, CustomerName = "A", FromCity = "Pune", ToCity = "Mumbai", VehicleNumber = "MH01AA1111", VehicleId = "V1", Freight = 5000, BookingDate = DateOnly.FromDateTime(DateTime.UtcNow), Status = "Delivered", Payment = "Paid", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
-        var rows = await AccountingReportService.BuildVehicleLedgerAsync(db, Tenant());
+        var rows = await AccountingReportService.BuildVehicleLedgerAsync(db, Tenant(), new AllBranchesContext());
 
         rows.Should().HaveCount(1);
         ((string)rows[0].GetType().GetProperty("vehicle")!.GetValue(rows[0])!).Should().Be("MH01AA1111");

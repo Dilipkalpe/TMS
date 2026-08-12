@@ -139,7 +139,11 @@ install_systemd() {
   fi
 
   mkdir -p /etc/tms
-  cat >/etc/tms/tms-api.env <<EOF
+  # Preserve production secrets on redeploy unless FORCE_ENV=1 or explicit overrides are passed.
+  if [[ -f /etc/tms/tms-api.env && "${FORCE_ENV:-0}" != "1" && -z "${TMS_JWT_KEY:-}" && -z "${TMS_CONNECTION_STRING:-}" ]]; then
+    log "Keeping existing /etc/tms/tms-api.env (set FORCE_ENV=1 to regenerate)"
+  else
+    cat >/etc/tms/tms-api.env <<EOF
 ASPNETCORE_ENVIRONMENT=Production
 ASPNETCORE_URLS=http://127.0.0.1:5000
 TMS_CONNECTION_STRING=${conn}
@@ -150,8 +154,9 @@ Database__FailOnMigrationError=false
 DemoData__Enabled=false
 Gps__AllowSimulator=false
 EOF
-  chmod 640 /etc/tms/tms-api.env
-  chown root:www-data /etc/tms/tms-api.env
+    chmod 640 /etc/tms/tms-api.env
+    chown root:www-data /etc/tms/tms-api.env
+  fi
 
   # Type=simple: ASP.NET does not call sd_notify without UseSystemd(); Type=notify can crash/kill the process.
   cat >"/etc/systemd/system/${SERVICE_NAME}.service" <<EOF

@@ -13,7 +13,7 @@ namespace Tms.Api.Controllers;
 [EnableRateLimiting(AuthRateLimiting.PlatformPolicyName)]
 [ApiController]
 [Route("api/platform")]
-public class PlatformController(TmsDbContext db) : ControllerBase
+public class PlatformController(TmsDbContext db, RoleMenuService roleMenus, UserRoleTypeService roleTypes) : ControllerBase
 {
     /// <summary>List companies with optional search and pagination.</summary>
     [HttpGet("companies")]
@@ -148,6 +148,10 @@ public class PlatformController(TmsDbContext db) : ControllerBase
             await tx.RollbackAsync();
             throw;
         }
+
+        // Provision User Role Types + default menu matrix for the new company
+        await roleTypes.EnsureSystemRolesAsync(companyId);
+        await roleMenus.ProvisionCompanyRoleTypesAsync(companyId, overwriteExisting: false);
 
         return Ok(new { message = "Company created.", companyId, branchId, plan = plan.Code });
     }

@@ -9,7 +9,7 @@ export function SubscriptionProvider({ children }) {
   const value = useMemo(() => ({
     ...createSubscriptionAccess(user),
     PLAN_MODULES,
-  }), [user?.features, user?.planCode, user?.isPlatformAdmin, user?.role])
+  }), [user?.features, user?.planCode, user?.isPlatformAdmin, user?.role, user?.menuKeys])
 
   return (
     <SubscriptionContext.Provider value={value}>

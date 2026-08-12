@@ -1,8 +1,12 @@
+import { hasRoleMenuAccess } from '../config/menuCatalog'
+import { navigation } from '../config/navigation'
+
 /** Pure subscription/plan access rules (testable without React). */
 
 export function createSubscriptionAccess(user) {
   const features = user?.features ?? []
   const planCode = user?.planCode ?? 'professional'
+  const menuKeys = user?.menuKeys
 
   const hasFeature = (feature) => {
     if (!user) return true
@@ -11,11 +15,23 @@ export function createSubscriptionAccess(user) {
     return features.includes(feature) || features.includes('unlimited_users')
   }
 
+  const hasMenuAccess = (path) => {
+    if (!user) return true
+    if (user.isPlatformAdmin) return true
+    return hasRoleMenuAccess(path, menuKeys, navigation)
+  }
+
   const canAccessPath = (path) => {
     if (!user) return true
     if (path.startsWith('/platform')) return Boolean(user.isPlatformAdmin)
     if (user.isPlatformAdmin) return true
+
+    // Role menu gate (after platform checks)
+    if (!hasMenuAccess(path)) return false
+
     if (path.startsWith('/settings')) {
+      // When menuKeys are present, hasMenuAccess already gated the path.
+      if (menuKeys != null) return true
       return hasFeature('multi_branch')
         || user?.role === 'Admin'
         || user?.role === 'Super Admin'
@@ -45,14 +61,31 @@ export function createSubscriptionAccess(user) {
   /** First safe landing path when dashboard (/) is not allowed — avoids TenantGuard redirect loops. */
   const firstAccessiblePath = () => {
     if (!user || user.isPlatformAdmin) return '/'
+    const candidates = [
+      '/',
+      '/shipment-management',
+      '/lr/list',
+      '/delivery-management',
+      '/operations/billing/list',
+      '/operations',
+      '/accounting',
+      '/accounting/outstanding',
+      '/reports',
+      '/masters',
+      '/expenses',
+      '/hr',
+      '/settings',
+    ]
+    for (const p of candidates) {
+      if (canAccessPath(p)) return p
+    }
     if (hasFeature('dashboard') || hasFeature('booking')) return '/'
     if (hasFeature('lr')) return '/lr/list'
     if (hasFeature('accounting')) return '/accounting'
-    if (hasFeature('outstanding')) return '/accounting/outstanding'
     return '/settings'
   }
 
-  return { planCode, features, hasFeature, canAccessPath, firstAccessiblePath }
+  return { planCode, features, hasFeature, canAccessPath, firstAccessiblePath, hasMenuAccess }
 }
 
 export const PLAN_MODULES = {

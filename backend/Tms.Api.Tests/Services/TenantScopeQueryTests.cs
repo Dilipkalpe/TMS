@@ -31,7 +31,7 @@ public class TenantScopeQueryTests
 
         var tenant = new FixedTenantContext(TmsWebApplicationFactory.TestCompanyId);
 
-        (await TenantScope.Vehicles(db, tenant).CountAsync()).Should().Be(1);
+        (await TenantScope.Vehicles(db, tenant, new AllBranchesContext()).CountAsync()).Should().Be(1);
         (await tenant.Filter(db.SpareParts.AsQueryable()).CountAsync()).Should().Be(1);
     }
 }

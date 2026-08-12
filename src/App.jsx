@@ -20,7 +20,7 @@ import {
   ItemList, ItemDetails, NewItem,
   ExpensesHub, ExpenseList, NewExpense,
   SettingsHub, Settings, DataCleanupPage, MastersHub, ShipmentManagementHub, HubTransferPage, DeliveryManagementHub,
-  BranchesPage, PortalUsersPage, UsersPage, DocumentNumberingPage, NotificationSettings, PrintTemplateSettingsPage,
+  BranchesPage, PortalUsersPage, UsersPage, RoleMenusPage, DocumentNumberingPage, NotificationSettings, PrintTemplateSettingsPage,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
   AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry,
@@ -256,6 +256,7 @@ export default function App() {
         <Route path="settings/data-cleanup" element={<DataCleanupPage />} />
         <Route path="settings/branches" element={<BranchesPage />} />
         <Route path="settings/users" element={<UsersPage />} />
+        <Route path="settings/role-menus" element={<RoleMenusPage />} />
         <Route path="settings/document-numbering" element={<DocumentNumberingPage />} />
         <Route path="settings/portal-users" element={<PortalUsersPage />} />
         <Route path="settings/notifications" element={<NotificationSettings />} />

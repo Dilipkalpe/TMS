@@ -136,6 +136,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IBranchContext, BranchContext>();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<RoleMenuService>();
+builder.Services.AddScoped<UserRoleTypeService>();
 
 builder.Services.AddScoped<RouteOptimizationService>();
 builder.Services.AddScoped<ImportService>();
@@ -332,6 +334,10 @@ if (!app.Environment.IsEnvironment("Testing"))
 
                 logger.LogInformation("Ensuring hub transfer schema…");
                 await HubTransferSchemaMigrator.EnsureAsync(db);
+
+                logger.LogInformation("Ensuring role menu permissions schema…");
+                await RoleMenuSchemaMigrator.EnsureAsync(db);
+                await UserRoleTypeSchemaMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring SaaS tenant schema…");
                 await TenantSchemaMigrator.EnsureAsync(db, logger);

@@ -11,7 +11,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/users")]
-public class UsersController(TmsDbContext db, ITenantContext tenants) : ControllerBase
+public class UsersController(TmsDbContext db, ITenantContext tenants, UserRoleTypeService roleTypes) : ControllerBase
 {
     public record UserDto(
         Guid Id,
@@ -108,6 +108,9 @@ public class UsersController(TmsDbContext db, ITenantContext tenants) : Controll
         if (companyId == null)
             return BadRequest(new ApiError("Company context is required."));
 
+        var roleErr = await ValidateRoleAsync(companyId.Value, body.Role);
+        if (roleErr != null) return BadRequest(new ApiError(roleErr));
+
         var username = body.Username.Trim();
         var exists = await db.Users.AnyAsync(u =>
             u.Username == username && u.CompanyId == companyId);
@@ -163,6 +166,9 @@ public class UsersController(TmsDbContext db, ITenantContext tenants) : Controll
         var companyId = user.CompanyId ?? tenants.EffectiveCompanyId;
         if (companyId == null)
             return BadRequest(new ApiError("Company context is required."));
+
+        var roleErr = await ValidateRoleAsync(companyId.Value, body.Role);
+        if (roleErr != null) return BadRequest(new ApiError(roleErr));
 
         var username = body.Username.Trim();
         var clash = await db.Users.AnyAsync(u =>
@@ -253,10 +259,7 @@ public class UsersController(TmsDbContext db, ITenantContext tenants) : Controll
     {
         if (string.IsNullOrWhiteSpace(body.Username)) return "Username is required.";
         if (string.IsNullOrWhiteSpace(body.FullName)) return "Display name is required.";
-        if (string.IsNullOrWhiteSpace(body.Role)) return "Role is required.";
-        if (!TenantRoles.AssignableRoles.Contains(NormalizeRole(body.Role))
-            && !TenantRoles.IsPlatformAdmin(body.Role))
-            return $"Role must be one of: {string.Join(", ", TenantRoles.AssignableRoles)}.";
+        if (string.IsNullOrWhiteSpace(body.Role)) return "User Role Type is required.";
 
         if (requirePassword || !string.IsNullOrWhiteSpace(body.Password))
         {
@@ -266,6 +269,15 @@ public class UsersController(TmsDbContext db, ITenantContext tenants) : Controll
                 return "Password and Confirm Password do not match.";
         }
         return null;
+    }
+
+    async Task<string?> ValidateRoleAsync(Guid companyId, string role)
+    {
+        if (TenantRoles.IsPlatformAdmin(role)) return null;
+        await roleTypes.EnsureSystemRolesAsync(companyId);
+        if (await roleTypes.ExistsAsync(companyId, role))
+            return null;
+        return "User Role Type is not valid for this company. Add it under User Role Types first.";
     }
 
     static string NormalizeRole(string role) => role.Trim();

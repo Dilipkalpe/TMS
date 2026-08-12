@@ -27,6 +27,11 @@ function filterCards(cards, canAccessPath) {
   return (cards || []).filter((card) => canAccessPath(card.path))
 }
 
+function filterQuickActions(actions, canAccessPath) {
+  if (!canAccessPath) return actions || []
+  return (actions || []).filter((action) => action?.path && canAccessPath(action.path))
+}
+
 export function HubKpiCard({ label, value, hint, tone = 'default' }) {
   const valueClass =
     tone === 'ok'
@@ -98,6 +103,7 @@ export function HubModuleGrid({ cards, canAccessPath, iconFallback = 'Layers', c
 
 /**
  * App-wide Option B hub shell: banner + optional KPIs + grouped module tiles.
+ * Cards and quick actions are both gated by canAccessPath (role menus + plan features).
  */
 export default function CommandCenterHub({
   module,
@@ -114,6 +120,8 @@ export default function CommandCenterHub({
   columns = 'xl',
   children,
 }) {
+  const visibleQuickActions = filterQuickActions(quickActions, canAccessPath)
+
   const resolvedSections = (sections?.length
     ? sections.map((section) => ({
         ...section,
@@ -127,7 +135,7 @@ export default function CommandCenterHub({
   return (
     <ERPContentPage module={module} title={title}>
       <div className="space-y-5">
-        {(headline || description || quickActions.length > 0 || kpis.length > 0) && (
+        {(headline || description || visibleQuickActions.length > 0 || kpis.length > 0) && (
           <div className={`grid gap-4 ${kpis.length ? 'lg:grid-cols-[1.35fr_1fr]' : ''}`}>
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#164a73] via-primary to-[#2a7ab0] px-5 py-5 text-white shadow-lg shadow-primary/20 sm:px-6 sm:py-6">
               <div
@@ -140,14 +148,14 @@ export default function CommandCenterHub({
                 {description ? (
                   <p className="mt-2 max-w-md text-sm text-white/85">{description}</p>
                 ) : null}
-                {quickActions.length > 0 ? (
+                {visibleQuickActions.length > 0 ? (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {quickActions.map((action) => (
+                    {visibleQuickActions.map((action, idx) => (
                       <Link
                         key={action.path + action.label}
                         to={action.path}
                         className={
-                          action.variant === 'accent'
+                          (action.variant === 'accent' || (action.variant == null && idx === 0))
                             ? 'rounded-[10px] bg-accent px-3.5 py-2 text-xs font-bold text-[#1a1205] transition hover:bg-amber-400'
                             : 'rounded-[10px] border border-white/25 bg-white/10 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-white/20'
                         }
@@ -186,6 +194,7 @@ export default function CommandCenterHub({
             ) : null}
             <HubModuleGrid
               cards={section.cards}
+              canAccessPath={canAccessPath}
               iconFallback={iconFallback}
               columns={columns}
             />

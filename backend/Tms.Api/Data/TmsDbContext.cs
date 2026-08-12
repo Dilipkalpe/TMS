@@ -91,9 +91,38 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<CompanyUsage> CompanyUsages => Set<CompanyUsage>();
     public DbSet<DocumentNumberConfig> DocumentNumberConfigs => Set<DocumentNumberConfig>();
     public DbSet<DocumentNumberSequence> DocumentNumberSequences => Set<DocumentNumberSequence>();
+    public DbSet<RoleMenuPermission> RoleMenuPermissions => Set<RoleMenuPermission>();
+    public DbSet<UserRoleType> UserRoleTypes => Set<UserRoleType>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<UserRoleType>(e =>
+        {
+            e.ToTable("user_role_types");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.Description).HasColumnName("description");
+            e.Property(x => x.IsSystem).HasColumnName("is_system");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<RoleMenuPermission>(e =>
+        {
+            e.ToTable("role_menu_permissions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.Role).HasColumnName("role");
+            e.Property(x => x.MenuKey).HasColumnName("menu_key");
+            e.Property(x => x.IsVisible).HasColumnName("is_visible");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => new { x.CompanyId, x.Role, x.MenuKey }).IsUnique();
+        });
+
         modelBuilder.Entity<User>(e =>
         {
             e.ToTable("users");

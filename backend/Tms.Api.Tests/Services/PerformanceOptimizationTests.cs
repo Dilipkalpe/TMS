@@ -63,6 +63,7 @@ public class AccountingRegisterJobServiceTests
         var service = new AccountingRegisterJobService(
             db,
             new FixedTenantContext(CompanyId),
+            new AllBranchesContext(),
             cache,
             new FixedScopeFactory(db, accountingRead),
             accountingRead,

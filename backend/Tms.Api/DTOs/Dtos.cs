@@ -18,7 +18,8 @@ public record LoginResponse(
     bool IsPlatformAdmin,
     string? PlanCode,
     IReadOnlyList<string>? Features,
-    IReadOnlyList<Guid>? AllowedBranchIds = null);
+    IReadOnlyList<Guid>? AllowedBranchIds = null,
+    IReadOnlyList<string>? MenuKeys = null);
 public record ApiError(string Message);
 
 public record BookingDto(

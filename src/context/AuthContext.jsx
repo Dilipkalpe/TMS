@@ -22,6 +22,8 @@ function mapProfile(res) {
     planCode: res.planCode,
     features: res.features ?? [],
     allowedBranchIds: (res.allowedBranchIds || []).map(String),
+    // null = legacy / unrestricted by role menus; array = enforce
+    menuKeys: Array.isArray(res.menuKeys) ? res.menuKeys : null,
   }
 }
 

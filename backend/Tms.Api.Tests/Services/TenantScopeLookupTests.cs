@@ -43,8 +43,8 @@ public class TenantScopeLookupTests
             new Vehicle { Id = "V-B", CompanyId = CompanyB, Number = "MH02BB2222", Type = "Truck", Status = "Active", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
-        (await TenantScope.ValidateVehicleIdsAsync(db, new FixedTenantContext(CompanyA), ["V-A"])).Should().BeTrue();
-        (await TenantScope.ValidateVehicleIdsAsync(db, new FixedTenantContext(CompanyA), ["V-B"])).Should().BeFalse();
+        (await TenantScope.ValidateVehicleIdsAsync(db, new FixedTenantContext(CompanyA), new AllBranchesContext(), ["V-A"])).Should().BeTrue();
+        (await TenantScope.ValidateVehicleIdsAsync(db, new FixedTenantContext(CompanyA), new AllBranchesContext(), ["V-B"])).Should().BeFalse();
     }
 
     [Fact]

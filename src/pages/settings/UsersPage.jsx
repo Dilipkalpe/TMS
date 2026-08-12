@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
-import Input, { Select } from '../../components/ui/Input'
+import Input from '../../components/ui/Input'
 import Badge, { statusVariant } from '../../components/ui/Badge'
 import ERPDataTable from '../../components/ui/ERPDataTable'
+import UserRoleTypeSelect from '../../components/settings/UserRoleTypeSelect'
 import { branchesApi, usersApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { UserPlus } from 'lucide-react'
-
-const ROLES = ['Admin', 'Branch Manager', 'Accountant', 'Operator']
 
 const emptyForm = {
   username: '',
@@ -65,6 +64,10 @@ export default function UsersPage() {
   const save = async () => {
     if (!form.username.trim() || !form.fullName.trim()) {
       toast({ title: 'Validation', message: 'Username and display name are required', type: 'error' })
+      return
+    }
+    if (!form.role?.trim()) {
+      toast({ title: 'Validation', message: 'User Role Type is required', type: 'error' })
       return
     }
     if (!editingId && (!form.password || form.password.length < 6)) {
@@ -135,7 +138,7 @@ export default function UsersPage() {
   const columns = useMemo(() => [
     { key: 'username', label: 'User' },
     { key: 'fullName', label: 'Display Name', maxWidth: 'max-w-[10rem]' },
-    { key: 'role', label: 'Role' },
+    { key: 'role', label: 'User Role Type' },
     {
       key: 'branches',
       label: 'Branches',
@@ -152,7 +155,8 @@ export default function UsersPage() {
   return (
     <ERPContentPage module="Settings" title="User Management">
       <p className="mb-4 text-sm text-slate-500">
-        Create staff users with company, role and branch access. Passwords are stored with BCrypt hashing — never as plain text.
+        Create staff users with company, User Role Type, and branch access. Passwords are stored with BCrypt hashing — never as plain text.
+        Menu visibility for each User Role Type is configured under Settings → User role types.
       </p>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -168,11 +172,9 @@ export default function UsersPage() {
             <Input label="Mobile" value={form.mobile} onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))} />
             <Input label={editingId ? 'New Password (optional)' : 'Password'} type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
             <Input label="Confirm Password" type="password" value={form.confirmPassword} onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))} />
-            <Select
-              label="Role"
+            <UserRoleTypeSelect
               value={form.role}
-              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-              options={ROLES.map((r) => ({ value: r, label: r }))}
+              onChange={(role) => setForm((f) => ({ ...f, role }))}
             />
             <label className="flex items-center gap-2 self-end pb-2 text-sm">
               <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))} />

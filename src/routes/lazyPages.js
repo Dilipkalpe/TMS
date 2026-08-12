@@ -58,6 +58,7 @@ export const DeliveryManagementHub = lazy(() => import('../pages/delivery/Delive
 export const BranchesPage = lazy(() => import('../pages/settings/BranchesPage'))
 export const PortalUsersPage = lazy(() => import('../pages/settings/PortalUsersPage'))
 export const UsersPage = lazy(() => import('../pages/settings/UsersPage'))
+export const RoleMenusPage = lazy(() => import('../pages/settings/RoleMenusPage'))
 export const DocumentNumberingPage = lazy(() => import('../pages/settings/DocumentNumberingPage'))
 export const PrintTemplateSettingsPage = lazy(() => import('../pages/settings/PrintTemplateSettingsPage'))
 export const NotificationSettings = lazy(() => import('../pages/settings/NotificationSettings'))

@@ -84,11 +84,15 @@ export default function Sidebar() {
   const { menuExpanded, collapseMenu } = useSidebar()
   const { user } = useAuth()
   const { needsCompanySelection, companyName } = useCompany()
-  const { hasFeature } = useSubscription()
+  const { hasFeature, canAccessPath } = useSubscription()
 
   const items = needsCompanySelection
     ? []
-    : navigation.filter((item) => !item.feature || hasFeature(item.feature))
+    : navigation.filter((item) => {
+      if (item.feature && !hasFeature(item.feature)) return false
+      // Role menu visibility (menuKeys); canAccessPath also layers subscription rules
+      return canAccessPath(item.path)
+    })
   const platformItems = user?.isPlatformAdmin ? platformNavigation : []
 
   const closePopup = () => collapseMenu()

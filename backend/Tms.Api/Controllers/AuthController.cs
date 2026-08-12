@@ -14,7 +14,7 @@ namespace Tms.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(TmsDbContext db, IConfiguration config, SubscriptionService subscriptions) : ControllerBase
+public class AuthController(TmsDbContext db, IConfiguration config, SubscriptionService subscriptions, RoleMenuService roleMenus) : ControllerBase
 {
     [AllowAnonymous]
     [EnableRateLimiting(AuthRateLimiting.PolicyName)]
@@ -77,6 +77,16 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
             planCode = sub?.Plan?.Code;
         }
 
+        IReadOnlyList<string>? menuKeys = null;
+        if (isPlatform)
+        {
+            menuKeys = RoleMenuService.AllCatalogKeys.ToList();
+        }
+        else if (user.CompanyId.HasValue)
+        {
+            menuKeys = await roleMenus.GetEffectiveMenuKeysAsync(user.CompanyId.Value, user.Role);
+        }
+
         return new LoginResponse(
             token,
             user.FullName,
@@ -90,7 +100,8 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
             isPlatform,
             planCode,
             features,
-            allowed);
+            allowed,
+            menuKeys);
     }
 
     string GenerateToken(Models.User user, IReadOnlyList<Guid> allowedBranchIds)

@@ -171,6 +171,18 @@ export const usersApi = {
   remove: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
 }
 
+export const roleMenusApi = {
+  get: () => apiRequest('/role-menus'),
+  roleTypes: () => apiRequest('/role-menus/role-types'),
+  provision: (data = {}) => apiRequest('/role-menus/provision', { method: 'POST', body: data }),
+  save: (data) => apiRequest('/role-menus', { method: 'PUT', body: data }),
+}
+
+export const userRoleTypesApi = {
+  list: (params = {}) => apiRequest(`/user-role-types?${queryString(params)}`),
+  create: (data) => apiRequest('/user-role-types', { method: 'POST', body: data }),
+}
+
 export const documentNumberingApi = {
   list: (params = {}) => apiRequest(`/document-numbering?${queryString(params)}`),
   update: (id, data) => apiRequest(`/document-numbering/${id}`, { method: 'PUT', body: data }),

@@ -2,9 +2,11 @@ import CommandCenterHub from '../../components/ui/CommandCenterHub'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { hrPayrollHubSections } from '../../config/hrPayrollHub'
 import { useApiObject } from '../../hooks/useApiResource'
+import { useSubscription } from '../../context/SubscriptionContext'
 import { hrApi, payrollApi } from '../../services/api'
 
 export default function HrHub() {
+  const { canAccessPath } = useSubscription()
   const { data: hrSummary, loading: hrLoading, error: hrError } = useApiObject(() => hrApi.summary(), [])
   const { data: paySummary, loading: payLoading, error: payError } = useApiObject(() => payrollApi.summary(), [])
 
@@ -40,6 +42,7 @@ export default function HrHub() {
       ]}
       kpis={kpis.slice(0, 4)}
       sections={hrPayrollHubSections}
+      canAccessPath={canAccessPath}
       iconFallback="Briefcase"
       columns="lg"
     >

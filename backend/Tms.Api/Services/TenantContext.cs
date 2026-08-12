@@ -85,7 +85,15 @@ public static class TenantRoles
         IsPlatformAdmin(role) || role is CompanyAdmin or Accountant;
 
     public static bool CanAccessOperations(string? role) =>
-        IsPlatformAdmin(role) || role is CompanyAdmin or Accountant or Operator;
+        IsPlatformAdmin(role)
+        || role is CompanyAdmin or Accountant or Operator
+        // Custom User Role Types get Operator-level operations access by default
+        || (role != null
+            && !IsPlatformAdmin(role)
+            && !AssignableRoles.Contains(role, StringComparer.OrdinalIgnoreCase));
+
+    public static bool IsSystemAssignableRole(string? role) =>
+        role != null && AssignableRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
 }
 
 public static class TenantAccess
