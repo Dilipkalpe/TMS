@@ -423,15 +423,19 @@ export const importApi = {
 }
 
 export const reportsApi = {
-  trips: (params = {}) => apiRequest(`/reports/trips?${new URLSearchParams(params)}`),
-  income: () => apiRequest('/reports/income'),
-  expenses: () => apiRequest('/reports/expenses'),
-  vehicles: (params = {}) => apiRequest(`/reports/vehicles?${new URLSearchParams(params)}`),
-  drivers: (params = {}) => apiRequest(`/reports/drivers?${new URLSearchParams(params)}`),
-  customers: (params = {}) => apiRequest(`/reports/customers?${new URLSearchParams(params)}`),
-  vendors: (params = {}) => apiRequest(`/reports/vendors?${new URLSearchParams(params)}`),
-  cashFlow: () => apiRequest('/reports/cash-flow'),
-  cashFlowDetails: (params = {}) => apiRequest(`/reports/cash-flow/details?${new URLSearchParams(params)}`),
+  trips: (params = {}) => apiRequest(`/reports/trips?${queryString(params)}`),
+  loadingDispatch: (params = {}) => apiRequest(`/reports/loading-dispatch?${queryString(params)}`),
+  hubTransfer: (params = {}) => apiRequest(`/reports/hub-transfer?${queryString(params)}`),
+  deliveryPod: (params = {}) => apiRequest(`/reports/delivery-pod?${queryString(params)}`),
+  income: (params = {}) => apiRequest(`/reports/income?${queryString(params)}`),
+  expenses: (params = {}) => apiRequest(`/reports/expenses?${queryString(params)}`),
+  vehicles: (params = {}) => apiRequest(`/reports/vehicles?${queryString(params)}`),
+  drivers: (params = {}) => apiRequest(`/reports/drivers?${queryString(params)}`),
+  customers: (params = {}) => apiRequest(`/reports/customers?${queryString(params)}`),
+  vendors: (params = {}) => apiRequest(`/reports/vendors?${queryString(params)}`),
+  cashFlow: (params = {}) => apiRequest(`/reports/cash-flow?${queryString(params)}`),
+  cashFlowDetails: (params = {}) => apiRequest(`/reports/cash-flow/details?${queryString(params)}`),
+  directLrProfitLoss: (params = {}) => apiRequest(`/reports/direct-lr-profit-loss?${queryString(params)}`),
 }
 
 export const accountingApi = {
@@ -470,7 +474,7 @@ export const bookingFinanceApi = {
   deleteBill: (bookingId, billId) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/bills/${billId}`, { method: 'DELETE' }),
   profitLoss: (bookingId) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(bookingId))}/profit-loss`),
   bookingProfitLossReport: (params = {}) => apiRequest(`/reports/booking-profit-loss?${queryString(params)}`),
-  brokerOutstanding: () => apiRequest('/reports/broker-outstanding'),
+  brokerOutstanding: (params = {}) => apiRequest(`/reports/broker-outstanding?${queryString(params)}`),
   provisions: (params = {}) => apiRequest(`/provisions?${new URLSearchParams(params)}`),
   createProvision: (data) => apiRequest('/provisions', { method: 'POST', body: data }),
   reverseProvision: (id) => apiRequest(`/provisions/${id}/reverse`, { method: 'POST' }),

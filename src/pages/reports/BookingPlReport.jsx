@@ -44,11 +44,15 @@ export default function BookingPlReport() {
   const columns = [
     { key: 'bookingId', label: 'Booking' },
     { key: 'bookingDate', label: 'Date', render: (r) => formatGridDate(r.bookingDate) },
+    { key: 'workflowLabel', label: 'Workflow', render: () => 'Booking → LR' },
     { key: 'customer', label: 'Customer' },
     { key: 'route', label: 'Route' },
+    { key: 'lrCount', label: 'LRs', render: (r) => r.lrCount ?? 0 },
     { key: 'income', label: 'Income', render: (r) => formatCurrency(r.income) },
+    { key: 'lrFreight', label: 'LR Freight', render: (r) => formatCurrency(r.lrFreight) },
     { key: 'brokerCharges', label: 'Broker', render: (r) => formatCurrency(r.brokerCharges) },
-    { key: 'expenses', label: 'Expenses', render: (r) => formatCurrency(r.expenses) },
+    { key: 'expenses', label: 'Booking Exp.', render: (r) => formatCurrency(r.expenses) },
+    { key: 'lrExpenses', label: 'LR Exp.', render: (r) => formatCurrency(r.lrExpenses) },
     { key: 'profit', label: 'Profit', render: (r) => formatCurrency(r.profit) },
     { key: 'marginPercent', label: 'Margin %', render: (r) => `${r.marginPercent}%` },
   ]
@@ -71,7 +75,8 @@ export default function BookingPlReport() {
           onApply={handleApply}
         />
         <p className="mt-2 text-xs text-slate-500">
-          Showing {items.length} booking(s) for {rangeLabel}
+          Booking → LR workflow only · {items.length} booking(s) for {rangeLabel}.
+          For LRs without a booking, use Direct LR P&L.
         </p>
       </Card>
 

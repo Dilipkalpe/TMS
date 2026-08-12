@@ -11,11 +11,11 @@ export default function ReportsHub() {
       title="Reports Hub"
       eyebrow="Insights"
       headline="Operational & finance reports"
-      description="Analyze trips, fleet, customers, cash flow, and accounting statements from one place."
+      description="Supports Booking→LR and Direct LR workflows — ops flow reports plus matching finance P&L."
       quickActions={[
-        { label: 'Trip report', path: '/reports/trips', variant: 'accent' },
-        { label: 'Cash flow', path: '/reports/cash-flow', variant: 'ghost' },
-        { label: 'P&L', path: '/accounting/profit-loss', variant: 'ghost' },
+        { label: 'LR register', path: '/reports/trips', variant: 'accent' },
+        { label: 'Booking P&L', path: '/reports/booking-pl', variant: 'ghost' },
+        { label: 'Direct LR P&L', path: '/reports/direct-lr-pl', variant: 'ghost' },
       ]}
       sections={reportsHubSections}
       canAccessPath={canAccessPath}

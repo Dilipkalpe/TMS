@@ -10,6 +10,7 @@ function normalizePagedResponse(result) {
       total: result.length,
       hasMore: false,
       totalIsApproximate: false,
+      summary: null,
     }
   }
   return {
@@ -17,6 +18,7 @@ function normalizePagedResponse(result) {
     total: result.total ?? 0,
     hasMore: result.hasMore ?? false,
     totalIsApproximate: result.totalIsApproximate ?? false,
+    summary: result.summary ?? null,
   }
 }
 
@@ -26,6 +28,7 @@ export function usePagedApiResource(fetchPage, deps = []) {
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [totalIsApproximate, setTotalIsApproximate] = useState(false)
+  const [summary, setSummary] = useState(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [searchInput, setSearchInput] = useState('')
@@ -48,6 +51,7 @@ export function usePagedApiResource(fetchPage, deps = []) {
       setItems(normalized.items)
       setHasMore(normalized.hasMore)
       setTotalIsApproximate(normalized.totalIsApproximate)
+      setSummary(normalized.summary)
       if (page === 1 || !normalized.totalIsApproximate) {
         setTotal(normalized.total)
       } else if (normalized.hasMore) {
@@ -58,6 +62,7 @@ export function usePagedApiResource(fetchPage, deps = []) {
       setItems([])
       setTotal(0)
       setHasMore(false)
+      setSummary(null)
     } finally {
       setLoading(false)
     }
@@ -87,6 +92,7 @@ export function usePagedApiResource(fetchPage, deps = []) {
     total,
     hasMore,
     totalIsApproximate,
+    summary,
     page,
     pageSize,
     search: searchInput,

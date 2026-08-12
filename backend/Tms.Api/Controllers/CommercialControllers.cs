@@ -712,12 +712,28 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
             return BadRequest(new ApiError(ex.Message));
         }
 
-        // BookingId is required on BookingPayment — use linked booking, else a stable LR/invoice key.
-        var bookingKey = !string.IsNullOrWhiteSpace(inv.BookingId)
-            ? inv.BookingId
-            : !string.IsNullOrWhiteSpace(inv.LrNumber)
-                ? $"LR:{inv.LrNumber}"
-                : $"INV:{inv.InvoiceNo}";
+        // BookingId is required on BookingPayment. Prefer a real booking PK when it exists;
+        // otherwise use a stable Direct-LR / invoice key (no FK to bookings).
+        string bookingKey;
+        Booking? booking = null;
+        if (!string.IsNullOrWhiteSpace(inv.BookingId)
+            && !inv.BookingId.StartsWith("LR:", StringComparison.OrdinalIgnoreCase)
+            && !inv.BookingId.StartsWith("INV:", StringComparison.OrdinalIgnoreCase))
+        {
+            booking = await TenantScope.FindBookingAsync(db, tenants, branches, inv.BookingId);
+            if (booking != null)
+                bookingKey = booking.Id;
+            else
+                bookingKey = !string.IsNullOrWhiteSpace(inv.LrNumber) ? $"LR:{inv.LrNumber}" : $"INV:{inv.InvoiceNo}";
+        }
+        else if (!string.IsNullOrWhiteSpace(inv.LrNumber))
+        {
+            bookingKey = $"LR:{inv.LrNumber}";
+        }
+        else
+        {
+            bookingKey = $"INV:{inv.InvoiceNo}";
+        }
 
         var payment = new BookingPayment
         {
@@ -737,14 +753,10 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
 
         await BookingFinanceService.RecalculateFreightInvoiceStatusAsync(db, inv);
 
-        if (!string.IsNullOrWhiteSpace(inv.BookingId) && !inv.BookingId.StartsWith("LR:", StringComparison.Ordinal))
+        if (booking != null)
         {
-            var booking = await TenantScope.FindBookingAsync(db, tenants, branches, inv.BookingId);
-            if (booking != null)
-            {
-                await BookingFinanceService.RecalculateBookingPaymentStatusAsync(db, booking);
-                await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
-            }
+            await BookingFinanceService.RecalculateBookingPaymentStatusAsync(db, booking);
+            await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
         }
         else if (!string.IsNullOrWhiteSpace(inv.CustomerId))
         {

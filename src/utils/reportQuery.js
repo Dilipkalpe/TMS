@@ -11,6 +11,10 @@ export function toReportQuery(filters = {}) {
   if (filters.toDate) q.toDate = filters.toDate
   if (filters.customerId) q.customerId = filters.customerId
   if (filters.vendorId) q.vendorId = filters.vendorId
+  if (filters.status) q.status = filters.status
+  if (filters.vehicle) q.vehicle = filters.vehicle
+  if (filters.hubBranchId) q.hubBranchId = filters.hubBranchId
+  if (filters.workflow) q.workflow = filters.workflow
   return q
 }
 
@@ -22,5 +26,46 @@ export function defaultReportFilters() {
     toDate: localDateString(now),
     customerId: '',
     vendorId: '',
+    status: '',
+    vehicle: '',
+    hubBranchId: '',
+    workflow: '',
   }
 }
+
+/** booking = Booking→LR · direct = LR without booking */
+export const WORKFLOW_OPTIONS = [
+  { value: 'booking', label: 'Booking → LR' },
+  { value: 'direct', label: 'Direct LR' },
+]
+
+/** Common LR flow statuses for report filters */
+export const LR_REPORT_STATUSES = [
+  'Draft',
+  'LR Created',
+  'Loading Completed',
+  'Transit Pass Generated',
+  'In Transit',
+  'Hub Received',
+  'Available for Re-Manifest',
+  'Delivery Completed',
+  'POD Uploaded',
+  'Invoice Generated',
+  'Closed',
+]
+
+export const HUB_MANIFEST_STATUSES = [
+  'Draft',
+  'VehicleAssigned',
+  'ReadyForDispatch',
+  'Dispatched',
+  'Completed',
+  'Cancelled',
+]
+
+export const DELIVERY_POD_STATUSES = [
+  'Delivery Completed',
+  'POD Uploaded',
+  'Invoice Generated',
+  'Closed',
+]

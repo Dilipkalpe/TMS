@@ -1,12 +1,23 @@
 import { useEffect, useState } from 'react'
 import Input, { Select } from './Input'
 import Button from './Button'
-import { customersApi, vendorsApi } from '../../services/api'
+import { branchesApi, customersApi, vendorsApi } from '../../services/api'
+import {
+  DELIVERY_POD_STATUSES,
+  HUB_MANIFEST_STATUSES,
+  LR_REPORT_STATUSES,
+  WORKFLOW_OPTIONS,
+} from '../../utils/reportQuery'
 
 export default function ReportFilterRow({
   showLedger,
   showCustomer,
   showVendor,
+  showStatus,
+  showVehicle,
+  showHub,
+  showWorkflow,
+  statusOptions,
   inline = false,
   value,
   onChange,
@@ -14,6 +25,7 @@ export default function ReportFilterRow({
 }) {
   const [customers, setCustomers] = useState([])
   const [vendors, setVendors] = useState([])
+  const [hubs, setHubs] = useState([])
 
   useEffect(() => {
     if (showCustomer) {
@@ -26,10 +38,22 @@ export default function ReportFilterRow({
         .then((res) => setVendors(res?.items ?? (Array.isArray(res) ? res : [])))
         .catch(() => setVendors([]))
     }
-  }, [showCustomer, showVendor])
+    if (showHub) {
+      branchesApi.list(true)
+        .then((res) => setHubs(Array.isArray(res) ? res : (res?.items ?? [])))
+        .catch(() => setHubs([]))
+    }
+  }, [showCustomer, showVendor, showHub])
 
   const v = value ?? {}
   const set = (patch) => onChange?.({ ...v, ...patch })
+
+  const resolvedStatuses = statusOptions
+    ?? (showStatus === 'hub'
+      ? HUB_MANIFEST_STATUSES
+      : showStatus === 'delivery'
+        ? DELIVERY_POD_STATUSES
+        : LR_REPORT_STATUSES)
 
   const customerOptions = [
     { value: '', label: '(All customers)' },
@@ -38,6 +62,14 @@ export default function ReportFilterRow({
   const vendorOptions = [
     { value: '', label: '(All vendors)' },
     ...vendors.map((x) => ({ value: x.id, label: x.name })),
+  ]
+  const statusSelectOptions = [
+    { value: '', label: '(All statuses)' },
+    ...resolvedStatuses.map((s) => ({ value: s, label: s })),
+  ]
+  const hubOptions = [
+    { value: '', label: '(All hubs)' },
+    ...hubs.map((b) => ({ value: b.id, label: b.name })),
   ]
 
   const dateFields = (
@@ -59,41 +91,86 @@ export default function ReportFilterRow({
     </>
   )
 
+  const extraFields = (
+    <>
+      {showLedger && (
+        <Select
+          label="Ledger"
+          className={inline ? 'w-[11.5rem] shrink-0' : ''}
+          value={v.ledger ?? ''}
+          onChange={(e) => set({ ledger: e.target.value })}
+          options={[
+            { value: '', label: '(All)' },
+            { value: 'cash', label: 'Cash Account' },
+            { value: 'bank', label: 'Bank Account' },
+          ]}
+        />
+      )}
+      {showStatus && (
+        <Select
+          label="Status"
+          className={inline ? 'min-w-[12rem] flex-1' : ''}
+          value={v.status ?? ''}
+          onChange={(e) => set({ status: e.target.value })}
+          options={statusSelectOptions}
+        />
+      )}
+      {showWorkflow && (
+        <Select
+          label="Workflow"
+          className={inline ? 'min-w-[12rem] flex-1' : ''}
+          value={v.workflow ?? ''}
+          onChange={(e) => set({ workflow: e.target.value })}
+          options={[
+            { value: '', label: '(All workflows)' },
+            ...WORKFLOW_OPTIONS,
+          ]}
+        />
+      )}
+      {showVehicle && (
+        <Input
+          label="Vehicle"
+          className={inline ? 'w-[11.5rem] shrink-0' : ''}
+          placeholder="Vehicle no."
+          value={v.vehicle ?? ''}
+          onChange={(e) => set({ vehicle: e.target.value })}
+        />
+      )}
+      {showHub && (
+        <Select
+          label="Hub"
+          className={inline ? 'min-w-[12rem] flex-1' : ''}
+          value={v.hubBranchId ?? ''}
+          onChange={(e) => set({ hubBranchId: e.target.value })}
+          options={hubOptions}
+        />
+      )}
+      {showCustomer && (
+        <Select
+          label="Customer"
+          className={inline ? 'min-w-[12rem] flex-1' : ''}
+          value={v.customerId ?? ''}
+          onChange={(e) => set({ customerId: e.target.value })}
+          options={customerOptions}
+        />
+      )}
+      {showVendor && (
+        <Select
+          label="Vendor"
+          className={inline ? 'min-w-[12rem] flex-1' : ''}
+          value={v.vendorId ?? ''}
+          onChange={(e) => set({ vendorId: e.target.value })}
+          options={vendorOptions}
+        />
+      )}
+    </>
+  )
+
   if (inline) {
     return (
       <div className="flex flex-wrap items-end gap-3">
         {dateFields}
-        {showLedger && (
-          <Select
-            label="Ledger"
-            className="w-[11.5rem] shrink-0"
-            value={v.ledger ?? ''}
-            onChange={(e) => set({ ledger: e.target.value })}
-            options={[
-              { value: '', label: '(All)' },
-              { value: 'cash', label: 'Cash Account' },
-              { value: 'bank', label: 'Bank Account' },
-            ]}
-          />
-        )}
-        {showCustomer && (
-          <Select
-            label="Customer"
-            className="min-w-[12rem] flex-1"
-            value={v.customerId ?? ''}
-            onChange={(e) => set({ customerId: e.target.value })}
-            options={customerOptions}
-          />
-        )}
-        {showVendor && (
-          <Select
-            label="Vendor"
-            className="min-w-[12rem] flex-1"
-            value={v.vendorId ?? ''}
-            onChange={(e) => set({ vendorId: e.target.value })}
-            options={vendorOptions}
-          />
-        )}
+        {extraFields}
         {onApply && (
           <Button size="sm" className="mb-0.5 h-[42px] shrink-0 px-5" onClick={onApply}>
             Apply
@@ -107,34 +184,7 @@ export default function ReportFilterRow({
     <div className="space-y-2 border-t border-primary/10 pt-2">
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {dateFields}
-        {showLedger && (
-          <Select
-            label="Ledger"
-            value={v.ledger ?? ''}
-            onChange={(e) => set({ ledger: e.target.value })}
-            options={[
-              { value: '', label: '(All)' },
-              { value: 'cash', label: 'Cash Account' },
-              { value: 'bank', label: 'Bank Account' },
-            ]}
-          />
-        )}
-        {showCustomer && (
-          <Select
-            label="Customer"
-            value={v.customerId ?? ''}
-            onChange={(e) => set({ customerId: e.target.value })}
-            options={customerOptions}
-          />
-        )}
-        {showVendor && (
-          <Select
-            label="Vendor"
-            value={v.vendorId ?? ''}
-            onChange={(e) => set({ vendorId: e.target.value })}
-            options={vendorOptions}
-          />
-        )}
+        {extraFields}
       </div>
       {onApply && (
         <div className="flex justify-end">

@@ -108,13 +108,9 @@ BEGIN
         ALTER TABLE booking_payments ADD COLUMN IF NOT EXISTS receipt_no VARCHAR(64);
         CREATE UNIQUE INDEX IF NOT EXISTS uq_booking_payments_receipt_no
             ON booking_payments (receipt_no) WHERE receipt_no IS NOT NULL;
-        BEGIN
-            ALTER TABLE booking_payments
-                ADD CONSTRAINT booking_payments_booking_id_fkey
-                FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE;
-        EXCEPTION WHEN duplicate_object THEN NULL;
-                  WHEN others THEN NULL;
-        END;
+        -- Do not FK booking_payments.booking_id → bookings(id): Direct LR / invoice
+        -- payments store synthetic keys (LR:… / INV:…) when there is no booking.
+        ALTER TABLE booking_payments DROP CONSTRAINT IF EXISTS booking_payments_booking_id_fkey;
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'booking_broker_charges') THEN

@@ -363,9 +363,25 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
     }
 
     [HttpGet("reports/broker-outstanding")]
-    public async Task<ActionResult<object>> BrokerOutstandingReport()
+    public async Task<ActionResult<object>> BrokerOutstandingReport(
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate)
     {
-        var rows = await tenants.Filter(db.BookingBrokerCharges.AsQueryable())
+        var q = tenants.Filter(db.BookingBrokerCharges.AsQueryable());
+        var from = AccountingReportService.ParseDate(fromDate);
+        var to = AccountingReportService.ParseDate(toDate);
+        if (from.HasValue)
+        {
+            var fromDt = from.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            q = q.Where(c => c.CreatedAt >= fromDt);
+        }
+        if (to.HasValue)
+        {
+            var toDt = to.Value.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+            q = q.Where(c => c.CreatedAt <= toDt);
+        }
+
+        var rows = await q
             .GroupBy(c => c.BrokerName)
             .Select(g => new
             {

@@ -30,8 +30,9 @@ import {
   FreightInvoiceList, FreightInvoiceDetails,
   TrialBalance, ProfitLoss, BalanceSheet, BookingPaymentAdjustment,
   ProvisionsPage, OutstandingReport, GSTReports,
-  ReportsHub, TripReport, VehicleReport, DriverReport, IncomeReport,
-  ExpenseReportPage, CustomerReport, BookingPlReport, BrokerOutstandingReport,
+  ReportsHub, TripReport, LoadingDispatchReport, HubTransferReport, DeliveryPodReport,
+  VehicleReport, DriverReport, IncomeReport,
+  ExpenseReportPage, CustomerReport, BookingPlReport, DirectLrPlReport, BrokerOutstandingReport,
   VendorReport, CashFlowReport,
   PayrollHub, PayrollList, ProcessPayroll, PayrollDetails, PayslipList,
   PayslipView, PayrollSettings, SalaryRegister,
@@ -235,12 +236,16 @@ export default function App() {
         <Route path="accounting/gst" element={<GSTReports />} />
         <Route path="reports" element={<ReportsHub />} />
         <Route path="reports/trips" element={<TripReport />} />
+        <Route path="reports/loading-dispatch" element={<LoadingDispatchReport />} />
+        <Route path="reports/hub-transfer" element={<HubTransferReport />} />
+        <Route path="reports/delivery-pod" element={<DeliveryPodReport />} />
         <Route path="reports/vehicles" element={<VehicleReport />} />
         <Route path="reports/drivers" element={<DriverReport />} />
         <Route path="reports/income" element={<IncomeReport />} />
         <Route path="reports/expenses" element={<ExpenseReportPage />} />
         <Route path="reports/customers" element={<CustomerReport />} />
         <Route path="reports/booking-pl" element={<BookingPlReport />} />
+        <Route path="reports/direct-lr-pl" element={<DirectLrPlReport />} />
         <Route path="reports/broker-outstanding" element={<BrokerOutstandingReport />} />
         <Route path="reports/vendors" element={<VendorReport />} />
         <Route path="reports/cash-flow" element={<CashFlowReport />} />

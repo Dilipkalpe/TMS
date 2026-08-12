@@ -23,7 +23,7 @@ export function createSubscriptionAccess(user) {
     }
     if (path.startsWith('/accounting') || path.startsWith('/reports')) {
       if (path.includes('outstanding')) return hasFeature('outstanding')
-      if (path.includes('profit-loss') || path.includes('booking-pl')) return hasFeature('profit_loss')
+      if (path.includes('profit-loss') || path.includes('booking-pl') || path.includes('direct-lr-pl')) return hasFeature('profit_loss')
       if (path.includes('balance-sheet')) return hasFeature('balance_sheet')
       if (path.includes('gst')) return hasFeature('gst')
       return hasFeature('accounting') || hasFeature('dashboard')
@@ -62,7 +62,7 @@ export const PLAN_MODULES = {
   outstanding: ['/accounting/outstanding'],
   accounting: ['/accounting'],
   dashboard: ['/'],
-  profit_loss: ['/accounting/profit-loss', '/reports/booking-pl'],
+  profit_loss: ['/accounting/profit-loss', '/reports/booking-pl', '/reports/direct-lr-pl'],
   balance_sheet: ['/accounting/balance-sheet'],
   gst: ['/accounting/gst'],
   export: ['*'],

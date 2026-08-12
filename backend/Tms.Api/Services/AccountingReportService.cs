@@ -213,48 +213,73 @@ public static class AccountingReportService
         };
     }
 
-    public static async Task<List<object>> BuildCashFlowAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default)
+    public static Task<List<object>> BuildCashFlowAsync(TmsDbContext db, ITenantContext tenants, CancellationToken ct = default) =>
+        BuildCashFlowAsync(db, tenants, null, null, ct);
+
+    public static async Task<List<object>> BuildCashFlowAsync(
+        TmsDbContext db, ITenantContext tenants, string? fromDate, string? toDate, CancellationToken ct = default)
     {
         var months = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+        var from = ParseDate(fromDate) ?? new DateOnly(DateTime.UtcNow.Year, 1, 1);
+        var to = ParseDate(toDate) ?? DateOnly.FromDateTime(DateTime.UtcNow);
 
         var paymentIn = await tenants.Filter(db.BookingPayments.AsQueryable())
-            .GroupBy(p => p.PaymentDate.Month)
-            .Select(g => new { month = g.Key, amount = g.Sum(p => p.Amount) })
+            .Where(p => p.PaymentDate >= from && p.PaymentDate <= to)
+            .GroupBy(p => new { p.PaymentDate.Year, p.PaymentDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(p => p.Amount) })
             .ToListAsync(ct);
 
         var advanceIn = await tenants.Filter(db.Bookings.AsQueryable())
-            .Where(b => b.Advance > 0)
-            .GroupBy(b => b.BookingDate.Month)
-            .Select(g => new { month = g.Key, amount = g.Sum(b => b.Advance) })
+            .Where(b => b.Advance > 0 && b.BookingDate >= from && b.BookingDate <= to)
+            .GroupBy(b => new { b.BookingDate.Year, b.BookingDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(b => b.Advance) })
             .ToListAsync(ct);
 
         var globalExp = await tenants.Filter(db.Expenses.AsQueryable())
-            .GroupBy(e => e.ExpenseDate.Month)
-            .Select(g => new { month = g.Key, amount = g.Sum(e => e.Amount) })
+            .Where(e => e.ExpenseDate >= from && e.ExpenseDate <= to)
+            .GroupBy(e => new { e.ExpenseDate.Year, e.ExpenseDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(e => e.Amount) })
             .ToListAsync(ct);
 
         var bookingExp = await tenants.Filter(db.BookingExpenses.AsQueryable())
-            .GroupBy(e => e.ExpenseDate.Month)
-            .Select(g => new { month = g.Key, amount = g.Sum(e => e.Amount) })
+            .Where(e => e.ExpenseDate >= from && e.ExpenseDate <= to)
+            .GroupBy(e => new { e.ExpenseDate.Year, e.ExpenseDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(e => e.Amount) })
             .ToListAsync(ct);
 
+        var fromDt = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toDt = to.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
         var brokerExp = await tenants.Filter(db.BookingBrokerCharges.AsQueryable())
-            .GroupBy(c => c.CreatedAt.Month)
-            .Select(g => new { month = g.Key, amount = g.Sum(c => c.Amount) })
+            .Where(c => c.CreatedAt >= fromDt && c.CreatedAt <= toDt)
+            .GroupBy(c => new { c.CreatedAt.Year, c.CreatedAt.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, amount = g.Sum(c => c.Amount) })
             .ToListAsync(ct);
 
-        return months.Select((label, i) =>
+        var keys = paymentIn.Select(x => (x.Year, x.Month))
+            .Concat(advanceIn.Select(x => (x.Year, x.Month)))
+            .Concat(globalExp.Select(x => (x.Year, x.Month)))
+            .Concat(bookingExp.Select(x => (x.Year, x.Month)))
+            .Concat(brokerExp.Select(x => (x.Year, x.Month)))
+            .Distinct()
+            .OrderBy(x => x.Year).ThenBy(x => x.Month);
+
+        return keys.Select(k =>
         {
-            var month = i + 1;
-            var inflow = (paymentIn.FirstOrDefault(x => x.month == month)?.amount ?? 0)
-                + (advanceIn.FirstOrDefault(x => x.month == month)?.amount ?? 0);
-            var outflow = (globalExp.FirstOrDefault(x => x.month == month)?.amount ?? 0)
-                + (bookingExp.FirstOrDefault(x => x.month == month)?.amount ?? 0)
-                + (brokerExp.FirstOrDefault(x => x.month == month)?.amount ?? 0);
-            if (inflow == 0 && outflow == 0) return null;
-            var year = DateTime.UtcNow.Year;
-            return (object)new { month = label, monthNo = month, year, inflow, outflow, net = inflow - outflow };
-        }).Where(x => x != null).Cast<object>().ToList();
+            var inflow = (paymentIn.FirstOrDefault(x => x.Year == k.Year && x.Month == k.Month)?.amount ?? 0)
+                + (advanceIn.FirstOrDefault(x => x.Year == k.Year && x.Month == k.Month)?.amount ?? 0);
+            var outflow = (globalExp.FirstOrDefault(x => x.Year == k.Year && x.Month == k.Month)?.amount ?? 0)
+                + (bookingExp.FirstOrDefault(x => x.Year == k.Year && x.Month == k.Month)?.amount ?? 0)
+                + (brokerExp.FirstOrDefault(x => x.Year == k.Year && x.Month == k.Month)?.amount ?? 0);
+            return (object)new
+            {
+                month = $"{months[k.Month - 1]} {k.Year}",
+                monthNo = k.Month,
+                year = k.Year,
+                inflow,
+                outflow,
+                net = inflow - outflow,
+            };
+        }).ToList();
     }
 
     public static async Task<object> BuildCashFlowDetailsAsync(TmsDbContext db, ITenantContext tenants, int month, int year, CancellationToken ct = default)

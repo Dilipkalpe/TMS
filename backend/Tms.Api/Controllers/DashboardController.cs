@@ -567,208 +567,136 @@ public class LookupsController(
 [Authorize]
 [ApiController]
 [Route("api/reports")]
-public class ReportsController(ReadOnlyTmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
+public class ReportsController(OpsReportsService reports, ReadOnlyTmsDbContext db, ITenantContext tenants) : ControllerBase
 {
     [HttpGet("trips")]
     public async Task<ActionResult<object>> Trips(
         [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        [FromQuery] string? status,
+        [FromQuery] string? vehicle,
+        [FromQuery] string? workflow,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
-        [FromQuery] bool includeTotal = true)
-    {
-        var q = TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.Trim().ToLowerInvariant();
-            q = q.Where(l =>
-                l.LrNumber.ToLower().Contains(s) ||
-                (l.VehicleNumber != null && l.VehicleNumber.ToLower().Contains(s)) ||
-                (l.DriverName != null && l.DriverName.ToLower().Contains(s)) ||
-                l.FromCity.ToLower().Contains(s) ||
-                l.ToCity.ToLower().Contains(s));
-        }
-        q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
-        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize, QueryExtensions.ReportMaxPageSize);
-        var (list, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.LrRegisterAsync(search, fromDate, toDate, status, vehicle, workflow, page, pageSize, includeTotal, ct));
 
-        var bookingIds = list
-            .Select(l => l.BookingId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct()
-            .Cast<string>()
-            .ToList();
+    [HttpGet("loading-dispatch")]
+    public async Task<ActionResult<object>> LoadingDispatch(
+        [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        [FromQuery] string? workflow,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.LoadingDispatchAsync(search, fromDate, toDate, workflow, page, pageSize, includeTotal, ct));
 
-        var pods = bookingIds.Count == 0
-            ? new Dictionary<string, DateTime?>()
-            : await tenants.Filter(db.ProofOfDeliveries.AsNoTracking())
-                .Where(x => bookingIds.Contains(x.BookingId) && x.DeliveredAt != null)
-                .GroupBy(x => x.BookingId)
-                .Select(g => new { BookingId = g.Key, DeliveredAt = g.Max(x => x.DeliveredAt) })
-                .ToDictionaryAsync(x => x.BookingId, x => x.DeliveredAt);
+    [HttpGet("hub-transfer")]
+    public async Task<ActionResult<object>> HubTransfer(
+        [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        [FromQuery] string? status,
+        [FromQuery] Guid? hubBranchId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.HubTransferReportAsync(search, fromDate, toDate, status, hubBranchId, page, pageSize, includeTotal, ct));
 
-        var deliveredBookings = bookingIds.Count == 0
-            ? new Dictionary<string, DateOnly?>()
-            : await tenants.Filter(db.Bookings.AsNoTracking())
-                .Where(b => bookingIds.Contains(b.Id) && b.Status == "Delivered")
-                .Select(b => new { b.Id, b.UpdatedAt })
-                .ToDictionaryAsync(b => b.Id, b => (DateOnly?)DateOnly.FromDateTime(b.UpdatedAt));
-
-        var rows = list.Select(l =>
-        {
-            DateOnly? deliveryDate = null;
-            if (!string.IsNullOrWhiteSpace(l.BookingId) &&
-                pods.TryGetValue(l.BookingId, out var deliveredAt) &&
-                deliveredAt != null)
-            {
-                deliveryDate = DateOnly.FromDateTime(deliveredAt.Value);
-            }
-            else if (!string.IsNullOrWhiteSpace(l.BookingId) &&
-                     deliveredBookings.TryGetValue(l.BookingId, out var bookingDelivered))
-            {
-                deliveryDate = bookingDelivered;
-            }
-
-            int? deliveryDays = null;
-            if (deliveryDate != null)
-                deliveryDays = deliveryDate.Value.DayNumber - l.LrDate.DayNumber;
-
-            return (object)new
-            {
-                lr = l.LrNumber,
-                date = l.LrDate.ToString("yyyy-MM-dd"),
-                lrDate = l.LrDate.ToString("yyyy-MM-dd"),
-                deliveryDate = deliveryDate?.ToString("yyyy-MM-dd"),
-                deliveryDays,
-                vehicle = l.VehicleNumber,
-                driver = l.DriverName,
-                route = $"{l.FromCity} → {l.ToCity}",
-                distance = "—",
-                freight = l.Freight,
-                expense = 0,
-                profit = l.Freight,
-                bookingId = l.BookingId,
-            };
-        }).ToList();
-
-        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
-    }
+    [HttpGet("delivery-pod")]
+    public async Task<ActionResult<object>> DeliveryPod(
+        [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        [FromQuery] string? status,
+        [FromQuery] string? workflow,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.DeliveryPodAsync(search, fromDate, toDate, status, workflow, page, pageSize, includeTotal, ct));
 
     [HttpGet("income")]
-    public async Task<ActionResult<object>> Income()
-    {
-        var months = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-        var data = await tenants.Filter(branches.Filter(db.Bookings.AsNoTracking())).GroupBy(b => b.BookingDate.Month)
-            .Select(g => new { month = g.Key, freight = g.Sum(b => b.Freight), loading = g.Sum(b => b.Freight * 0.05m), total = g.Sum(b => b.Freight) })
-            .ToListAsync();
-        return Ok(data.Select(d => new { month = months[d.month - 1], d.freight, d.loading, d.total }));
-    }
+    public async Task<ActionResult<object>> Income(
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        [FromQuery] string? workflow,
+        CancellationToken ct = default) =>
+        Ok(await reports.IncomeAsync(fromDate, toDate, workflow, ct));
+
+    [HttpGet("direct-lr-profit-loss")]
+    public async Task<ActionResult<object>> DirectLrProfitLoss(
+        [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.DirectLrProfitLossAsync(search, fromDate, toDate, page, pageSize, includeTotal, ct));
 
     [HttpGet("expenses")]
-    public async Task<ActionResult<object>> Expenses()
-    {
-        var months = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-        var data = await tenants.Filter(branches.Filter(db.Expenses.AsNoTracking())).GroupBy(e => e.ExpenseDate.Month)
-            .Select(g => new { month = g.Key, fuel = g.Where(e => e.Category == "Fuel").Sum(e => e.Amount), salary = g.Where(e => e.Category == "Salary").Sum(e => e.Amount), toll = g.Where(e => e.Category == "Toll").Sum(e => e.Amount), maintenance = g.Where(e => e.Category == "Maintenance").Sum(e => e.Amount), total = g.Sum(e => e.Amount) })
-            .ToListAsync();
-        return Ok(data.Select(d => new { month = months[d.month - 1], d.fuel, d.salary, d.toll, d.maintenance, d.total }));
-    }
+    public async Task<ActionResult<object>> Expenses(
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        CancellationToken ct = default) =>
+        Ok(await reports.ExpensesAsync(fromDate, toDate, ct));
 
     [HttpGet("vehicles")]
-    public async Task<ActionResult<PagedResult<object>>> Vehicles(
+    public async Task<ActionResult<object>> Vehicles(
         [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
-        [FromQuery] bool includeTotal = true)
-    {
-        var q = tenants.Filter(branches.Filter(db.Vehicles.AsNoTracking()));
-        q = SearchHelper.Filter(q, search);
-        q = q.OrderBy(v => v.Number);
-        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize, QueryExtensions.ReportMaxPageSize);
-        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
-        var rows = items.Select(v => (object)new
-        {
-            number = v.Number,
-            type = v.Type,
-            status = v.Status,
-            trips = v.Trips,
-            revenue = v.Revenue,
-            insurance = v.Insurance,
-        }).ToList();
-        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
-    }
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.VehiclesLiveAsync(search, fromDate, toDate, page, pageSize, includeTotal, ct));
 
     [HttpGet("drivers")]
-    public async Task<ActionResult<PagedResult<object>>> Drivers(
+    public async Task<ActionResult<object>> Drivers(
         [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
-        [FromQuery] bool includeTotal = true)
-    {
-        var q = tenants.Filter(branches.Filter(db.Drivers.AsNoTracking()));
-        q = SearchHelper.Filter(q, search);
-        q = q.OrderBy(d => d.Name);
-        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize, QueryExtensions.ReportMaxPageSize);
-        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
-        var rows = items.Select(d => (object)new
-        {
-            name = d.Name,
-            phone = d.Phone,
-            status = d.Status,
-            trips = d.Trips,
-            rating = d.Rating,
-            salary = d.Salary,
-        }).ToList();
-        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
-    }
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.DriversLiveAsync(search, fromDate, toDate, page, pageSize, includeTotal, ct));
 
     [HttpGet("customers")]
-    public async Task<ActionResult<PagedResult<object>>> Customers(
+    public async Task<ActionResult<object>> Customers(
         [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
-        [FromQuery] bool includeTotal = true)
-    {
-        var q = tenants.Filter(branches.Filter(db.Customers.AsNoTracking()));
-        q = SearchHelper.Filter(q, search);
-        q = q.OrderBy(c => c.Name);
-        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize, QueryExtensions.ReportMaxPageSize);
-        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
-        var rows = items.Select(c => (object)new
-        {
-            name = c.Name,
-            contact = c.Contact,
-            outstanding = c.Outstanding,
-            trips = c.TotalTrips,
-            creditLimit = c.CreditLimit,
-        }).ToList();
-        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
-    }
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.CustomersLiveAsync(search, fromDate, toDate, page, pageSize, includeTotal, ct));
 
     [HttpGet("vendors")]
-    public async Task<ActionResult<PagedResult<object>>> Vendors(
+    public async Task<ActionResult<object>> Vendors(
         [FromQuery] string? search,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
-        [FromQuery] bool includeTotal = true)
-    {
-        var q = tenants.Filter(db.Vendors.AsNoTracking());
-        q = SearchHelper.Filter(q, search);
-        q = q.OrderBy(v => v.Name);
-        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize, QueryExtensions.ReportMaxPageSize);
-        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
-        var rows = items.Select(v => (object)new
-        {
-            name = v.Name,
-            category = v.Category,
-            outstanding = v.Outstanding,
-            bills = v.TotalBills,
-        }).ToList();
-        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
-    }
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.VendorsLiveAsync(search, fromDate, toDate, page, pageSize, includeTotal, ct));
 
     [HttpGet("cash-flow")]
-    public async Task<ActionResult<object>> CashFlow() =>
-        Ok(await AccountingReportService.BuildCashFlowAsync(db, tenants));
+    public async Task<ActionResult<object>> CashFlow(
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        CancellationToken ct = default) =>
+        Ok(await AccountingReportService.BuildCashFlowAsync(db, tenants, fromDate, toDate, ct));
 
     [HttpGet("cash-flow/details")]
     public async Task<ActionResult<object>> CashFlowDetails([FromQuery] int month, [FromQuery] int? year)

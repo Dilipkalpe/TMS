@@ -107,3 +107,7 @@ ALTER TABLE booking_payments
 
 CREATE INDEX IF NOT EXISTS idx_booking_payments_invoice
     ON booking_payments (freight_invoice_id);
+
+-- Direct LR / invoice payments use synthetic booking_id keys (LR:… / INV:…).
+-- Drop FK so Pay works without a bookings row.
+ALTER TABLE booking_payments DROP CONSTRAINT IF EXISTS booking_payments_booking_id_fkey;

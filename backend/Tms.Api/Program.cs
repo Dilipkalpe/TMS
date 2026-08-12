@@ -145,6 +145,7 @@ builder.Services.AddScoped<DocumentFlowService>();
 builder.Services.AddScoped<DocumentNumberService>();
 builder.Services.AddScoped<EwayBillSyncService>();
 builder.Services.AddScoped<HubTransferService>();
+builder.Services.AddScoped<OpsReportsService>();
 builder.Services.AddScoped<CompanyDataPurgeService>();
 
 builder.Services.AddHttpClient();

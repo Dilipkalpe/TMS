@@ -1209,7 +1209,8 @@ public class LrProcessController(
             CompanyId = lr.CompanyId,
             BranchId = invBranchId,
             InvoiceNo = invoiceNo,
-            BookingId = bookingId,
+            // Empty for Direct LR (no booking); never invent a fake booking PK.
+            BookingId = booking?.Id ?? "",
             LrNumber = lr.LrNumber,
             CustomerId = booking?.CustomerId,
             CustomerName = ApiParseHelper.BodyString(body, "customerName") ?? booking?.CustomerName ?? lr.Consignor,

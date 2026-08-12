@@ -42,7 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_booking_expenses_booking ON booking_expenses(book
 
 CREATE TABLE IF NOT EXISTS booking_payments (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    booking_id      VARCHAR(20) NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    -- No FK to bookings: Direct LR payments use synthetic keys (LR:… / INV:…).
+    booking_id      VARCHAR(64) NOT NULL,
     payment_date    DATE NOT NULL DEFAULT CURRENT_DATE,
     amount          DECIMAL(12,2) NOT NULL DEFAULT 0,
     payment_mode    VARCHAR(30),

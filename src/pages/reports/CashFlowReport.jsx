@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ERPListPage from '../../components/ui/ERPListPage'
 import ReportFilterRow from '../../components/ui/ReportFilterRow'
@@ -10,14 +10,26 @@ import { formatCurrency } from '../../components/ui/ReportFilters'
 import { useApiResource } from '../../hooks/useApiResource'
 import { reportsApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
+import { defaultReportFilters, toReportQuery } from '../../utils/reportQuery'
 
 export default function CashFlowReport() {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useApiResource(() => reportsApi.cashFlow())
+  const initial = useMemo(() => {
+    const now = new Date()
+    return {
+      ...defaultReportFilters(),
+      fromDate: `${now.getFullYear()}-01-01`,
+    }
+  }, [])
+  const [filters, setFilters] = useState(initial)
+  const [applied, setApplied] = useState(() => toReportQuery(initial))
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailTitle, setDetailTitle] = useState('')
   const [detailRows, setDetailRows] = useState([])
+
+  const load = useCallback(() => reportsApi.cashFlow(applied), [applied])
+  const { data, loading, error, refresh } = useApiResource(load, [applied.fromDate, applied.toDate])
 
   const openDetails = async (row) => {
     if (!row.monthNo) return
@@ -67,7 +79,7 @@ export default function CashFlowReport() {
         onAdd={() => navigate(addRecordRoutes.voucher)}
         module="Reports"
         title="Cash Flow Report"
-        statusCards={registerStatusCards('Total Months', data.length, 'blue', 'Banknote')}
+        statusCards={registerStatusCards('Months', data.length, 'blue', 'Banknote')}
         showActions={false}
         searchKeys={['month']}
         columns={columns}
@@ -77,7 +89,13 @@ export default function CashFlowReport() {
         loading={loading}
         error={error}
         onRefreshExternal={refresh}
-        filterRow={<ReportFilterRow />}
+        filterRow={(
+          <ReportFilterRow
+            value={filters}
+            onChange={setFilters}
+            onApply={() => setApplied(toReportQuery(filters))}
+          />
+        )}
       />
       <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailTitle} size="xl">
         {detailLoading ? (

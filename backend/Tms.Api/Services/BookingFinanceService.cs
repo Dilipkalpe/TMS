@@ -105,23 +105,53 @@ public static class BookingFinanceService
             .Select(g => new { g.Key, Total = g.Sum(e => e.Amount) })
             .ToDictionaryAsync(x => x.Key, x => x.Total, ct);
 
+        var lrs = await db.LorryReceipts.AsNoTracking()
+            .Where(l => l.BookingId != null && ids.Contains(l.BookingId))
+            .Select(l => new { l.BookingId, l.LrNumber, l.Freight, l.Gst })
+            .ToListAsync(ct);
+        var lrFreightByBooking = lrs
+            .GroupBy(l => l.BookingId!)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Freight + x.Gst));
+        var lrNumbers = lrs.Select(l => l.LrNumber).Distinct().ToList();
+        var lrExpenseByNumber = lrNumbers.Count == 0
+            ? new Dictionary<string, decimal>()
+            : await db.LrExpenses.AsNoTracking()
+                .Where(e => lrNumbers.Contains(e.LrNumber) && e.Status != "Rejected")
+                .GroupBy(e => e.LrNumber)
+                .Select(g => new { g.Key, Total = g.Sum(x => x.Amount) })
+                .ToDictionaryAsync(x => x.Key, x => x.Total, ct);
+        var lrExpenseByBooking = lrs
+            .GroupBy(l => l.BookingId!)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(x => lrExpenseByNumber.TryGetValue(x.LrNumber, out var a) ? a : 0));
+
         var rows = new List<object>(bookings.Count);
         foreach (var booking in bookings)
         {
             brokerByBooking.TryGetValue(booking.Id, out var brokerCharges);
             expenseByBooking.TryGetValue(booking.Id, out var expenses);
-            var income = booking.Freight;
-            var totalCost = brokerCharges + expenses;
+            lrFreightByBooking.TryGetValue(booking.Id, out var lrFreight);
+            lrExpenseByBooking.TryGetValue(booking.Id, out var lrExpenses);
+            var income = booking.Freight + lrFreight;
+            var totalCost = brokerCharges + expenses + lrExpenses;
             var profit = income - totalCost;
+            var lrCount = lrs.Count(x => string.Equals(x.BookingId, booking.Id, StringComparison.OrdinalIgnoreCase));
             rows.Add(new
             {
                 bookingId = booking.Id,
                 bookingDate = booking.BookingDate.ToString("yyyy-MM-dd"),
                 customer = booking.CustomerName,
                 route = $"{booking.FromCity} → {booking.ToCity}",
+                workflow = "booking",
+                workflowLabel = "Booking",
+                lrCount,
                 income,
+                bookingFreight = booking.Freight,
+                lrFreight,
                 brokerCharges,
                 expenses,
+                lrExpenses,
                 totalCost,
                 profit,
                 marginPercent = income > 0 ? Math.Round(profit / income * 100, 2) : 0

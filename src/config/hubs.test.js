@@ -50,7 +50,7 @@ describe('hub navigation config', () => {
   it('shipment management hub cards', () => {
     expectCardShape(shipmentManagementCards)
     expect(shipmentManagementCards.map((c) => c.title)).toEqual([
-      'Quotation', 'Booking', 'LR List', 'Loading Slip', 'Transit Pass', 'Dispatch',
+      'Quotation', 'Booking', 'LR List', 'Loading Slip', 'Transit Pass', 'Dispatch', 'Hub Transfer',
     ])
   })
 
@@ -63,6 +63,11 @@ describe('hub navigation config', () => {
 
   it('reports hub includes cash flow report', () => {
     expect(reportCards.some((c) => c.path === '/reports/cash-flow')).toBe(true)
+    expect(reportCards.some((c) => c.path === '/reports/loading-dispatch')).toBe(true)
+    expect(reportCards.some((c) => c.path === '/reports/hub-transfer')).toBe(true)
+    expect(reportCards.some((c) => c.path === '/reports/delivery-pod')).toBe(true)
+    expect(reportCards.some((c) => c.path === '/reports/direct-lr-pl')).toBe(true)
+    expect(reportCards.some((c) => c.path === '/reports/booking-pl')).toBe(true)
     expect(reportsHubSections.map((s) => s.title)).toEqual([
       'Operations reports',
       'Finance reports',
