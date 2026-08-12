@@ -11,7 +11,13 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/accounting")]
-public class AccountingController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, AccountingRegisterJobService registers, AccountingReadService accountingRead) : ControllerBase
+public class AccountingController(
+    TmsDbContext db,
+    ITenantContext tenants,
+    IBranchContext branches,
+    AccountingRegisterJobService registers,
+    AccountingReadService accountingRead,
+    DocumentNumberService documentNumbers) : ControllerBase
 {
     [HttpGet("chart-of-accounts")]
     public async Task<ActionResult<object>> ChartOfAccounts()
@@ -378,14 +384,51 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
         var from = AccountingReportService.ParseDate(fromDate);
         var to = AccountingReportService.ParseDate(toDate);
 
-        // All open customer receivables — do not drop parties with no txn in the filter dates.
+        static string ClassifyBucket(DateOnly docDate, DateOnly? fromDateVal, DateOnly? toDateVal)
+        {
+            if (fromDateVal.HasValue && docDate < fromDateVal.Value) return "balance";
+            if ((!fromDateVal.HasValue || docDate >= fromDateVal.Value)
+                && (!toDateVal.HasValue || docDate <= toDateVal.Value))
+                return "outstanding";
+            if (!fromDateVal.HasValue && !toDateVal.HasValue) return "outstanding";
+            return "outstanding";
+        }
+
+        // ---- Customers: bookings + direct LRs + freight invoices ----
         var bookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking().Where(b => b.Balance > 0);
         if (!string.IsNullOrWhiteSpace(customerId))
             bookings = bookings.Where(b => b.CustomerId == customerId);
 
-        var bookingLines = await bookings
-            .Select(b => new { partyId = b.CustomerId ?? "", name = b.CustomerName, date = b.BookingDate, amount = b.Balance })
+        var bookingRows = await bookings
+            .Select(b => new { b.Id, partyId = b.CustomerId ?? "", name = b.CustomerName, date = b.BookingDate, amount = b.Balance })
             .ToListAsync();
+        var bookingIds = bookingRows.Select(b => b.Id).ToList();
+        var lrByBooking = bookingIds.Count == 0
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : (await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking()
+                .Where(l => l.BookingId != null && bookingIds.Contains(l.BookingId))
+                .Select(l => new { l.BookingId, l.LrNumber })
+                .ToListAsync())
+                .GroupBy(x => x.BookingId!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.LrNumber).First().LrNumber, StringComparer.OrdinalIgnoreCase);
+
+        var customerDetailLines = new List<(string PartyKey, string PartyId, string Name, string LrNo, DateOnly Date, decimal Amount, string Bucket, string SourceType, string SourceId)>();
+
+        foreach (var b in bookingRows)
+        {
+            var partyKey = string.IsNullOrEmpty(b.partyId) ? b.name : b.partyId;
+            lrByBooking.TryGetValue(b.Id, out var linkedLr);
+            customerDetailLines.Add((
+                partyKey,
+                b.partyId,
+                b.name,
+                linkedLr ?? b.Id,
+                b.date,
+                b.amount,
+                ClassifyBucket(b.date, from, to),
+                "booking",
+                b.Id));
+        }
 
         var invoicedLrNos = TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking()
             .Where(i => i.Status != "Cancelled" && i.LrNumber != null && i.LrNumber != "")
@@ -399,41 +442,185 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
         if (!string.IsNullOrWhiteSpace(customerId))
             directLrs = directLrs.Where(l => l.CustomerId == customerId);
 
-        var lrLines = await directLrs
-            .Select(l => new { partyId = l.CustomerId ?? "", name = l.CustomerName ?? "Unknown", date = l.LrDate, amount = l.Balance })
-            .ToListAsync();
+        foreach (var l in await directLrs.Select(x => new { partyId = x.CustomerId ?? "", name = x.CustomerName ?? "Unknown", x.LrNumber, date = x.LrDate, amount = x.Balance }).ToListAsync())
+        {
+            var partyKey = string.IsNullOrEmpty(l.partyId) ? l.name : l.partyId;
+            customerDetailLines.Add((partyKey, l.partyId, l.name, l.LrNumber, l.date, l.amount, ClassifyBucket(l.date, from, to), "lr", l.LrNumber));
+        }
 
         var invoices = TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking()
             .Where(i => i.Status != "Cancelled" && i.Balance > 0);
         if (!string.IsNullOrWhiteSpace(customerId))
             invoices = invoices.Where(i => i.CustomerId == customerId);
 
-        var invoiceLines = await invoices
-            .Select(i => new { partyId = i.CustomerId ?? "", name = i.CustomerName ?? "Unknown", date = i.InvoiceDate, amount = i.Balance })
+        foreach (var i in await invoices.Select(x => new { x.Id, partyId = x.CustomerId ?? "", name = x.CustomerName ?? "Unknown", lrNo = x.LrNumber ?? x.InvoiceNo, date = x.InvoiceDate, amount = x.Balance }).ToListAsync())
+        {
+            var partyKey = string.IsNullOrEmpty(i.partyId) ? i.name : i.partyId;
+            customerDetailLines.Add((partyKey, i.partyId, i.name, i.lrNo, i.date, i.amount, ClassifyBucket(i.date, from, to), "invoice", i.Id.ToString()));
+        }
+
+        var customers = customerDetailLines
+            .GroupBy(r => r.PartyKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var balance = g.Where(x => x.Bucket == "balance").Sum(x => x.Amount);
+                var outstanding = g.Where(x => x.Bucket == "outstanding").Sum(x => x.Amount);
+                var totalPending = balance + outstanding;
+                return new
+                {
+                    name = g.Select(x => x.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? g.Key,
+                    partyId = g.Select(x => x.PartyId).FirstOrDefault(id => !string.IsNullOrEmpty(id)) ?? "",
+                    balance,
+                    outstanding,
+                    totalPending,
+                    amount = totalPending,
+                    lines = g.OrderByDescending(x => x.Date).ThenBy(x => x.LrNo)
+                        .Select(x => (object)new
+                        {
+                            lrNo = x.LrNo,
+                            lrDate = x.Date.ToString("yyyy-MM-dd"),
+                            amount = x.Amount,
+                            bucket = x.Bucket,
+                            sourceType = x.SourceType,
+                            sourceId = x.SourceId,
+                        }).ToList(),
+                };
+            })
+            .Where(r => r.totalPending > 0)
+            .OrderByDescending(r => r.totalPending)
+            .Cast<object>()
+            .ToList();
+
+        // ---- Vendors: booking expenses + vendor provisions ----
+        var vendorExpenseQ = tenants.Filter(db.BookingExpenses.AsNoTracking())
+            .Where(e => e.Amount > 0 && e.VendorId != null && e.VendorId != "");
+        if (!string.IsNullOrWhiteSpace(vendorId))
+            vendorExpenseQ = vendorExpenseQ.Where(e => e.VendorId == vendorId);
+
+        var vendorExpenseRaw = await vendorExpenseQ
+            .Select(e => new { partyId = e.VendorId!, name = e.VendorName ?? e.VendorId!, e.BookingId, date = e.ExpenseDate, amount = e.Amount })
+            .ToListAsync();
+        var vendorBookingIds = vendorExpenseRaw.Select(e => e.BookingId).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        var vendorLrByBooking = vendorBookingIds.Count == 0
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : (await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking()
+                .Where(l => l.BookingId != null && vendorBookingIds.Contains(l.BookingId))
+                .Select(l => new { l.BookingId, l.LrNumber })
+                .ToListAsync())
+                .GroupBy(x => x.BookingId!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.LrNumber).First().LrNumber, StringComparer.OrdinalIgnoreCase);
+
+        var vendorExpenseLines = vendorExpenseRaw.Select(e =>
+        {
+            vendorLrByBooking.TryGetValue(e.BookingId, out var linkedLr);
+            var lrNo = !string.IsNullOrWhiteSpace(linkedLr) ? linkedLr! : e.BookingId;
+            return new { e.partyId, e.name, lrNo, e.date, e.amount };
+        }).ToList();
+
+        var vendorProvQ = tenants.Filter(db.Provisions.AsNoTracking())
+            .Where(p => p.ProvisionType == "Vendor" && !p.IsReversed && p.Amount > 0);
+        if (!string.IsNullOrWhiteSpace(vendorId))
+            vendorProvQ = vendorProvQ.Where(p => p.PartyId == vendorId);
+
+        var vendorProvLines = await vendorProvQ
+            .Select(p => new
+            {
+                partyId = p.PartyId ?? p.PartyName,
+                name = p.PartyName,
+                lrNo = p.ReferenceNo ?? p.Id.ToString(),
+                date = p.ProvisionDate,
+                amount = p.Amount,
+            })
             .ToListAsync();
 
-        var allLines = bookingLines.Concat(lrLines).Concat(invoiceLines).ToList();
+        var vendorDetailLines = vendorExpenseLines
+            .Select(e => (PartyKey: e.partyId, PartyId: e.partyId, Name: e.name, LrNo: e.lrNo, Date: e.date, Amount: e.amount, Bucket: ClassifyBucket(e.date, from, to)))
+            .Concat(vendorProvLines.Select(p => (PartyKey: string.IsNullOrEmpty(p.partyId) ? p.name : p.partyId, PartyId: p.partyId ?? "", Name: p.name, LrNo: p.lrNo, Date: p.date, Amount: p.amount, Bucket: ClassifyBucket(p.date, from, to))))
+            .ToList();
 
-        var customerRows = allLines
+        // Ensure vendors with Outstanding master balance but no detail rows still appear via master.
+        var vendorsMaster = await TenantScope.Vendors(db, tenants, branches).AsNoTracking()
+            .Where(v => v.Outstanding > 0)
+            .Select(v => new { v.Id, v.Name, v.Outstanding })
+            .ToListAsync();
+        if (!string.IsNullOrWhiteSpace(vendorId))
+            vendorsMaster = vendorsMaster.Where(v => v.Id == vendorId).ToList();
+
+        var vendors = vendorsMaster
+            .Select(v =>
+            {
+                var lines = vendorDetailLines
+                    .Where(l => string.Equals(l.PartyId, v.Id, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(l.Name, v.Name, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var balance = lines.Where(x => x.Bucket == "balance").Sum(x => x.Amount);
+                var outstanding = lines.Where(x => x.Bucket == "outstanding").Sum(x => x.Amount);
+                if (lines.Count == 0)
+                {
+                    // Fall back to master outstanding in Outstanding column when no dated lines.
+                    outstanding = v.Outstanding;
+                    balance = 0m;
+                }
+                var totalPending = balance + outstanding;
+                if (totalPending <= 0 && v.Outstanding > 0)
+                {
+                    outstanding = v.Outstanding;
+                    totalPending = v.Outstanding;
+                }
+                return (object)new
+                {
+                    name = v.Name,
+                    partyId = v.Id,
+                    balance,
+                    outstanding,
+                    totalPending,
+                    amount = totalPending,
+                    lines = lines.OrderByDescending(x => x.Date).ThenBy(x => x.LrNo)
+                        .Select(x => (object)new
+                        {
+                            lrNo = x.LrNo,
+                            lrDate = x.Date.ToString("yyyy-MM-dd"),
+                            amount = x.Amount,
+                            bucket = x.Bucket,
+                        }).ToList(),
+                };
+            })
+            .ToList();
+
+        // ---- Party provisions ----
+        var partiesQ = tenants.Filter(db.Provisions.AsNoTracking())
+            .Where(p => p.ProvisionType == "Party" && !p.IsReversed && p.Amount > 0);
+        var partyProvRows = await partiesQ
+            .Select(p => new
+            {
+                partyId = p.PartyId ?? "",
+                name = p.PartyName,
+                lrNo = p.ReferenceNo ?? p.Id.ToString(),
+                date = p.ProvisionDate,
+                amount = p.Amount,
+            })
+            .ToListAsync();
+
+        var parties = partyProvRows
             .GroupBy(r => string.IsNullOrEmpty(r.partyId) ? r.name : r.partyId, StringComparer.OrdinalIgnoreCase)
             .Select(g =>
             {
-                decimal balance = 0m;     // backdated pending (before From date)
-                decimal outstanding = 0m; // selected-period / current pending
-                foreach (var line in g)
+                decimal balance = 0m;
+                decimal outstanding = 0m;
+                var lines = new List<object>();
+                foreach (var line in g.OrderByDescending(x => x.date).ThenBy(x => x.lrNo))
                 {
-                    var isBackdated = from.HasValue && line.date < from.Value;
-                    var inSelectedRange = (!from.HasValue || line.date >= from.Value)
-                        && (!to.HasValue || line.date <= to.Value);
-
-                    if (isBackdated)
-                        balance += line.amount;
-                    else if (inSelectedRange || (!from.HasValue && !to.HasValue))
-                        outstanding += line.amount;
-                    else if (to.HasValue && line.date > to.Value)
-                        outstanding += line.amount;
+                    var bucket = ClassifyBucket(line.date, from, to);
+                    if (bucket == "balance") balance += line.amount;
+                    else outstanding += line.amount;
+                    lines.Add(new
+                    {
+                        lrNo = line.lrNo,
+                        lrDate = line.date.ToString("yyyy-MM-dd"),
+                        amount = line.amount,
+                        bucket,
+                    });
                 }
-
                 var totalPending = balance + outstanding;
                 return new
                 {
@@ -442,53 +629,264 @@ public class AccountingController(TmsDbContext db, ITenantContext tenants, IBran
                     balance,
                     outstanding,
                     totalPending,
+                    amount = totalPending,
+                    lines,
                 };
             })
             .Where(r => r.totalPending > 0)
-            .OrderByDescending(r => r.totalPending)
+            .Cast<object>()
             .ToList();
-
-        var customers = customerRows
-            .Select((r, idx) => (object)new
-            {
-                srNo = idx + 1,
-                name = r.name,
-                partyId = r.partyId,
-                balance = r.balance,
-                outstanding = r.outstanding,
-                totalPending = r.totalPending,
-                amount = r.totalPending,
-                days0_30 = r.outstanding,
-                days30_60 = 0m,
-                days60_90 = 0m,
-                days90plus = r.balance,
-            })
-            .ToList();
-
-        var vendorsQ = TenantScope.Vendors(db, tenants, branches).Where(v => v.Outstanding > 0);
-        if (!string.IsNullOrWhiteSpace(vendorId)) vendorsQ = vendorsQ.Where(v => v.Id == vendorId);
-
-        var vendors = await vendorsQ
-            .Select(v => new { name = v.Name, partyId = v.Id, amount = v.Outstanding })
-            .ToListAsync();
-
-        var partiesQ = tenants.Filter(db.Provisions.AsQueryable()).Where(p => p.ProvisionType == "Party" && !p.IsReversed && p.Amount > 0);
-        if (from.HasValue) partiesQ = partiesQ.Where(p => p.ProvisionDate >= from.Value);
-        if (to.HasValue) partiesQ = partiesQ.Where(p => p.ProvisionDate <= to.Value);
-
-        var parties = await partiesQ
-            .GroupBy(p => p.PartyName)
-            .Select(g => new { name = g.Key, partyId = g.Max(p => p.PartyId) ?? "", amount = g.Sum(p => p.Amount) })
-            .ToListAsync();
 
         return Ok(new
         {
             customers,
-            vendors = vendors.Select(r => ToAgingDto(r.name, r.partyId, r.amount)),
-            parties = parties.Select(r => ToAgingDto(r.name, r.partyId, r.amount)),
+            vendors,
+            parties,
             asOf = new { fromDate, toDate },
         });
     }
+
+    /// <summary>
+    /// Record a customer payment against one outstanding line (booking, freight invoice, or direct LR).
+    /// </summary>
+    [HttpPost("outstanding/customer-payment")]
+    public async Task<ActionResult<object>> RecordCustomerOutstandingPayment([FromBody] Dictionary<string, object?> body)
+    {
+        var sourceType = (ApiParseHelper.BodyString(body, "sourceType") ?? "").Trim().ToLowerInvariant();
+        var sourceId = (ApiParseHelper.BodyString(body, "sourceId") ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(sourceType) || string.IsNullOrWhiteSpace(sourceId))
+            return BadRequest(new ApiError("sourceType and sourceId are required."));
+
+        var amount = ApiParseHelper.BodyDecimal(body, "amount");
+        if (amount <= 0)
+            return BadRequest(new ApiError("Payment amount must be greater than zero."));
+
+        var paymentDate = ApiParseHelper.BodyDate(body, "paymentDate", DateOnly.FromDateTime(DateTime.UtcNow));
+        var paymentMode = ApiParseHelper.BodyString(body, "paymentMode") ?? "Cash";
+        var referenceNo = ApiParseHelper.BodyString(body, "referenceNo");
+        var remarks = ApiParseHelper.BodyString(body, "remarks");
+
+        if (sourceType is "booking")
+        {
+            var booking = await TenantScope.FindBookingAsync(db, tenants, branches, sourceId);
+            if (booking == null) return NotFound(new ApiError("Booking not found."));
+            if (amount > booking.Balance)
+                return BadRequest(new ApiError($"Payment exceeds outstanding balance ({booking.Balance:N2})."));
+
+            Guid? freightInvoiceId = null;
+            FreightInvoice? invoice = null;
+            if (Guid.TryParse(ApiParseHelper.BodyString(body, "freightInvoiceId"), out var fid))
+            {
+                invoice = await db.FreightInvoices.FindAsync(fid);
+                if (invoice == null || invoice.BookingId != booking.Id || !TenantAccess.CanAccess(tenants, invoice))
+                    return BadRequest(new ApiError("Freight invoice not found for this booking."));
+                if (invoice.Status == "Cancelled")
+                    return BadRequest(new ApiError("Cannot pay a cancelled freight invoice."));
+                if (amount > invoice.Balance)
+                    return BadRequest(new ApiError($"Payment exceeds invoice balance ({invoice.Balance:N2})."));
+                freightInvoiceId = invoice.Id;
+            }
+            else
+            {
+                invoice = await db.FreightInvoices
+                    .Where(i => i.BookingId == booking.Id && i.Status != "Cancelled" && i.Balance > 0)
+                    .OrderByDescending(i => i.CreatedAt)
+                    .FirstOrDefaultAsync();
+                if (invoice != null)
+                    freightInvoiceId = invoice.Id;
+            }
+
+            string receiptNo;
+            try
+            {
+                var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, booking.BranchId);
+                receiptNo = await documentNumbers.NextAsync(DocumentNumberTypes.Receipt, booking.CompanyId, branchId, paymentDate);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ApiError(ex.Message));
+            }
+
+            var payment = new BookingPayment
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = booking.CompanyId,
+                BookingId = booking.Id,
+                FreightInvoiceId = freightInvoiceId,
+                ReceiptNo = receiptNo,
+                PaymentDate = paymentDate,
+                Amount = amount,
+                PaymentMode = paymentMode,
+                ReferenceNo = referenceNo,
+                Remarks = remarks,
+                CreatedAt = DateTime.UtcNow,
+            };
+            db.BookingPayments.Add(payment);
+            await BookingFinanceService.RecalculateBookingPaymentStatusAsync(db, booking);
+            if (invoice != null)
+                await BookingFinanceService.RecalculateFreightInvoiceStatusAsync(db, invoice);
+            await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
+            await db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Payment recorded.",
+                receiptNo,
+                sourceType,
+                sourceId = booking.Id,
+                outstanding = booking.Balance,
+                paymentStatus = booking.Payment,
+            });
+        }
+
+        if (sourceType is "invoice")
+        {
+            if (!Guid.TryParse(sourceId, out var invoiceId))
+                return BadRequest(new ApiError("Invalid invoice id."));
+            var inv = await db.FreightInvoices.FindAsync(invoiceId);
+            if (inv == null || !TenantScope.CanAccessBranchEntity(tenants, branches, inv))
+                return NotFound(new ApiError("Freight invoice not found."));
+            if (inv.Status == "Cancelled")
+                return BadRequest(new ApiError("Cannot pay a cancelled invoice."));
+            if (inv.Balance <= 0)
+                return BadRequest(new ApiError("Invoice is already fully paid."));
+            if (amount > inv.Balance)
+                return BadRequest(new ApiError($"Payment exceeds invoice balance ({inv.Balance:N2})."));
+
+            string receiptNo;
+            try
+            {
+                var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, inv.BranchId);
+                receiptNo = await documentNumbers.NextAsync(DocumentNumberTypes.Receipt, inv.CompanyId, branchId, paymentDate);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ApiError(ex.Message));
+            }
+
+            string bookingKey;
+            Booking? booking = null;
+            if (!string.IsNullOrWhiteSpace(inv.BookingId)
+                && !inv.BookingId.StartsWith("LR:", StringComparison.OrdinalIgnoreCase)
+                && !inv.BookingId.StartsWith("INV:", StringComparison.OrdinalIgnoreCase))
+            {
+                booking = await TenantScope.FindBookingAsync(db, tenants, branches, inv.BookingId);
+                bookingKey = booking?.Id ?? (!string.IsNullOrWhiteSpace(inv.LrNumber) ? $"LR:{inv.LrNumber}" : $"INV:{inv.InvoiceNo}");
+            }
+            else if (!string.IsNullOrWhiteSpace(inv.LrNumber))
+            {
+                bookingKey = $"LR:{inv.LrNumber}";
+            }
+            else
+            {
+                bookingKey = $"INV:{inv.InvoiceNo}";
+            }
+
+            var payment = new BookingPayment
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = inv.CompanyId,
+                BookingId = bookingKey,
+                FreightInvoiceId = inv.Id,
+                ReceiptNo = receiptNo,
+                PaymentDate = paymentDate,
+                Amount = amount,
+                PaymentMode = paymentMode,
+                ReferenceNo = referenceNo,
+                Remarks = remarks,
+                CreatedAt = DateTime.UtcNow,
+            };
+            db.BookingPayments.Add(payment);
+            await BookingFinanceService.RecalculateFreightInvoiceStatusAsync(db, inv);
+            if (booking != null)
+            {
+                await BookingFinanceService.RecalculateBookingPaymentStatusAsync(db, booking);
+                await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
+            }
+            else if (!string.IsNullOrWhiteSpace(inv.CustomerId))
+            {
+                await BookingFinanceService.SyncCustomerOutstandingAsync(db, inv.CompanyId, inv.CustomerId);
+            }
+            await db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Payment recorded.",
+                receiptNo,
+                sourceType,
+                sourceId = inv.Id,
+                outstanding = inv.Balance,
+                invoiceStatus = inv.Status,
+            });
+        }
+
+        if (sourceType is "lr")
+        {
+            var lr = await db.LorryReceipts.FirstOrDefaultAsync(x => x.LrNumber == sourceId);
+            if (lr == null || !TenantScope.CanAccessBranchEntity(tenants, branches, lr))
+                return NotFound(new ApiError("LR not found."));
+            if (lr.Balance <= 0)
+                return BadRequest(new ApiError("LR is already fully paid."));
+            if (amount > lr.Balance)
+                return BadRequest(new ApiError($"Payment exceeds outstanding balance ({lr.Balance:N2})."));
+
+            string receiptNo;
+            try
+            {
+                var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, lr.BranchId);
+                receiptNo = await documentNumbers.NextAsync(DocumentNumberTypes.Receipt, lr.CompanyId, branchId, paymentDate);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ApiError(ex.Message));
+            }
+
+            var bookingKey = $"LR:{lr.LrNumber}";
+            var payment = new BookingPayment
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = lr.CompanyId,
+                BookingId = bookingKey,
+                ReceiptNo = receiptNo,
+                PaymentDate = paymentDate,
+                Amount = amount,
+                PaymentMode = paymentMode,
+                ReferenceNo = referenceNo,
+                Remarks = remarks,
+                CreatedAt = DateTime.UtcNow,
+            };
+            db.BookingPayments.Add(payment);
+
+            var charges = lr.Freight + lr.Gst
+                + (lr.Hamali ?? 0) + (lr.LoadingCharges ?? 0) + (lr.UnloadingCharges ?? 0) + (lr.Insurance ?? 0);
+            var advance = lr.Advance ?? 0m;
+            var paidDb = await db.BookingPayments
+                .Where(p => p.BookingId == bookingKey)
+                .SumAsync(p => p.Amount);
+            var pendingAdded = db.ChangeTracker.Entries<BookingPayment>()
+                .Where(e => e.State == EntityState.Added && e.Entity.BookingId == bookingKey)
+                .Sum(e => e.Entity.Amount);
+            lr.Balance = Math.Max(0, charges - advance - paidDb - pendingAdded);
+            if (lr.Balance <= 0)
+                lr.PaymentType = "Paid";
+            lr.UpdatedAt = DateTime.UtcNow;
+
+            await BookingFinanceService.SyncCustomerOutstandingAsync(db, lr.CompanyId, lr.CustomerId);
+            await db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Payment recorded.",
+                receiptNo,
+                sourceType,
+                sourceId = lr.LrNumber,
+                outstanding = lr.Balance,
+            });
+        }
+
+        return BadRequest(new ApiError("sourceType must be booking, invoice, or lr."));
+    }
+
     static object ToAgingDto(string name, string partyId, decimal amount) => new
     {
         name,

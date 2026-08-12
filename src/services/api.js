@@ -461,6 +461,7 @@ export const accountingApi = {
   profitLoss: () => apiRequest('/accounting/profit-loss'),
   balanceSheet: (params = {}) => apiRequest(`/accounting/balance-sheet?${new URLSearchParams(params)}`),
   outstanding: (params = {}) => apiRequest(`/accounting/outstanding?${new URLSearchParams(params)}`),
+  recordCustomerPayment: (data) => apiRequest('/accounting/outstanding/customer-payment', { method: 'POST', body: data }),
   gst: () => apiRequest('/accounting/gst'),
 }
 
