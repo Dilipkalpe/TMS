@@ -36,7 +36,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
 
   // Portal to body so Enter/keyboard is not stolen by parent grids (e.g. LR Item Details).
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-kbd-popup="true">
+    <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4" data-kbd-popup="true">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
         ref={contentRef}

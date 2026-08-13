@@ -14,11 +14,15 @@ function resolveLogoUrl(url) {
   return `${APP_BASE_PATH || ''}${path}`
 }
 
+function unescapeTemplateText(s) {
+  return String(s).replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+}
+
 function fieldValue(fields, field, label, content) {
-  if (content != null && content !== '') return String(content)
-  if (!field) return label || ''
+  if (content != null && content !== '') return unescapeTemplateText(content)
+  if (!field) return label ? unescapeTemplateText(label) : ''
   const v = fields?.[field] ?? fields?.[field.toLowerCase()] ?? ''
-  if (label) return `${label}${v === '' || v == null ? '' : `: ${v}`}`
+  if (label) return `${unescapeTemplateText(label)}${v === '' || v == null ? '' : `: ${v}`}`
   return v == null || v === '' ? '' : String(v)
 }
 

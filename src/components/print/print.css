@@ -14,6 +14,11 @@
     print-color-adjust: exact;
   }
 
+  /* Hide app UI + any body portals (modals/toasts). Only #print-root may print. */
+  body.printing > *:not(#print-root) {
+    display: none !important;
+  }
+
   body.printing #root,
   body.printing aside,
   body.printing nav,
