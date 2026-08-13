@@ -3,6 +3,7 @@ import { hubSection, withHubTheme } from './hubTheme'
 export const settingsCards = withHubTheme([
   { title: 'General', path: '/settings/general', icon: 'Settings', description: 'Company profile, theme, print logo, and document flow' },
   { title: 'Document print templates', path: '/settings/print-templates', icon: 'Printer', description: 'Customize LR, invoice, and document print layouts' },
+  { title: 'Package label templates', path: '/settings/label-templates', icon: 'Tags', description: 'DB-driven LR package label layouts for LBL Print' },
   { title: 'Staff users', path: '/settings/users', icon: 'Users', description: 'Staff accounts, User Role Type, and branch access' },
   { title: 'User role types', path: '/settings/role-menus', icon: 'Shield', description: 'Provision role types and show/hide menus per User Role Type' },
   { title: 'Portal user access', path: '/settings/portal-users', icon: 'UserCircle', description: 'Customer portal login and permissions' },
@@ -19,6 +20,7 @@ export const settingsHubSections = [
   hubSection('Company & documents', 'Profile, print templates, and numbering', pick(
     '/settings/general',
     '/settings/print-templates',
+    '/settings/label-templates',
     '/settings/document-numbering',
   ), { chip: 'Setup' }),
   hubSection('Users & branches', 'Access control and locations', pick(

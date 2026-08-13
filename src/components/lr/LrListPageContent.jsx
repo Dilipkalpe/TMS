@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Tags } from 'lucide-react'
 import Badge from '../ui/Badge'
 import ERPListPage from '../ui/ERPListPage'
 import ERPPageTitle from '../ui/ERPPageTitle'
+import { buildStandardRowActions } from '../ui/TableRowActions'
 import LrListActionBar from './LrListActionBar'
 import LrListKpiCards from './LrListKpiCards'
 import LrListFilterPanel from './LrListFilterPanel'
 import LrListTableToolbar from './LrListTableToolbar'
 import LrListActiveFilterChips from './LrListActiveFilterChips'
+import LrLabelPrintModal from './LrLabelPrintModal'
 import SlideDrawer from '../ui/SlideDrawer'
 import KeyboardShortcutBar, { LR_LIST_SHORTCUTS } from '../keyboard/KeyboardShortcutBar'
 import { usePagedApiResource } from '../../hooks/usePagedApiResource'
@@ -255,6 +258,32 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
     })
   }
 
+  const [labelModalOpen, setLabelModalOpen] = useState(false)
+  const [labelLrNumber, setLabelLrNumber] = useState(null)
+
+  const handleLblPrint = useCallback((row) => {
+    if (!row?.lrNumber) return
+    setLabelLrNumber(row.lrNumber)
+    setLabelModalOpen(true)
+  }, [])
+
+  const rowActions = useCallback((row) => [
+    ...buildStandardRowActions({
+      onView: openRow,
+      onEdit: (r) => navigate(lrEditPath(r.lrNumber)),
+      onDelete: handleDelete,
+      onPrint: handlePrint,
+      printTitle: 'Print LR',
+    }),
+    {
+      id: 'lbl-print',
+      icon: Tags,
+      label: 'LBL Print',
+      variant: 'outline',
+      onClick: handleLblPrint,
+    },
+  ], [handleDelete, handlePrint, handleLblPrint, navigate])
+
   const handleExport = useCallback(() => {
     const rows = paged.items.map(mapExportRow)
     const ok = exportToCsv(rows, EXPORT_COLUMNS, 'lr-list.csv')
@@ -397,11 +426,7 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
       error={paged.error}
       onRefreshExternal={refreshList}
       onRowClick={openRow}
-      onView={openRow}
-      onEdit={(r) => navigate(lrEditPath(r.lrNumber))}
-      onDelete={handleDelete}
-      onPrint={handlePrint}
-      rowPrintTitle="Print LR"
+      rowActions={rowActions}
       getRowKey={(row) => row.lrNumber}
       exportFilename="lr-list"
       serverMode
@@ -415,12 +440,26 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
     />
   )
 
+  const labelModal = (
+    <LrLabelPrintModal
+      open={labelModalOpen}
+      onClose={() => { setLabelModalOpen(false); setLabelLrNumber(null) }}
+      lrNumber={labelLrNumber}
+    />
+  )
+
   if (embedded) {
-    return <div className="flex min-h-0 flex-1 flex-col gap-3">{listBlock}</div>
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        {listBlock}
+        {labelModal}
+      </div>
+    )
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {labelModal}
       <ERPPageTitle
         module="LR"
         title="LR List"

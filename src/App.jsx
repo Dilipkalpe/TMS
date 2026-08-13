@@ -20,7 +20,7 @@ import {
   ItemList, ItemDetails, NewItem,
   ExpensesHub, ExpenseList, NewExpense,
   SettingsHub, Settings, DataCleanupPage, MastersHub, ShipmentManagementHub, HubTransferPage, DeliveryManagementHub,
-  BranchesPage, PortalUsersPage, UsersPage, RoleMenusPage, DocumentNumberingPage, NotificationSettings, PrintTemplateSettingsPage,
+  BranchesPage, PortalUsersPage, UsersPage, RoleMenusPage, DocumentNumberingPage, NotificationSettings, PrintTemplateSettingsPage, LabelTemplatesSettingsPage,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
   AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry,
@@ -261,6 +261,7 @@ export default function App() {
         <Route path="settings/portal-users" element={<PortalUsersPage />} />
         <Route path="settings/notifications" element={<NotificationSettings />} />
         <Route path="settings/print-templates" element={<PrintTemplateSettingsPage />} />
+        <Route path="settings/label-templates" element={<LabelTemplatesSettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

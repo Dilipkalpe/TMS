@@ -74,6 +74,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<AccountingReportJob> AccountingReportJobs => Set<AccountingReportJob>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<PrintTemplateConfiguration> PrintTemplateConfigurations => Set<PrintTemplateConfiguration>();
+    public DbSet<LabelTemplate> LabelTemplates => Set<LabelTemplate>();
     public DbSet<Broker> Brokers => Set<Broker>();
     public DbSet<BookingBrokerCharge> BookingBrokerCharges => Set<BookingBrokerCharge>();
     public DbSet<BookingExpense> BookingExpenses => Set<BookingExpense>();
@@ -556,6 +557,26 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.ModifiedBy).HasColumnName("modified_by").HasMaxLength(120);
             e.Property(x => x.ModifiedAt).HasColumnName("modified_at");
             e.HasIndex(x => new { x.CompanyId, x.UserId, x.ModuleCode });
+        });
+
+        modelBuilder.Entity<LabelTemplate>(e =>
+        {
+            e.ToTable("label_templates");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.TemplateName).HasColumnName("template_name").HasMaxLength(120);
+            e.Property(x => x.TemplateType).HasColumnName("template_type").HasMaxLength(40);
+            e.Property(x => x.PaperWidth).HasColumnName("paper_width");
+            e.Property(x => x.PaperHeight).HasColumnName("paper_height");
+            e.Property(x => x.TemplateJson).HasColumnName("template_json").HasColumnType("jsonb");
+            e.Property(x => x.IsDefault).HasColumnName("is_default");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(120);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by").HasMaxLength(120);
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => new { x.CompanyId, x.TemplateType });
         });
     }
 

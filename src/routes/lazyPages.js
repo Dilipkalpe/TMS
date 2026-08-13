@@ -61,6 +61,7 @@ export const UsersPage = lazy(() => import('../pages/settings/UsersPage'))
 export const RoleMenusPage = lazy(() => import('../pages/settings/RoleMenusPage'))
 export const DocumentNumberingPage = lazy(() => import('../pages/settings/DocumentNumberingPage'))
 export const PrintTemplateSettingsPage = lazy(() => import('../pages/settings/PrintTemplateSettingsPage'))
+export const LabelTemplatesSettingsPage = lazy(() => import('../pages/settings/LabelTemplatesSettingsPage'))
 export const NotificationSettings = lazy(() => import('../pages/settings/NotificationSettings'))
 
 // Portal

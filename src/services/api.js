@@ -311,6 +311,18 @@ export const lrApi = {
   create: (data) => apiRequest('/lr', { method: 'POST', body: data }),
   update: (lrNumber, data) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`, { method: 'PUT', body: data }),
   remove: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}`, { method: 'DELETE' }),
+  labelData: (lrNumber) => apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}/label-data`),
+  generateLabel: (lrNumber, body = {}) =>
+    apiRequest(`/lr/${encodeURIComponent(toDocPath(lrNumber))}/generate-label`, { method: 'POST', body }),
+}
+
+export const labelTemplatesApi = {
+  list: (params = {}) => apiRequest(`/label-templates?${new URLSearchParams(params)}`),
+  getDefault: (type = 'LR_PACKAGE') => apiRequest(`/label-templates/default?type=${encodeURIComponent(type)}`),
+  get: (id) => apiRequest(`/label-templates/${encodeURIComponent(id)}`),
+  create: (data) => apiRequest('/label-templates', { method: 'POST', body: data }),
+  update: (id, data) => apiRequest(`/label-templates/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  setDefault: (id) => apiRequest(`/label-templates/${encodeURIComponent(id)}/set-default`, { method: 'POST', body: {} }),
 }
 
 export const lrOperationsApi = {

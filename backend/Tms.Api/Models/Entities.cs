@@ -418,3 +418,20 @@ public class PrintTemplateConfiguration : ITenantScoped
     public string? ModifiedBy { get; set; }
     public DateTime? ModifiedAt { get; set; }
 }
+
+public class LabelTemplate : ITenantScoped
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string TemplateName { get; set; } = "";
+    public string TemplateType { get; set; } = "LR_PACKAGE";
+    public decimal PaperWidth { get; set; } = 100;
+    public decimal PaperHeight { get; set; } = 150;
+    public string TemplateJson { get; set; } = "{}";
+    public bool IsDefault { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? CreatedBy { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? UpdatedBy { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}

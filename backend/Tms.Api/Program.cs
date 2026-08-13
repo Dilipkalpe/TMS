@@ -144,6 +144,7 @@ builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<LookupQuickCreateService>();
 builder.Services.AddScoped<DriverSyncService>();
 builder.Services.AddScoped<DocumentFlowService>();
+builder.Services.AddScoped<LrLabelService>();
 builder.Services.AddScoped<DocumentNumberService>();
 builder.Services.AddScoped<EwayBillSyncService>();
 builder.Services.AddScoped<HubTransferService>();
@@ -328,6 +329,9 @@ if (!app.Environment.IsEnvironment("Testing"))
 
                 logger.LogInformation("Ensuring print template schema…");
                 await PrintTemplateSchemaMigrator.EnsureAsync(db);
+
+                logger.LogInformation("Ensuring label template schema…");
+                await LabelTemplateSchemaMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring e-way bill schema…");
                 await EwayBillSchemaMigrator.EnsureAsync(db);

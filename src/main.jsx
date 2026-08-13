@@ -15,6 +15,7 @@ import { PrintProvider } from './context/PrintContext'
 import { KeyboardShortcutProvider } from './context/KeyboardShortcutContext'
 import './index.css'
 import './components/print/print.css'
+import './components/labels/labelPrint.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
