@@ -133,4 +133,39 @@ public class AuthController(TmsDbContext db, IConfiguration config, Subscription
             signingCredentials: creds);
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public sealed class ChangePasswordRequest
+    {
+        public string? CurrentPassword { get; set; }
+        public string? NewPassword { get; set; }
+    }
+
+    /// <summary>Change password for the currently authenticated user.</summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordRequest req)
+    {
+        var username = User.FindFirstValue("username")
+            ?? User.FindFirstValue(ClaimTypes.Name)
+            ?? User.Identity?.Name;
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        var current = (req.CurrentPassword ?? "").Trim();
+        var next = (req.NewPassword ?? "").Trim();
+        if (string.IsNullOrEmpty(current) || string.IsNullOrEmpty(next))
+            return BadRequest(new ApiError("Current and new password are required."));
+        if (next.Length < 6)
+            return BadRequest(new ApiError("New password must be at least 6 characters."));
+        if (string.Equals(current, next, StringComparison.Ordinal))
+            return BadRequest(new ApiError("New password must be different from the current password."));
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+        if (user == null || !user.IsActive) return Unauthorized();
+        if (!BCrypt.Net.BCrypt.Verify(current, user.PasswordHash))
+            return BadRequest(new ApiError("Current password is incorrect."));
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(next);
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Password updated." });
+    }
 }

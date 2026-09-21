@@ -298,37 +298,54 @@ export default function BillingInvoicePageContent({
     const targets = [...selectedLrs]
     if (!targets.length && primaryLrNumber) targets.push(primaryLrNumber)
 
+    const useConsolidated = targets.length > 1
     await runSave(
-      targets.length > 1
-        ? `${targets.length} invoices created (one per LR)`
+      useConsolidated
+        ? `1 consolidated invoice created for ${targets.length} LRs`
         : 'Invoice saved',
       async () => {
-        const results = []
-        for (const lrNum of targets) {
-          const lr = selectedLrRows.find((r) => r.lrNumber === lrNum) || primaryLr
-          const payload = buildInvoicePayload({
-            form,
-            rows: linesFromLr(lr, form.invoiceType),
-            summary: { amountInWords: amountToWords(summary.grand) },
-            lr,
-          })
-          const res = await lrProcessApi.createInvoice(lrNum, payload)
-          results.push({ lrNum, res, lr })
+        const payload = buildInvoicePayload({
+          form,
+          rows,
+          summary: {
+            ...summary,
+            amountInWords: amountToWords(summary.grand),
+            taxable: summary.adjusted,
+            gst: summary.gst,
+            advance: summary.advance,
+            grand: summary.grand,
+          },
+          lr: selectedLrRows[0] || primaryLr,
+          lrNumbers: targets,
+        })
+
+        let res
+        if (useConsolidated) {
+          res = await lrProcessApi.createConsolidatedInvoice(payload)
+        } else {
+          res = await lrProcessApi.createInvoice(targets[0], payload)
         }
+
         localStorage.removeItem(DRAFT_KEY)
-        if (andPrint && results[0]) {
-          const { res, lr } = results[0]
+        if (andPrint && res) {
           await printModuleDocument({
             moduleCode: PRINT_MODULE_CODES.BILLING,
             company,
             print,
             documentData: {
-              bill: printBillFromResult({ inv: res, form, company, summary, rows: linesFromLr(lr, form.invoiceType), lr }),
-              lr,
+              bill: printBillFromResult({
+                inv: res,
+                form,
+                company,
+                summary,
+                rows,
+                lr: selectedLrRows[0] || primaryLr,
+              }),
+              lr: selectedLrRows[0] || primaryLr,
+              lrs: selectedLrRows,
             },
           })
         }
-        // Fresh invoice entry — clear related page controls
         navigate('/operations/billing/invoice', { replace: true })
       },
     )

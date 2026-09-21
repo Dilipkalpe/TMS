@@ -135,4 +135,56 @@ public static class WorkflowTestSeed
         db.SaveChanges();
         return lr;
     }
+
+    /// <summary>Two POD-ready LRs for consolidated freight invoice tests.</summary>
+    public static (LorryReceipt A, LorryReceipt B) SeedPodLrsForConsolidatedInvoice(TmsDbContext db)
+    {
+        EnsureBranch(db);
+
+        // Clean prior invoice/LR rows for these numbers so the test is idempotent.
+        var nos = new[] { "TC/PN/2026-27/LR/C001", "TC/PN/2026-27/LR/C002" };
+        var oldInvs = db.FreightInvoices.Where(i => nos.Contains(i.LrNumber)).ToList();
+        if (oldInvs.Count > 0)
+        {
+            db.FreightInvoices.RemoveRange(oldInvs);
+            db.SaveChanges();
+        }
+        var old = db.LorryReceipts.Where(l => nos.Contains(l.LrNumber)).ToList();
+        if (old.Count > 0)
+        {
+            db.LorryReceipts.RemoveRange(old);
+            db.SaveChanges();
+        }
+
+        LorryReceipt Make(string lrNumber, decimal freight, decimal gst) => new()
+        {
+            LrNumber = lrNumber,
+            CompanyId = TmsWebApplicationFactory.TestCompanyId,
+            BranchId = TestBranchId,
+            LrDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            CustomerName = "Consolidated Customer",
+            Consignor = "Consolidated Customer",
+            Consignee = "Consignee Co",
+            FromCity = "Mumbai",
+            ToCity = "Pune",
+            VehicleNumber = "MH12AB9999",
+            DriverName = "Driver",
+            Material = "General",
+            Quantity = "5 Pkgs",
+            Freight = freight,
+            Gst = gst,
+            Advance = 0,
+            Balance = freight + gst,
+            PaymentType = "To Pay",
+            Status = LrStatuses.PodUploaded,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+
+        var a = Make("TC/PN/2026-27/LR/C001", 10000, 1800);
+        var b = Make("TC/PN/2026-27/LR/C002", 5000, 900);
+        db.LorryReceipts.AddRange(a, b);
+        db.SaveChanges();
+        return (a, b);
+    }
 }

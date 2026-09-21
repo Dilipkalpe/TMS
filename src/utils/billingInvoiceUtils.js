@@ -149,8 +149,10 @@ export function calcInvoiceSummary({ rows, form, billType, advance = 0, isInters
   }
 }
 
-export function buildInvoicePayload({ form, rows, summary, lr }) {
-  const lrLines = lr ? linesFromLr(lr, form.invoiceType) : rows
+export function buildInvoicePayload({ form, rows, summary, lr, lrNumbers }) {
+  const lrLines = rows?.length
+    ? rows
+    : (lr ? linesFromLr(lr, form.invoiceType) : [])
   return {
     billType: normalizeBillType(form.invoiceType),
     invoiceDate: form.invoiceDate,
@@ -159,6 +161,11 @@ export function buildInvoicePayload({ form, rows, summary, lr }) {
     placeOfSupply: form.placeOfSupply,
     paymentType: form.paymentMode,
     notes: form.remarks,
+    lrNumbers: lrNumbers?.length ? lrNumbers : (lr?.lrNumber ? [lr.lrNumber] : undefined),
+    taxableAmount: summary?.taxable ?? summary?.adjusted,
+    gstAmount: summary?.gst,
+    advanceAdjusted: summary?.advance,
+    totalAmount: summary?.grand,
     lineItems: lrLines.map((r) => ({
       particulars: r.particulars,
       description: r.description,
@@ -169,7 +176,7 @@ export function buildInvoicePayload({ form, rows, summary, lr }) {
       rate: r.rate,
       gstPct: r.gstPct,
     })),
-    amountInWords: summary.amountInWords || undefined,
+    amountInWords: summary?.amountInWords || undefined,
     paymentDetails: {
       mode: form.paymentMode,
       terms: form.paymentTerms,

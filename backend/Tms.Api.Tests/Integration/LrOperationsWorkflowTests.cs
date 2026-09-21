@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tms.Api.Data;
 using Tms.Api.Models;
@@ -161,5 +162,92 @@ public class LrOperationsWorkflowTests(TmsWebApplicationFactory factory)
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateConsolidatedInvoice_creates_one_invoice_for_multiple_pod_lrs()
+    {
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
+            WorkflowTestSeed.SeedPodLrsForConsolidatedInvoice(db);
+        }
+
+        var client = await AuthedClientAsync();
+        var response = await client.PostAsJsonAsync("/api/lr/invoices/consolidated", new
+        {
+            lrNumbers = new[] { "TC/PN/2026-27/LR/C001", "TC/PN/2026-27/LR/C002" },
+            billType = "FC",
+            invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+            customerName = "Consolidated Customer",
+            placeOfSupply = "Pune",
+            taxableAmount = 15000m,
+            gstAmount = 2700m,
+            advanceAdjusted = 0m,
+            lineItems = new[]
+            {
+                new { particulars = "Freight", lrRef = "TC/PN/2026-27/LR/C001", qty = 1, rate = 10000, gstPct = 18 },
+                new { particulars = "Freight", lrRef = "TC/PN/2026-27/LR/C002", qty = 1, rate = 5000, gstPct = 18 },
+            },
+        });
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, because: body);
+
+        var json = JsonDocument.Parse(body).RootElement;
+        json.GetProperty("consolidated").GetBoolean().Should().BeTrue();
+        json.GetProperty("lrNumbers").GetArrayLength().Should().Be(2);
+        json.GetProperty("invoiceNo").GetString().Should().NotBeNullOrWhiteSpace();
+        json.GetProperty("totalAmount").GetDecimal().Should().Be(17700m);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
+            var a = await db.LorryReceipts.FirstAsync(l => l.LrNumber == "TC/PN/2026-27/LR/C001");
+            var b = await db.LorryReceipts.FirstAsync(l => l.LrNumber == "TC/PN/2026-27/LR/C002");
+            a.Status.Should().Be(LrStatuses.InvoiceGenerated);
+            b.Status.Should().Be(LrStatuses.InvoiceGenerated);
+            (await db.FreightInvoices.CountAsync(i =>
+                i.Status != "Cancelled"
+                && i.InvoiceDataJson != null
+                && i.InvoiceDataJson.Contains("C001")
+                && i.InvoiceDataJson.Contains("C002")))
+                .Should().Be(1);
+        }
+
+        var dup = await client.PostAsJsonAsync("/api/lr/invoices/consolidated", new
+        {
+            lrNumbers = new[] { "TC/PN/2026-27/LR/C001", "TC/PN/2026-27/LR/C002" },
+            billType = "FC",
+            invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+        });
+        dup.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ChangePassword_updates_hash_for_current_user()
+    {
+        var client = await AuthedClientAsync();
+        var ok = await client.PostAsJsonAsync("/api/auth/change-password", new
+        {
+            currentPassword = TmsWebApplicationFactory.AdminPassword,
+            newPassword = "admin1234",
+        });
+        ok.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var revertClient = factory.CreateClient();
+        var login = await revertClient.PostAsJsonAsync("/api/auth/login", new
+        {
+            username = "admin",
+            password = "admin1234",
+        });
+        login.EnsureSuccessStatusCode();
+        var token = (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
+        revertClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var revert = await revertClient.PostAsJsonAsync("/api/auth/change-password", new
+        {
+            currentPassword = "admin1234",
+            newPassword = TmsWebApplicationFactory.AdminPassword,
+        });
+        revert.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

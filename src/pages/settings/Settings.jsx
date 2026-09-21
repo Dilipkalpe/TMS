@@ -7,7 +7,7 @@ import Tabs from '../../components/ui/Tabs'
 import { useTheme } from '../../context/ThemeContext'
 import TallyModeToggle from '../../components/keyboard/TallyModeToggle'
 import { usePrint } from '../../context/PrintContext'
-import { settingsApi } from '../../services/api'
+import { settingsApi, authApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { getStoredPrintLogoUrl, resolveCompanyLogoUrl } from '../../utils/printLogo'
 import { Save, Download, Shield, Loader2, Upload, X, ImageIcon, GitBranch, Building2 } from 'lucide-react'
@@ -19,6 +19,9 @@ import {
   setNotificationDisplayDurationSeconds,
 } from '../../config/notificationUiSettings'
 
+const SESSION_TIMEOUT_OPTIONS = ['15 minutes', '30 minutes', '1 hour', '4 hours']
+const SESSION_TIMEOUT_KEY = 'tms-session-timeout'
+
 export default function Settings() {
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
@@ -27,6 +30,14 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notificationDuration, setNotificationDuration] = useState(DEFAULT_NOTIFICATION_DISPLAY_DURATION_SECONDS)
+  const [securityForm, setSecurityForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    sessionTimeout: typeof localStorage !== 'undefined'
+      ? (localStorage.getItem(SESSION_TIMEOUT_KEY) || '30 minutes')
+      : '30 minutes',
+  })
 
   const [uploadingLogo, setUploadingLogo] = useState(false)
 
@@ -103,6 +114,35 @@ export default function Settings() {
   }
 
   const logoPreview = resolveCompanyLogoUrl(settings.logoUrl || settings.printLogoUrl)
+
+  const updateSecurityField = (key, value) => setSecurityForm((s) => ({ ...s, [key]: value }))
+
+  const handleUpdateSecurity = async () => {
+    const { currentPassword, newPassword, confirmPassword, sessionTimeout } = securityForm
+    if (!currentPassword || !newPassword) {
+      toast({ title: 'Validation', message: 'Current and new password are required.', type: 'warning' })
+      return
+    }
+    if (newPassword.length < 6) {
+      toast({ title: 'Validation', message: 'New password must be at least 6 characters.', type: 'warning' })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Validation', message: 'New password and confirm password do not match.', type: 'warning' })
+      return
+    }
+    setSaving(true)
+    try {
+      await authApi.changePassword(currentPassword, newPassword)
+      try { localStorage.setItem(SESSION_TIMEOUT_KEY, sessionTimeout) } catch { /* ignore */ }
+      setSecurityForm((s) => ({ ...s, currentPassword: '', newPassword: '', confirmPassword: '' }))
+      toast({ title: 'Security updated', message: 'Password changed successfully.', type: 'success' })
+    } catch (err) {
+      toast({ title: 'Update failed', message: err.message, type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const tabs = [
     {
@@ -249,7 +289,12 @@ export default function Settings() {
           <Select label="Current Financial Year" options={['2025-26', '2024-25', '2023-24']} value={settings.financialYear ?? '2025-26'} onChange={(e) => update('financialYear', e.target.value)} />
           <Input label="Year Start" type="date" value={settings.yearStart ?? '2025-04-01'} onChange={(e) => update('yearStart', e.target.value)} />
           <Input label="Year End" type="date" value={settings.yearEnd ?? '2026-03-31'} onChange={(e) => update('yearEnd', e.target.value)} />
-          <Button icon={Save} onClick={() => saveSettings({ financialYear: settings.financialYear })}>Update Financial Year</Button>
+          <Button icon={Save} onClick={() => saveSettings({ financialYear: settings.financialYear })}>
+            Update Financial Year
+          </Button>
+          <p className="sm:col-span-2 text-xs text-slate-500">
+            Year Start / Year End are display aids only and are not stored yet.
+          </p>
         </div>
       ),
     },
@@ -262,7 +307,12 @@ export default function Settings() {
           <Select label="GST Type" options={['Regular', 'Composition', 'Unregistered']} value={settings.gstType ?? 'Regular'} onChange={(e) => update('gstType', e.target.value)} />
           <Input label="State Code" value={settings.stateCode ?? ''} onChange={(e) => update('stateCode', e.target.value)} />
           <Input label="GST Rate (%)" type="number" value={settings.gstRate ?? 18} onChange={(e) => update('gstRate', e.target.value)} />
-          <Button icon={Save} onClick={() => saveSettings({ gstin: settings.gstin, gstRate: settings.gstRate })}>Save GST Details</Button>
+          <Button icon={Save} onClick={() => saveSettings({ gstin: settings.gstin, gstRate: settings.gstRate })}>
+            Save GST Details
+          </Button>
+          <p className="sm:col-span-2 text-xs text-slate-500">
+            GST Type and State Code are not stored yet — only GSTIN and GST Rate are saved.
+          </p>
         </div>
       ),
     },
@@ -362,11 +412,36 @@ export default function Settings() {
       label: 'Security',
       content: (
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Current Password" type="password" />
-          <Input label="New Password" type="password" />
-          <Input label="Confirm Password" type="password" />
-          <Select label="Session Timeout" options={['15 minutes', '30 minutes', '1 hour', '4 hours']} />
-          <Button icon={Shield}>Update Security</Button>
+          <Input
+            label="Current Password"
+            type="password"
+            value={securityForm.currentPassword}
+            onChange={(e) => updateSecurityField('currentPassword', e.target.value)}
+            autoComplete="current-password"
+          />
+          <Input
+            label="New Password"
+            type="password"
+            value={securityForm.newPassword}
+            onChange={(e) => updateSecurityField('newPassword', e.target.value)}
+            autoComplete="new-password"
+          />
+          <Input
+            label="Confirm Password"
+            type="password"
+            value={securityForm.confirmPassword}
+            onChange={(e) => updateSecurityField('confirmPassword', e.target.value)}
+            autoComplete="new-password"
+          />
+          <Select
+            label="Session Timeout"
+            options={SESSION_TIMEOUT_OPTIONS}
+            value={securityForm.sessionTimeout}
+            onChange={(e) => updateSecurityField('sessionTimeout', e.target.value)}
+          />
+          <Button icon={Shield} onClick={handleUpdateSecurity} disabled={saving}>
+            {saving ? 'Updating…' : 'Update Security'}
+          </Button>
         </div>
       ),
     },
@@ -379,14 +454,36 @@ export default function Settings() {
             <div className="flex items-center gap-4">
               <Building2 className="h-10 w-10 text-primary" />
               <div>
-                <p className="font-medium">Last Backup: 17 Jun 2026, 11:30 PM</p>
-                <p className="text-sm text-slate-500">Automatic daily backup enabled</p>
+                <p className="font-medium">Database backup</p>
+                <p className="text-sm text-slate-500">
+                  On-demand backup/restore from this screen is not available yet.
+                  Use the server backup scripts under <code className="text-xs">/var/backups/tms</code> (production)
+                  or your DBA process.
+                </p>
               </div>
             </div>
           </Card>
           <div className="flex gap-2">
-            <Button icon={Download}>Download Backup</Button>
-            <Button variant="outline">Restore Backup</Button>
+            <Button
+              icon={Download}
+              onClick={() => toast({
+                title: 'Not available',
+                message: 'In-app backup download is not configured. Use server-side backup scripts.',
+                type: 'warning',
+              })}
+            >
+              Download Backup
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => toast({
+                title: 'Not available',
+                message: 'In-app restore is not configured. Restore must be done by an administrator on the server.',
+                type: 'warning',
+              })}
+            >
+              Restore Backup
+            </Button>
           </div>
         </div>
       ),

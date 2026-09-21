@@ -139,6 +139,11 @@ export async function apiRequest(path, options = {}) {
 export const authApi = {
   login: (username, password) => apiRequest('/auth/login', { method: 'POST', body: { username, password }, auth: false }),
   me: (options = {}) => apiRequest('/auth/me', options),
+  changePassword: (currentPassword, newPassword) =>
+    apiRequest('/auth/change-password', {
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    }),
 }
 
 export const platformApi = {
@@ -399,6 +404,8 @@ export const lrProcessApi = {
     apiRequest(lrPath(lrNumber, `expenses/${expenseId}/reject`), { method: 'PATCH', body: { remarks } }),
   pendingExpenses: () => apiRequest('/lr/expenses/pending'),
   createInvoice: (lrNumber, data = {}) => apiRequest(lrPath(lrNumber, 'invoice'), { method: 'POST', body: data }),
+  createConsolidatedInvoice: (data = {}) =>
+    apiRequest('/lr/invoices/consolidated', { method: 'POST', body: data }),
   validateLoadingSheet: (lrNumber, data) =>
     apiRequest(lrPath(lrNumber, 'loading-sheet/validate'), { method: 'POST', body: data }),
   close: (lrNumber) => apiRequest(lrPath(lrNumber, 'close'), { method: 'POST' }),

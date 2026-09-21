@@ -5,7 +5,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { fieldConfigurationsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
-import { RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
+import { RotateCcw, Save } from 'lucide-react'
 import { effectiveDisplayName } from '../../utils/fieldConfig'
 
 const MODULES = [
@@ -33,6 +33,13 @@ export default function FieldConfigurationPage() {
       items.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
         || String(a.technicalFieldName).localeCompare(String(b.technicalFieldName)))
       setRows(items)
+      if (!items.length) {
+        toast({
+          title: 'No fields loaded',
+          message: 'Field configuration returned 0 rows. Try Save after API restart, or check company selection.',
+          type: 'warning',
+        })
+      }
     } catch (e) {
       toast({ title: 'Load failed', message: e.message, type: 'error' })
       setRows([])
@@ -96,15 +103,28 @@ export default function FieldConfigurationPage() {
     }
   }
 
+  const saveButton = (
+    <Button icon={saving ? undefined : Save} onClick={save} disabled={saving || loading}>
+      {saving ? 'Saving…' : 'Save configuration'}
+    </Button>
+  )
+
   return (
     <ERPContentPage
+      module="Settings"
       title="Field configuration"
-      subtitle="Control Booking and LR field visibility, required status, display labels, and order"
-      icon={SlidersHorizontal}
-      actions={(
-        <Button icon={saving ? undefined : Save} onClick={save} disabled={saving || loading}>
-          {saving ? 'Saving…' : 'Save configuration'}
-        </Button>
+      breadcrumb={[
+        { label: 'Home', path: '/' },
+        { label: 'Settings', path: '/settings' },
+        { label: 'Field configuration' },
+      ]}
+      toolbar={(
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-slate-500">
+            Control Booking and LR field visibility, required status, display labels, and order.
+          </p>
+          {saveButton}
+        </div>
       )}
     >
       <Card className="mb-4 p-4">
@@ -225,6 +245,12 @@ export default function FieldConfigurationPage() {
           </table>
         )}
       </Card>
+
+      {!loading && (
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+          {saveButton}
+        </div>
+      )}
     </ERPContentPage>
   )
 }

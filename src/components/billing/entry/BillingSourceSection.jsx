@@ -101,7 +101,8 @@ export default function BillingSourceSection({
 
       {selected.size > 1 && (
         <p className="billing-v2-multi-hint">
-          Multiple LRs selected — the system creates <strong>one invoice per LR</strong> (existing API). Line items are generated per LR on save.
+          Multiple LRs selected — Save creates <strong>one consolidated invoice</strong> with
+          line items for all {selected.size} LRs (total freight {formatCurrency(totalFreight)}).
         </p>
       )}
       <div className="billing-v2-source-summary">

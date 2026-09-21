@@ -322,6 +322,9 @@ if (!app.Environment.IsEnvironment("Testing"))
                 logger.LogInformation("Ensuring document numbering schema…");
                 await DocumentNumberingSchemaMigrator.EnsureAsync(db);
 
+                logger.LogInformation("Ensuring field configuration schema…");
+                await FieldConfigurationSchemaMigrator.EnsureAsync(db);
+
                 logger.LogInformation("Ensuring maintenance schema…");
                 await MaintenanceSchemaMigrator.EnsureAsync(db);
 

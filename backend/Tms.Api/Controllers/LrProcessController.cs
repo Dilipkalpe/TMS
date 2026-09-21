@@ -1156,6 +1156,173 @@ public class LrProcessController(
         return Ok(MapExpense(expense));
     }
 
+    /// <summary>
+    /// Create one freight invoice covering multiple LRs (consolidated bill).
+    /// Marks every selected LR as Invoice Generated and stores all LR refs in invoice JSON.
+    /// </summary>
+    [HttpPost("invoices/consolidated")]
+    public async Task<ActionResult<object>> CreateConsolidatedInvoice([FromBody] Dictionary<string, object?> body)
+    {
+        var lrNumbers = ApiParseHelper.BodyStringList(body, "lrNumbers")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (lrNumbers.Count == 0)
+            return BadRequest(new ApiError("lrNumbers is required — select at least one LR."));
+
+        var billType = (ApiParseHelper.BodyString(body, "billType") ?? "FC").ToUpperInvariant();
+        if (billType is not ("RCM" or "FC" or "STANDARD"))
+            return BadRequest(new ApiError("billType must be RCM, FC, or STANDARD."));
+
+        var lrs = new List<LorryReceipt>();
+        foreach (var num in lrNumbers)
+        {
+            var row = await LrProcessService.FindLrAsync(db, tenants, branches, num);
+            if (row == null) return BadRequest(new ApiError($"LR not found: {num}"));
+            var guard = GuardStatus(row, LrStatuses.DeliveryCompleted, LrStatuses.PodUploaded);
+            if (guard != null) return guard;
+            lrs.Add(row);
+        }
+
+        var companyId = lrs[0].CompanyId;
+        if (lrs.Any(l => l.CompanyId != companyId))
+            return BadRequest(new ApiError("All selected LRs must belong to the same company."));
+
+        // Load active invoices once — avoid EF translating string.Contains against jsonb (Postgres 42883).
+        var activeInvoices = await db.FreightInvoices.AsNoTracking()
+            .Where(i => i.CompanyId == companyId && i.Status != "Cancelled")
+            .Select(i => new { i.InvoiceNo, i.LrNumber, i.InvoiceDataJson })
+            .ToListAsync();
+
+        foreach (var lr in lrs)
+        {
+            if (lr.Status is LrStatuses.InvoiceGenerated or LrStatuses.Closed)
+                return BadRequest(new ApiError($"LR {lr.LrNumber} is already billed (status: {lr.Status})."));
+
+            if (activeInvoices.Any(i =>
+                    string.Equals(i.LrNumber, lr.LrNumber, StringComparison.OrdinalIgnoreCase)))
+                return BadRequest(new ApiError($"An active freight invoice already exists for LR {lr.LrNumber}."));
+
+            foreach (var hit in activeInvoices.Where(i => !string.IsNullOrWhiteSpace(i.InvoiceDataJson)))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(hit.InvoiceDataJson!);
+                    if (doc.RootElement.TryGetProperty("lrNumbers", out var arr) && arr.ValueKind == JsonValueKind.Array
+                        && arr.EnumerateArray().Any(x =>
+                            string.Equals(x.GetString(), lr.LrNumber, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return BadRequest(new ApiError(
+                            $"LR {lr.LrNumber} is already on invoice {hit.InvoiceNo}."));
+                    }
+                }
+                catch (JsonException) { /* ignore malformed */ }
+            }
+        }
+
+        decimal? TryBodyDecimal(string key)
+        {
+            if (body == null || !body.ContainsKey(key) || body[key] is null) return null;
+            var s = ApiParseHelper.BodyString(body, key);
+            return decimal.TryParse(s, out var d) ? d : null;
+        }
+
+        var taxableFromBody = TryBodyDecimal("taxableAmount");
+        var gstFromBody = TryBodyDecimal("gstAmount");
+        var advanceFromBody = TryBodyDecimal("advanceAdjusted");
+
+        decimal taxable = taxableFromBody ?? lrs.Sum(l =>
+            l.Freight + (l.Hamali ?? 0) + (l.LoadingCharges ?? 0) + (l.UnloadingCharges ?? 0));
+        decimal gst = gstFromBody ?? (billType == "RCM"
+            ? Math.Round(taxable * 0.05m, 2)
+            : lrs.Sum(l => l.Gst));
+        decimal advanceAdjusted = advanceFromBody ?? lrs.Sum(l => l.Advance ?? 0);
+
+        var isRcm = billType == "RCM";
+        var grossTotal = isRcm ? taxable : taxable + gst;
+        var netTotal = Math.Max(0, grossTotal - advanceAdjusted);
+
+        var primary = lrs[0];
+        Guid invBranchId;
+        string invoiceNo;
+        DateOnly invoiceDate;
+        try
+        {
+            invBranchId = await documentNumbers.ResolveBranchIdForNumberingAsync(
+                tenants, branches, primary.BranchId);
+            invoiceDate = ApiParseHelper.BodyDate(body, "invoiceDate", DateOnly.FromDateTime(DateTime.UtcNow));
+            invoiceNo = await documentNumbers.NextAsync(
+                DocumentNumberTypes.Invoice, companyId, invBranchId, invoiceDate);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(ex.Message));
+        }
+
+        var invoiceData = new
+        {
+            consolidated = true,
+            lrNumbers = lrs.Select(l => l.LrNumber).ToList(),
+            routes = lrs.Select(l => $"{l.FromCity} → {l.ToCity}").ToList(),
+            billType,
+            taxableAmount = taxable,
+            gstAmount = gst,
+            advanceAdjusted,
+            lineItems = ApiParseHelper.BodyJsonRaw(body, "lineItems"),
+            amountInWords = ApiParseHelper.BodyString(body, "amountInWords"),
+            paymentDetails = ApiParseHelper.BodyJsonRaw(body, "paymentDetails"),
+        };
+
+        var inv = new FreightInvoice
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            BranchId = invBranchId,
+            InvoiceNo = invoiceNo,
+            BookingId = "",
+            LrNumber = primary.LrNumber,
+            CustomerId = primary.CustomerId ?? lrs.Select(l => l.CustomerId).FirstOrDefault(id => !string.IsNullOrEmpty(id)),
+            CustomerName = ApiParseHelper.BodyString(body, "customerName")
+                ?? primary.CustomerName
+                ?? primary.Consignor,
+            Gstin = ApiParseHelper.BodyString(body, "gstin"),
+            PlaceOfSupply = ApiParseHelper.BodyString(body, "placeOfSupply") ?? primary.ToCity,
+            BillType = billType,
+            InvoiceDate = invoiceDate,
+            TaxableAmount = taxable,
+            GstAmount = gst,
+            TotalAmount = netTotal,
+            AdvanceAdjusted = advanceAdjusted,
+            Balance = netTotal,
+            Status = netTotal <= 0 ? "Paid" : "Issued",
+            InvoiceDataJson = JsonSerializer.Serialize(invoiceData),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        db.FreightInvoices.Add(inv);
+
+        foreach (var lr in lrs)
+        {
+            lr.Status = LrStatuses.InvoiceGenerated;
+            lr.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+        await BookingFinanceService.SyncCustomerOutstandingAsync(db, companyId, inv.CustomerId);
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            inv.Id,
+            inv.InvoiceNo,
+            invoiceDate = inv.InvoiceDate.ToString("yyyy-MM-dd"),
+            inv.TotalAmount,
+            inv.Balance,
+            inv.Status,
+            lrNumbers = lrs.Select(l => l.LrNumber).ToList(),
+            consolidated = true,
+        });
+    }
+
     [HttpPost("{lrNumber}/invoice")]
     public async Task<ActionResult<object>> CreateInvoice(string lrNumber, [FromBody] Dictionary<string, object?> body)
     {
