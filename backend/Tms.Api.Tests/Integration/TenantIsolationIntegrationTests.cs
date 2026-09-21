@@ -49,12 +49,55 @@ public class TenantIsolationIntegrationTests(TmsWebApplicationFactory factory)
         return json.GetProperty("token").GetString()!;
     }
 
+    static readonly Guid CompanyABranchId = Guid.Parse("00000000-0000-4000-8000-000000000091");
+    static readonly Guid CompanyBBranchId = Guid.Parse("00000000-0000-4000-8000-000000000092");
+
     static async Task SeedCrossTenantDataAsync(TmsWebApplicationFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
 
-        if (await db.Invoices.AnyAsync(i => i.InvoiceNo == "INV-TENANT-TEST-A")) return;
+        if (!await db.Companies.AnyAsync(c => c.Id == CompanyA))
+        {
+            db.Companies.AddRange(
+                new Company { Id = CompanyA, Code = "CA", Name = "Company A", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+                new Company { Id = CompanyB, Code = "CB", Name = "Company B", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+        }
+
+        if (!await db.Branches.AnyAsync(b => b.Id == CompanyABranchId))
+        {
+            db.Branches.AddRange(
+                new Branch
+                {
+                    Id = CompanyABranchId,
+                    CompanyId = CompanyA,
+                    Code = "PN",
+                    Name = "Company A HO",
+                    City = "Pune",
+                    IsHeadOffice = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                },
+                new Branch
+                {
+                    Id = CompanyBBranchId,
+                    CompanyId = CompanyB,
+                    Code = "MB",
+                    Name = "Company B HO",
+                    City = "Mumbai",
+                    IsHeadOffice = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                });
+        }
+
+        if (await db.Invoices.AnyAsync(i => i.InvoiceNo == "INV-TENANT-TEST-A"))
+        {
+            await db.SaveChangesAsync();
+            return;
+        }
 
         db.Invoices.AddRange(
             new Invoice
@@ -231,6 +274,8 @@ public class TenantIsolationIntegrationTests(TmsWebApplicationFactory factory)
             Content = JsonContent.Create(new
             {
                 customer = "Test Customer A",
+                consignor = "Test Consignor A",
+                consignee = "Test Consignee A",
                 from = "Pune",
                 to = "Mumbai",
                 date = DateTime.UtcNow.ToString("yyyy-MM-dd"),
@@ -241,9 +286,11 @@ public class TenantIsolationIntegrationTests(TmsWebApplicationFactory factory)
                 payment = "Unpaid",
             }),
         };
+        request.Headers.Add("X-Branch-Id", CompanyABranchId.ToString());
 
         var response = await _client.SendAsync(request);
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Created, because: body);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         var bookingId = json.GetProperty("id").GetString();
         json.GetProperty("vehicle").GetString().Should().Be("MH99ZZ9999");

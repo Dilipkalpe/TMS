@@ -78,6 +78,9 @@ public static class SearchHelper
         var p = Pattern(search);
         return q.Where(b => EF.Functions.ILike(b.Id, p)
             || EF.Functions.ILike(b.CustomerName, p)
+            || (b.Consignor != null && EF.Functions.ILike(b.Consignor, p))
+            || (b.Consignee != null && EF.Functions.ILike(b.Consignee, p))
+            || (b.Material != null && EF.Functions.ILike(b.Material, p))
             || EF.Functions.ILike(b.FromCity, p)
             || EF.Functions.ILike(b.ToCity, p));
     }

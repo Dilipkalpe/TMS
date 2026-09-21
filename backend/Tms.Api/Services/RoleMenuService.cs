@@ -15,6 +15,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
         "/settings",
         "/settings/users",
         "/settings/role-menus",
+        "/settings/field-configuration",
     ];
 
     public static IReadOnlyList<MenuCatalogItem> Catalog { get; } = BuildCatalog();
@@ -36,6 +37,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
                 "/settings/notifications",
                 "/settings/print-templates",
                 "/settings/portal-users",
+                "/settings/field-configuration",
             };
             all.RemoveWhere(k => hide.Contains(k));
             foreach (var k in AdminLockedKeys) all.Add(k);
@@ -562,6 +564,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
         Add("/settings/portal-users", "Portal user access", "Settings hub");
         Add("/settings/branches", "Branch locations", "Settings hub");
         Add("/settings/document-numbering", "Document numbering", "Settings hub");
+        Add("/settings/field-configuration", "Field configuration", "Settings hub");
         Add("/settings/notifications", "SMS & WhatsApp", "Settings hub");
         Add("/settings/data-cleanup", "Data cleanup", "Settings hub");
 

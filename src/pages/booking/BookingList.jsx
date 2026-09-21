@@ -38,9 +38,11 @@ export default function BookingList({ embedded = false, defaultStatus = '(All)' 
     { key: 'id', label: 'Booking ID' },
     { key: 'date', label: 'Date' },
     { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
-    { key: 'customer', label: 'Customer' },
+    { key: 'consignor', label: 'Consignor', render: (r) => r.consignor || r.customer || '—' },
+    { key: 'consignee', label: 'Consignee', render: (r) => r.consignee || '—' },
     { key: 'from', label: 'From' },
     { key: 'to', label: 'To' },
+    { key: 'material', label: 'Material', render: (r) => r.material || '—' },
     { key: 'freight', label: 'Freight', render: (r) => formatCurrency(r.freight) },
     { key: 'lrNumber', label: 'LR', render: (r) => r.lrNumber || '—' },
     { key: 'status', label: 'Status', width: 'w-28', nowrap: true, render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
@@ -72,8 +74,8 @@ export default function BookingList({ embedded = false, defaultStatus = '(All)' 
       statusCards={embedded ? [] : statusCards.slice(-1)}
       onAdd={embedded ? undefined : () => navigate(addRecordRoutes.bookings)}
       showAdd={!embedded}
-      searchPlaceholder="Booking ID, customer..."
-      searchKeys={['id', 'customer', 'from', 'to']}
+      searchPlaceholder="Booking ID, consignor, route…"
+      searchKeys={['id', 'customer', 'consignor', 'consignee', 'from', 'to']}
       filterOptions={embedded && defaultStatus !== '(All)'
         ? [defaultStatus]
         : ['(All)', 'Pending', 'Confirmed', 'In Transit', 'Delivered', 'Cancelled']}

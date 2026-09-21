@@ -248,10 +248,13 @@ public class Booking : IBranchScoped, IAuditable
     public DateOnly BookingDate { get; set; }
     public string? CustomerId { get; set; }
     public string CustomerName { get; set; } = "";
+    public string? ConsignorId { get; set; }
+    public string? ConsigneeId { get; set; }
     public string? Consignor { get; set; }
     public string? Consignee { get; set; }
     public string FromCity { get; set; } = "";
     public string ToCity { get; set; } = "";
+    public string? MaterialId { get; set; }
     public string? Material { get; set; }
     public string? Quantity { get; set; }
     public string? VehicleId { get; set; }

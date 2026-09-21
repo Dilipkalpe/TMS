@@ -1,51 +1,45 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import ERPContentPage from '../../components/ui/ERPContentPage'
-import Card from '../../components/ui/Card'
-import Button from '../../components/ui/Button'
-import Input, { Select, Textarea } from '../../components/ui/Input'
-import LookupSelect from '../../components/ui/LookupSelect'
-import DriverLookupSelect from '../../components/ui/DriverLookupSelect'
-import { Save, ArrowLeft, Loader2 } from 'lucide-react'
+import ERPPageTitle from '../../components/ui/ERPPageTitle'
+import { Select } from '../../components/ui/Input'
+import BookingEntryFormLayout, {
+  buildBookingApiPayload,
+  emptyBookingEntryForm,
+} from '../../components/booking/BookingEntryFormLayout'
+import LrEntryActionButtons from '../../components/lr/LrEntryActionButtons'
+import FormValidationPopup from '../../components/ui/FormValidationPopup'
 import { bookingsApi, freightRatesApi, lrApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { useDocumentFlow } from '../../hooks/useDocumentFlow'
+import { useFieldConfig } from '../../hooks/useFieldConfig'
+import { useAuth } from '../../context/AuthContext'
+import { useKeyboardPageActions, useAutoFocus } from '../../hooks/useKeyboardPageActions'
 import { clearControlsAfterSave } from '../../utils/formResetAfterSave'
-
-const paymentStatuses = ['Unpaid', 'Partial', 'Paid']
-
-const EMPTY_BOOKING = {
-  date: new Date().toISOString().slice(0, 10),
-  customer: '',
-  consignor: '',
-  consignee: '',
-  from: '',
-  to: '',
-  material: '',
-  quantity: '',
-  vehicle: '',
-  driver: '',
-  freight: '',
-  advance: '',
-  payment: 'Unpaid',
-  remarks: '',
-  lrNumber: '',
-}
+import { scrollToFirstFieldError, focusFirstFieldError } from '../../utils/formValidationFocus'
+import { buildBookingFieldErrors } from '../../utils/fieldConfig'
 
 export default function NewBooking() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { toast } = useToast()
+  const { user } = useAuth()
   const { isFirstLrThenBooking, documentFlowLabel, loading: flowLoading } = useDocumentFlow()
+  const { map: fieldMap, loading: fieldsLoading } = useFieldConfig('Booking')
+  const [form, setForm] = useState(() => ({
+    ...emptyBookingEntryForm(),
+    lrNumber: searchParams.get('lrNumber') || '',
+  }))
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [validationOpen, setValidationOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [unlinkedLrs, setUnlinkedLrs] = useState([])
-  const [form, setForm] = useState({
-    ...EMPTY_BOOKING,
-    date: new Date().toISOString().slice(0, 10),
-    lrNumber: searchParams.get('lrNumber') || '',
-  })
+  const formRef = useRef(null)
 
-  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+  useEffect(() => {
+    if (user?.branchName && !form.branchName) {
+      setForm((prev) => ({ ...prev, branchName: user.branchName }))
+    }
+  }, [user?.branchName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isFirstLrThenBooking) return
@@ -68,25 +62,46 @@ export default function NewBooking() {
     [unlinkedLrs],
   )
 
+  const clearFieldErrors = useCallback((keys) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      keys.forEach((key) => { delete next[key] })
+      return next
+    })
+  }, [])
+
+  const update = (field, value) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      if (prev[field]) delete next[field]
+      return next
+    })
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
   const applyLr = async (lrNumber) => {
-    set('lrNumber', lrNumber)
+    update('lrNumber', lrNumber)
     if (!lrNumber) return
     try {
       const lr = await lrApi.get(lrNumber)
       setForm((f) => ({
         ...f,
         lrNumber,
+        consignorId: lr.consignorId || f.consignorId,
+        consigneeId: lr.consigneeId || f.consigneeId,
         consignor: lr.consignor || f.consignor,
         consignee: lr.consignee || f.consignee,
         from: lr.from || f.from,
         to: lr.to || f.to,
         vehicle: lr.vehicle || f.vehicle,
         driver: lr.driver || f.driver,
+        materialId: lr.materialId || f.materialId,
         material: lr.material || f.material,
         quantity: lr.quantity || f.quantity,
         freight: lr.freight ?? f.freight,
         advance: lr.advance ?? f.advance,
       }))
+      clearFieldErrors(['consignor', 'consignee', 'from', 'to', 'material'])
     } catch {
       /* keep manual entry */
     }
@@ -108,108 +123,142 @@ export default function NewBooking() {
         toast({ title: 'No rate found', message: 'No matching freight rate for this lane.', type: 'warning' })
         return
       }
-      set('freight', String(res.rate.rateAmount))
+      update('freight', String(res.rate.rateAmount))
       toast({ title: 'Freight rate applied', message: `₹${res.rate.rateAmount} (${res.rate.rateUnit})`, type: 'success' })
     } catch (err) {
       toast({ title: 'Lookup failed', message: err.message, type: 'error' })
     }
   }
 
-  const handleSave = async () => {
+  const validate = () => {
     if (isFirstLrThenBooking && !form.lrNumber?.trim()) {
-      toast({
-        title: 'Validation',
-        message: `Company Document Flow is "${documentFlowLabel}". Create an LR first, then select it here.`,
-        type: 'warning',
-      })
-      return
+      const errors = {
+        lrNumber: `Company Document Flow is "${documentFlowLabel}". Create an LR first, then select it here.`,
+      }
+      setFieldErrors(errors)
+      setValidationOpen(true)
+      return { ok: false }
     }
-    if (!form.customer?.trim()) {
-      toast({ title: 'Validation', message: 'Customer is required.', type: 'warning' })
-      return
+    const errors = buildBookingFieldErrors(form, fieldMap)
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      scrollToFirstFieldError(errors)
+      setValidationOpen(true)
+      return { ok: false }
     }
-    if (!form.from?.trim() || !form.to?.trim()) {
-      toast({ title: 'Validation', message: 'From and To cities are required.', type: 'warning' })
-      return
-    }
+    setValidationOpen(false)
+    return { ok: true }
+  }
+
+  const handleSave = useCallback(async () => {
+    const { ok } = validate()
+    if (!ok) return
     setSaving(true)
     try {
-      await bookingsApi.create({
-        date: form.date,
-        customer: form.customer,
-        consignor: form.consignor,
-        consignee: form.consignee,
-        from: form.from,
-        to: form.to,
-        material: form.material,
-        quantity: form.quantity,
-        vehicle: form.vehicle,
-        driver: form.driver,
-        freight: Number(form.freight) || 0,
-        advance: Number(form.advance) || 0,
-        status: 'Pending',
-        payment: form.payment,
-        remarks: form.remarks,
-        lrNumber: form.lrNumber || undefined,
-      })
+      await bookingsApi.create(buildBookingApiPayload(form))
       toast({ title: 'Booking saved', type: 'success' })
       clearControlsAfterSave({
-        reset: () => setForm({
-          ...EMPTY_BOOKING,
-          date: new Date().toISOString().slice(0, 10),
-        }),
+        reset: () => {
+          setForm({
+            ...emptyBookingEntryForm(),
+            branchName: user?.branchName || '',
+          })
+          setFieldErrors({})
+          setValidationOpen(false)
+        },
+        formRoot: formRef.current,
       })
     } catch (err) {
       toast({ title: 'Save failed', message: err.message, type: 'error' })
     } finally {
       setSaving(false)
     }
-  }
+  }, [form, fieldMap, isFirstLrThenBooking, documentFlowLabel, toast, user?.branchName])
+
+  const handleClear = useCallback(() => {
+    setForm({
+      ...emptyBookingEntryForm(),
+      branchName: user?.branchName || '',
+    })
+    setFieldErrors({})
+    setValidationOpen(false)
+  }, [user?.branchName])
+
+  const handleCancel = useCallback(() => navigate('/bookings'), [navigate])
+
+  useAutoFocus(formRef)
+  useKeyboardPageActions({
+    onSave: handleSave,
+    onCancel: handleCancel,
+    onNew: handleClear,
+  }, [handleSave, handleCancel, handleClear])
+
+  const lrSlot = isFirstLrThenBooking ? (
+    <Select
+      label="Linked LR (required)"
+      value={form.lrNumber}
+      options={lrOptions}
+      error={fieldErrors.lrNumber}
+      onChange={(e) => applyLr(e.target.value)}
+    />
+  ) : null
 
   return (
-    <ERPContentPage module="Booking" title="Add New Record">
-      {isFirstLrThenBooking && !flowLoading && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-          Document Flow: <strong>{documentFlowLabel}</strong>. Select an existing LR before saving this booking.
-        </div>
-      )}
-      <Card>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {isFirstLrThenBooking && (
-            <Select
-              label="Linked LR (required)"
-              value={form.lrNumber}
-              onChange={(e) => applyLr(e.target.value)}
-              options={lrOptions}
+    <div className="lr-entry-page flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <ERPPageTitle
+        module="Booking"
+        title="Add New Record"
+        breadcrumb={[
+          { label: 'Home', path: '/' },
+          { label: 'Bookings', path: '/bookings' },
+          { label: 'New Booking' },
+        ]}
+      />
+
+      <div ref={formRef} data-kbd-form-root className="lr-entry-v2-page flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="lr-entry-v2-scroll min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
+          {isFirstLrThenBooking && !flowLoading && (
+            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              Document Flow: <strong>{documentFlowLabel}</strong>. Select an existing LR before saving this booking.
+            </div>
+          )}
+
+          {fieldsLoading ? (
+            <p className="p-4 text-sm text-slate-500">Loading field configuration…</p>
+          ) : (
+            <BookingEntryFormLayout
+              form={form}
+              setForm={setForm}
+              update={update}
+              lrSlot={lrSlot}
+              fieldErrors={fieldErrors}
+              fieldMap={fieldMap}
+              onClearFieldErrors={clearFieldErrors}
+              onApplyRate={applyFreightRate}
             />
           )}
-          <Input label="Booking Date" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
-          <LookupSelect label="Customer" type="customers" value={form.customer} onChange={(v) => set('customer', v)} placeholder="Search customer…" />
-          <Input label="Consignor" value={form.consignor} onChange={(e) => set('consignor', e.target.value)} placeholder="Consignor name" />
-          <Input label="Consignee" value={form.consignee} onChange={(e) => set('consignee', e.target.value)} placeholder="Consignee name" />
-          <Input label="From" value={form.from} onChange={(e) => set('from', e.target.value)} placeholder="Origin city" />
-          <Input label="To" value={form.to} onChange={(e) => set('to', e.target.value)} placeholder="Destination city" />
-          <Input label="Material" value={form.material} onChange={(e) => set('material', e.target.value)} placeholder="Material type" />
-          <Input label="Quantity" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} placeholder="e.g. 12 MT" />
-          <LookupSelect label="Vehicle" type="vehicles" value={form.vehicle} onChange={(v) => set('vehicle', v)} placeholder="Search vehicle…" />
-          <DriverLookupSelect label="Driver" value={form.driver} onChange={(v) => set('driver', v)} />
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Input label="Freight (₹)" type="number" value={form.freight} onChange={(e) => set('freight', e.target.value)} />
-            </div>
-            <Button type="button" variant="outline" className="mb-0.5" onClick={applyFreightRate}>Apply Rate</Button>
-          </div>
-          <Input label="Advance (₹)" type="number" value={form.advance} onChange={(e) => set('advance', e.target.value)} />
-          <Select label="Payment Status" value={form.payment} onChange={(e) => set('payment', e.target.value)} options={paymentStatuses} />
-          <div className="sm:col-span-2 lg:col-span-3">
-            <Textarea label="Remarks" value={form.remarks} onChange={(e) => set('remarks', e.target.value)} placeholder="Additional notes..." />
-          </div>
         </div>
-        <div className="mt-6 flex gap-2">
-          <Button icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save Booking'}</Button>
-          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/bookings')}>Cancel</Button>
-        </div>
-      </Card>
-    </ERPContentPage>
+
+        <footer className="lr-entry-v2-footer shrink-0 border-t border-slate-200 bg-white px-2 py-1.5 sm:px-3 dark:border-slate-700 dark:bg-slate-900">
+          <LrEntryActionButtons
+            saving={saving}
+            saveDisabled={fieldsLoading}
+            onClear={handleClear}
+            onCancel={handleCancel}
+            onSave={handleSave}
+            saveLabel="Save Booking"
+          />
+        </footer>
+      </div>
+
+      <FormValidationPopup
+        open={validationOpen}
+        errors={fieldErrors}
+        onClose={() => {
+          setValidationOpen(false)
+          focusFirstFieldError(fieldErrors)
+        }}
+      />
+    </div>
   )
 }

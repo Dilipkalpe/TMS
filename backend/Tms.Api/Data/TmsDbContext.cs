@@ -92,6 +92,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<CompanyUsage> CompanyUsages => Set<CompanyUsage>();
     public DbSet<DocumentNumberConfig> DocumentNumberConfigs => Set<DocumentNumberConfig>();
     public DbSet<DocumentNumberSequence> DocumentNumberSequences => Set<DocumentNumberSequence>();
+    public DbSet<FieldConfiguration> FieldConfigurations => Set<FieldConfiguration>();
     public DbSet<RoleMenuPermission> RoleMenuPermissions => Set<RoleMenuPermission>();
     public DbSet<UserRoleType> UserRoleTypes => Set<UserRoleType>();
 
@@ -382,10 +383,13 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.BookingDate).HasColumnName("booking_date");
             e.Property(x => x.CustomerId).HasColumnName("customer_id");
             e.Property(x => x.CustomerName).HasColumnName("customer_name");
+            e.Property(x => x.ConsignorId).HasColumnName("consignor_id");
+            e.Property(x => x.ConsigneeId).HasColumnName("consignee_id");
             e.Property(x => x.Consignor).HasColumnName("consignor");
             e.Property(x => x.Consignee).HasColumnName("consignee");
             e.Property(x => x.FromCity).HasColumnName("from_city");
             e.Property(x => x.ToCity).HasColumnName("to_city");
+            e.Property(x => x.MaterialId).HasColumnName("material_id");
             e.Property(x => x.Material).HasColumnName("material");
             e.Property(x => x.Quantity).HasColumnName("quantity");
             e.Property(x => x.VehicleId).HasColumnName("vehicle_id");
@@ -705,6 +709,25 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.HasIndex(x => new { x.CompanyId, x.BranchId, x.DocumentType }).IsUnique();
+        });
+
+        modelBuilder.Entity<FieldConfiguration>(e =>
+        {
+            e.ToTable("field_configurations");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.Module).HasColumnName("module").HasMaxLength(40);
+            e.Property(x => x.TechnicalFieldName).HasColumnName("technical_field_name").HasMaxLength(80);
+            e.Property(x => x.DefaultDisplayName).HasColumnName("default_display_name").HasMaxLength(120);
+            e.Property(x => x.CustomDisplayName).HasColumnName("custom_display_name").HasMaxLength(120);
+            e.Property(x => x.IsVisible).HasColumnName("is_visible");
+            e.Property(x => x.IsRequired).HasColumnName("is_required");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => new { x.CompanyId, x.Module, x.TechnicalFieldName }).IsUnique();
         });
 
         modelBuilder.Entity<DocumentNumberSequence>(e =>

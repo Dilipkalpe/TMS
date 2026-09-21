@@ -23,17 +23,9 @@ import FormValidationPopup from '../../components/ui/FormValidationPopup'
 import { scrollToFirstFieldError, focusFirstFieldError } from '../../utils/formValidationFocus'
 import { syncLrRouteFields } from '../../utils/partyMasterLr'
 import { useKeyboardPageActions, useAutoFocus } from '../../hooks/useKeyboardPageActions'
+import { useFieldConfig } from '../../hooks/useFieldConfig'
+import { buildLrFieldErrors } from '../../utils/fieldConfig'
 import { ArrowLeft, Loader2, Workflow } from 'lucide-react'
-
-function buildFieldErrors(form) {
-  const errors = {}
-  if (!form.lrDate?.trim()) errors.lrDate = 'LR Date is required.'
-  if (!form.consignorId && !form.consignor?.trim()) errors.consignor = 'Please select Consignor.'
-  if (!form.consigneeId && !form.consignee?.trim()) errors.consignee = 'Please select Consignee.'
-  if (!form.from?.trim() && !form.pickupCity?.trim()) errors.from = 'Pickup city is required.'
-  if (!form.to?.trim()) errors.to = 'Delivery city is required.'
-  return errors
-}
 
 async function hydratePartyContacts(form) {
   const next = { ...form }
@@ -71,6 +63,7 @@ export default function EditLR() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { company, print } = usePrint()
+  const { map: fieldMap } = useFieldConfig('LR')
 
   const [form, setForm] = useState(null)
   const [snapshot, setSnapshot] = useState(null)
@@ -152,7 +145,7 @@ export default function EditLR() {
     if (synced.from !== form.from || synced.pickupCity !== form.pickupCity || synced.to !== form.to) {
       setForm(synced)
     }
-    const errors = buildFieldErrors(synced)
+    const errors = buildLrFieldErrors(synced, fieldMap)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
       scrollToFirstFieldError(errors)
@@ -161,7 +154,7 @@ export default function EditLR() {
     }
     setValidationOpen(false)
     return { ok: true, synced }
-  }, [form])
+  }, [form, fieldMap])
 
   const handleSave = useCallback(async (andPrint = false) => {
     const { ok, synced } = validate()
@@ -277,6 +270,7 @@ export default function EditLR() {
             setForm={setForm}
             update={update}
             fieldErrors={fieldErrors}
+            fieldMap={fieldMap}
             formActionsRef={formActionsRef}
             onClearFieldErrors={clearFieldErrors}
           />

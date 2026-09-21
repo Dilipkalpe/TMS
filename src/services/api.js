@@ -189,6 +189,15 @@ export const documentNumberingApi = {
   ensureDefaults: (params = {}) => apiRequest(`/document-numbering/ensure-defaults?${queryString(params)}`, { method: 'POST' }),
 }
 
+export const fieldConfigurationsApi = {
+  list: (module) => apiRequest(`/field-configurations?module=${encodeURIComponent(module)}`),
+  save: (module, items) => apiRequest(`/field-configurations?module=${encodeURIComponent(module)}`, {
+    method: 'PUT',
+    body: { items },
+  }),
+  ensureDefaults: () => apiRequest('/field-configurations/ensure-defaults', { method: 'POST' }),
+}
+
 export const bookingsApi = {
   list: (params = {}) => apiRequest(`/bookings?${new URLSearchParams(params)}`),
   get: (id) => apiRequest(`/bookings/${encodeURIComponent(toDocPath(id))}`),

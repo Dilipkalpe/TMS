@@ -165,6 +165,11 @@ public sealed class DocumentNumberService(TmsDbContext db)
         string financialYear,
         CancellationToken ct)
     {
+        // Production uses a DB stored procedure for atomic allocation.
+        // InMemory (integration tests) has no relational SQL — use an EF counter.
+        if (!db.Database.IsRelational())
+            return await AllocateNextViaEfAsync(companyId, branchId, documentType, financialYear, ct);
+
         var rows = await db.Database.SqlQueryRaw<int>(
             """
             SELECT sp_next_document_number({0}, {1}, {2}, {3}) AS "Value"
@@ -175,6 +180,44 @@ public sealed class DocumentNumberService(TmsDbContext db)
         if (rows.Count == 0)
             throw new InvalidOperationException("Failed to allocate document number.");
         return rows[0];
+    }
+
+    async Task<int> AllocateNextViaEfAsync(
+        Guid companyId,
+        Guid branchId,
+        string documentType,
+        string financialYear,
+        CancellationToken ct)
+    {
+        var seq = await db.DocumentNumberSequences
+            .FirstOrDefaultAsync(s =>
+                s.CompanyId == companyId &&
+                s.BranchId == branchId &&
+                s.DocumentType == documentType &&
+                s.FinancialYear == financialYear, ct);
+
+        if (seq == null)
+        {
+            seq = new DocumentNumberSequence
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyId,
+                BranchId = branchId,
+                DocumentType = documentType,
+                FinancialYear = financialYear,
+                CurrentNumber = 1,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            db.DocumentNumberSequences.Add(seq);
+        }
+        else
+        {
+            seq.CurrentNumber += 1;
+            seq.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync(ct);
+        return seq.CurrentNumber;
     }
 
     public async Task<IReadOnlyList<DocumentNumberConfigDto>> ListConfigsAsync(

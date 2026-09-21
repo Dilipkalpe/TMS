@@ -626,7 +626,7 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
 [Authorize]
 [ApiController]
 [Route("api/lr")]
-public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers, EwayBillSyncService ewayBillSync) : ControllerBase
+public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers, EwayBillSyncService ewayBillSync, FieldConfigurationService fieldConfig) : ControllerBase
 {
     async Task<Driver?> ResolveDriverAsync(string? driverName, CancellationToken ct = default)
     {
@@ -893,12 +893,15 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         return Ok(new
         {
             bookingId = b.Id,
+            consignorId = b.ConsignorId,
+            consigneeId = b.ConsigneeId,
             consignor = b.Consignor,
             consignee = b.Consignee,
             from = b.FromCity,
             to = b.ToCity,
             vehicle = b.VehicleNumber,
             driver = b.DriverName,
+            materialId = b.MaterialId,
             material = b.Material,
             quantity = b.Quantity,
             freight = b.Freight,
@@ -921,36 +924,59 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
     [HttpPost]
     public async Task<ActionResult<LrDto>> Create([FromBody] Dictionary<string, object?> body)
     {
-        var from = ApiParseHelper.BodyString(body, "from");
-        var to = ApiParseHelper.BodyString(body, "to");
-        if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
-            return BadRequest(new ApiError("From and To locations are required."));
+        var fieldMap = await fieldConfig.GetMapAsync(FieldConfigurationCatalog.ModuleLr);
+        static bool Visible(IReadOnlyDictionary<string, FieldConfigurationDto> map, string key) =>
+            !map.TryGetValue(key, out var f) || FieldConfigurationService.IsVisible(f);
 
-        var consignorId = ApiParseHelper.BodyString(body, "consignorId");
-        var consigneeId = ApiParseHelper.BodyString(body, "consigneeId");
-        var consignorText = ApiParseHelper.BodyString(body, "consignor");
-        var consigneeText = ApiParseHelper.BodyString(body, "consignee");
+        var from = Visible(fieldMap, "From") ? ApiParseHelper.BodyString(body, "from") : null;
+        var to = Visible(fieldMap, "To") ? ApiParseHelper.BodyString(body, "to") : null;
+        if (FieldConfigurationService.MustValidate(fieldMap.GetValueOrDefault("From")) && string.IsNullOrWhiteSpace(from))
+            return BadRequest(new ApiError(FieldConfigurationService.RequiredMessage(fieldMap.GetValueOrDefault("From"), "Pickup City")));
+        if (FieldConfigurationService.MustValidate(fieldMap.GetValueOrDefault("To")) && string.IsNullOrWhiteSpace(to))
+            return BadRequest(new ApiError(FieldConfigurationService.RequiredMessage(fieldMap.GetValueOrDefault("To"), "Delivery City")));
 
-        var (consignorRow, consignorErr) = await PartyMasterHelper.ResolveActiveConsignorAsync(
-            db, tenants, branches, consignorId, consignorText);
-        if (consignorErr != null) return BadRequest(new ApiError(consignorErr));
-        var (consigneeRow, consigneeErr) = await PartyMasterHelper.ResolveActiveConsigneeAsync(
-            db, tenants, branches, consigneeId, consigneeText);
-        if (consigneeErr != null) return BadRequest(new ApiError(consigneeErr));
+        var consignorId = Visible(fieldMap, "Consignor") ? ApiParseHelper.BodyString(body, "consignorId") : null;
+        var consigneeId = Visible(fieldMap, "Consignee") ? ApiParseHelper.BodyString(body, "consigneeId") : null;
+        var consignorText = Visible(fieldMap, "Consignor") ? ApiParseHelper.BodyString(body, "consignor") : null;
+        var consigneeText = Visible(fieldMap, "Consignee") ? ApiParseHelper.BodyString(body, "consignee") : null;
 
-        if (consignorRow == null && string.IsNullOrWhiteSpace(consignorText))
-            return BadRequest(new ApiError("Consignor is required."));
-        if (consigneeRow == null && string.IsNullOrWhiteSpace(consigneeText))
-            return BadRequest(new ApiError("Consignee is required."));
+        Consignor? consignorRow = null;
+        Consignee? consigneeRow = null;
+        if (Visible(fieldMap, "Consignor"))
+        {
+            var requireConsignor = FieldConfigurationService.MustValidate(fieldMap.GetValueOrDefault("Consignor"));
+            var (row, consignorErr) = await PartyMasterHelper.ResolveActiveConsignorAsync(
+                db, tenants, branches, consignorId, consignorText, requireValue: requireConsignor);
+            if (consignorErr != null) return BadRequest(new ApiError(
+                requireConsignor && consignorErr == "Consignor is required."
+                    ? FieldConfigurationService.RequiredMessage(fieldMap.GetValueOrDefault("Consignor"), "Consignor")
+                    : consignorErr));
+            consignorRow = row;
+        }
+        if (Visible(fieldMap, "Consignee"))
+        {
+            var requireConsignee = FieldConfigurationService.MustValidate(fieldMap.GetValueOrDefault("Consignee"));
+            var (row, consigneeErr) = await PartyMasterHelper.ResolveActiveConsigneeAsync(
+                db, tenants, branches, consigneeId, consigneeText, requireValue: requireConsignee);
+            if (consigneeErr != null) return BadRequest(new ApiError(
+                requireConsignee && consigneeErr == "Consignee is required."
+                    ? FieldConfigurationService.RequiredMessage(fieldMap.GetValueOrDefault("Consignee"), "Consignee")
+                    : consigneeErr));
+            consigneeRow = row;
+        }
+
+        if (FieldConfigurationService.MustValidate(fieldMap.GetValueOrDefault("LrDate"))
+            && string.IsNullOrWhiteSpace(ApiParseHelper.BodyString(body, "lrDate")))
+            return BadRequest(new ApiError(FieldConfigurationService.RequiredMessage(fieldMap.GetValueOrDefault("LrDate"), "LR Date")));
 
         var consignorName = consignorRow != null
             ? PartyMasterHelper.DisplayName(consignorRow.Name, consignorRow.CompanyName)
-            : consignorText!.Trim();
+            : (consignorText?.Trim());
         var consigneeName = consigneeRow != null
             ? PartyMasterHelper.DisplayName(consigneeRow.Name, consigneeRow.CompanyName)
-            : consigneeText!.Trim();
+            : (consigneeText?.Trim());
 
-        var bookingId = ApiParseHelper.BodyString(body, "bookingId");
+        var bookingId = Visible(fieldMap, "BookingId") ? ApiParseHelper.BodyString(body, "bookingId") : null;
 
         Booking? booking = null;
         if (!string.IsNullOrEmpty(bookingId))
@@ -973,22 +999,22 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         {
             return BadRequest(new ApiError(ex.Message));
         }
-        var vehicleNum = ApiParseHelper.BodyString(body, "vehicle");
+        var vehicleNum = Visible(fieldMap, "Vehicle") ? ApiParseHelper.BodyString(body, "vehicle") : null;
         var vehicle = !string.IsNullOrEmpty(vehicleNum)
             ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleNum) : null;
-        var driverName = ApiParseHelper.BodyString(body, "driver");
+        var driverName = Visible(fieldMap, "Driver") ? ApiParseHelper.BodyString(body, "driver") : null;
         var driver = !string.IsNullOrEmpty(driverName)
             ? await ResolveDriverAsync(driverName) : null;
-        var freight = ApiParseHelper.BodyDecimal(body, "freight");
-        var gst = body.ContainsKey("gst")
+        var freight = Visible(fieldMap, "Freight") ? ApiParseHelper.BodyDecimal(body, "freight") : 0;
+        var gst = body.ContainsKey("gst") && Visible(fieldMap, "GstPercent")
             ? ApiParseHelper.BodyDecimal(body, "gst")
-            : freight * 0.18m;
+            : (Visible(fieldMap, "GstPercent") ? freight * 0.18m : 0);
         var hamali = ApiParseHelper.BodyDecimal(body, "hamali");
-        var loading = ApiParseHelper.BodyDecimal(body, "loadingCharges");
-        var unloading = ApiParseHelper.BodyDecimal(body, "unloadingCharges");
-        var insurance = ApiParseHelper.BodyDecimal(body, "insurance");
-        var advance = ApiParseHelper.BodyDecimal(body, "advance");
-        if (booking != null)
+        var loading = Visible(fieldMap, "LoadingCharges") ? ApiParseHelper.BodyDecimal(body, "loadingCharges") : 0;
+        var unloading = Visible(fieldMap, "UnloadingCharges") ? ApiParseHelper.BodyDecimal(body, "unloadingCharges") : 0;
+        var insurance = Visible(fieldMap, "Insurance") ? ApiParseHelper.BodyDecimal(body, "insurance") : 0;
+        var advance = Visible(fieldMap, "Advance") ? ApiParseHelper.BodyDecimal(body, "advance") : 0;
+        if (booking != null && Visible(fieldMap, "Advance"))
         {
             var paymentsTotal = await db.BookingPayments
                 .Where(p => p.BookingId == bookingId)
@@ -997,12 +1023,15 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
                 advance = booking.Advance + paymentsTotal;
         }
 
-        var billingCustomerId = ApiParseHelper.BodyString(body, "customerId")
-            ?? ApiParseHelper.BodyString(body, "billingPartyId");
-        var billingCustomerName = ApiParseHelper.BodyString(body, "customerName")
-            ?? ApiParseHelper.BodyString(body, "billingParty")
-            ?? booking?.CustomerName
-            ?? consignorName;
+        var billingCustomerId = Visible(fieldMap, "BillingParty")
+            ? (ApiParseHelper.BodyString(body, "customerId") ?? ApiParseHelper.BodyString(body, "billingPartyId"))
+            : null;
+        var billingCustomerName = Visible(fieldMap, "BillingParty")
+            ? (ApiParseHelper.BodyString(body, "customerName")
+                ?? ApiParseHelper.BodyString(body, "billingParty")
+                ?? booking?.CustomerName
+                ?? consignorName)
+            : (booking?.CustomerName ?? consignorName);
         var billingCustomer = await BookingFinanceService.ResolveBillingCustomerAsync(
             db, tenants, branches, billingCustomerId, billingCustomerName);
         // Prefer explicit billing party; fall back to booking customer when unresolved.
@@ -1016,20 +1045,22 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             BranchId = branchId,
             LrDate = lrDate,
             BookingId = booking?.Id,
-            BusinessType = LrBusinessTypes.Normalize(ApiParseHelper.BodyString(body, "businessType")),
+            BusinessType = Visible(fieldMap, "BusinessType")
+                ? LrBusinessTypes.Normalize(ApiParseHelper.BodyString(body, "businessType"))
+                : LrBusinessTypes.Normalize(null),
             CustomerId = billingCustomer?.Id ?? booking?.CustomerId,
             CustomerName = billingCustomer?.Name ?? billingCustomerName ?? booking?.CustomerName,
             ConsignorId = consignorRow?.Id ?? consignorId,
             ConsigneeId = consigneeRow?.Id ?? consigneeId,
             Consignor = consignorName,
             Consignee = consigneeName,
-            FromCity = from,
-            ToCity = to,
+            FromCity = from ?? "",
+            ToCity = to ?? "",
             VehicleId = vehicle?.Id,
             VehicleNumber = vehicle?.Number ?? vehicleNum,
             DriverId = driver?.Id,
             DriverName = driver?.Name ?? driverName,
-            Material = ApiParseHelper.BodyString(body, "material"),
+            Material = Visible(fieldMap, "Material") ? ApiParseHelper.BodyString(body, "material") : null,
             Quantity = ApiParseHelper.BodyString(body, "quantity"),
             Freight = freight,
             Gst = gst,
@@ -1039,9 +1070,11 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             Insurance = insurance,
             Advance = advance,
             Balance = freight + gst + hamali + loading + unloading + insurance - advance,
-            PaymentType = ApiParseHelper.BodyString(body, "paymentType") ?? "To Pay",
+            PaymentType = Visible(fieldMap, "PaymentType")
+                ? (ApiParseHelper.BodyString(body, "paymentType") ?? "To Pay")
+                : "To Pay",
             Status = ApiParseHelper.BodyBool(body, "isDraft") == true ? LrStatuses.Draft : LrStatuses.LRCreated,
-            Remarks = ApiParseHelper.BodyString(body, "remarks"),
+            Remarks = Visible(fieldMap, "Remarks") ? ApiParseHelper.BodyString(body, "remarks") : null,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -1088,29 +1121,47 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             lr.Consignee = ApiParseHelper.BodyString(body, "consignee");
         if (body.ContainsKey("consignorId") || body.ContainsKey("consignor"))
         {
-            var (row, err) = await PartyMasterHelper.ResolveActiveConsignorAsync(
-                db, tenants, branches, lr.ConsignorId, lr.Consignor);
-            if (err != null) return BadRequest(new ApiError(err));
-            if (row != null)
+            var lrFieldMap = await fieldConfig.GetMapAsync(FieldConfigurationCatalog.ModuleLr);
+            var consignorCfg = lrFieldMap.GetValueOrDefault("Consignor");
+            if (FieldConfigurationService.IsVisible(consignorCfg))
             {
-                lr.ConsignorId = row.Id;
-                lr.Consignor = PartyMasterHelper.DisplayName(row.Name, row.CompanyName);
+                var requireConsignor = FieldConfigurationService.MustValidate(consignorCfg);
+                var (row, err) = await PartyMasterHelper.ResolveActiveConsignorAsync(
+                    db, tenants, branches, lr.ConsignorId, lr.Consignor, requireValue: requireConsignor);
+                if (err != null) return BadRequest(new ApiError(
+                    requireConsignor && err == "Consignor is required."
+                        ? FieldConfigurationService.RequiredMessage(consignorCfg, "Consignor")
+                        : err));
+                if (row != null)
+                {
+                    lr.ConsignorId = row.Id;
+                    lr.Consignor = PartyMasterHelper.DisplayName(row.Name, row.CompanyName);
+                }
+                else if (requireConsignor && string.IsNullOrWhiteSpace(lr.Consignor))
+                    return BadRequest(new ApiError(FieldConfigurationService.RequiredMessage(consignorCfg, "Consignor")));
             }
-            else if (string.IsNullOrWhiteSpace(lr.Consignor))
-                return BadRequest(new ApiError("Consignor is required."));
         }
         if (body.ContainsKey("consigneeId") || body.ContainsKey("consignee"))
         {
-            var (row, err) = await PartyMasterHelper.ResolveActiveConsigneeAsync(
-                db, tenants, branches, lr.ConsigneeId, lr.Consignee);
-            if (err != null) return BadRequest(new ApiError(err));
-            if (row != null)
+            var lrFieldMap = await fieldConfig.GetMapAsync(FieldConfigurationCatalog.ModuleLr);
+            var consigneeCfg = lrFieldMap.GetValueOrDefault("Consignee");
+            if (FieldConfigurationService.IsVisible(consigneeCfg))
             {
-                lr.ConsigneeId = row.Id;
-                lr.Consignee = PartyMasterHelper.DisplayName(row.Name, row.CompanyName);
+                var requireConsignee = FieldConfigurationService.MustValidate(consigneeCfg);
+                var (row, err) = await PartyMasterHelper.ResolveActiveConsigneeAsync(
+                    db, tenants, branches, lr.ConsigneeId, lr.Consignee, requireValue: requireConsignee);
+                if (err != null) return BadRequest(new ApiError(
+                    requireConsignee && err == "Consignee is required."
+                        ? FieldConfigurationService.RequiredMessage(consigneeCfg, "Consignee")
+                        : err));
+                if (row != null)
+                {
+                    lr.ConsigneeId = row.Id;
+                    lr.Consignee = PartyMasterHelper.DisplayName(row.Name, row.CompanyName);
+                }
+                else if (requireConsignee && string.IsNullOrWhiteSpace(lr.Consignee))
+                    return BadRequest(new ApiError(FieldConfigurationService.RequiredMessage(consigneeCfg, "Consignee")));
             }
-            else if (string.IsNullOrWhiteSpace(lr.Consignee))
-                return BadRequest(new ApiError("Consignee is required."));
         }
         if (body.ContainsKey("from") && !string.IsNullOrWhiteSpace(ApiParseHelper.BodyString(body, "from")))
             lr.FromCity = ApiParseHelper.BodyString(body, "from")!;

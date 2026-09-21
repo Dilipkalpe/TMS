@@ -27,6 +27,7 @@ public static class SchemaBootstrap
             ("LrProcess", () => LrSchemaMigrator.EnsureAsync(db, logger, ct)),
             ("Commercial", () => CommercialSchemaMigrator.EnsureAsync(db, ct)),
             ("DocumentNumbering", () => DocumentNumberingSchemaMigrator.EnsureAsync(db, ct)),
+            ("FieldConfiguration", () => FieldConfigurationSchemaMigrator.EnsureAsync(db, ct)),
             ("Reports", () => ReportsSchemaMigrator.EnsureAsync(db, ct)),
             ("PrintTemplates", () => PrintTemplateSchemaMigrator.EnsureAsync(db, ct)),
             ("LabelTemplates", () => LabelTemplateSchemaMigrator.EnsureAsync(db, ct)),

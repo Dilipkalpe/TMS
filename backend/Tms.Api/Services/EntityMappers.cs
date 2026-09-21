@@ -17,7 +17,8 @@ public static class EntityMappers
         b.Freight, b.Status, b.Payment,
         b.Advance, b.Balance, b.Remarks, lrNumber,
         b.BranchId, b.Branch?.Name,
-        b.CreatedBy, b.CreatedAt, b.UpdatedBy, b.UpdatedAt);
+        b.CreatedBy, b.CreatedAt, b.UpdatedBy, b.UpdatedAt,
+        b.ConsignorId, b.ConsigneeId, b.MaterialId);
 
     public static VehicleDto ToDto(Vehicle v) => new(
         v.Id, v.Number, v.Type, v.Model, v.Capacity, v.Owner, v.Status,

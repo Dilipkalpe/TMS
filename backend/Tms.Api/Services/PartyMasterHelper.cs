@@ -47,7 +47,8 @@ public static class PartyMasterHelper
 
     public static async Task<(Consignor? Entity, string? Error)> ResolveActiveConsignorAsync(
         TmsDbContext db, ITenantContext tenants, IBranchContext branches,
-        string? id, string? fallbackName, CancellationToken ct = default)
+        string? id, string? fallbackName, CancellationToken ct = default,
+        bool requireValue = true)
     {
         if (!string.IsNullOrWhiteSpace(id))
         {
@@ -60,14 +61,15 @@ public static class PartyMasterHelper
         }
 
         if (string.IsNullOrWhiteSpace(fallbackName))
-            return (null, "Consignor is required.");
+            return requireValue ? (null, "Consignor is required.") : (null, null);
 
         return (null, null);
     }
 
     public static async Task<(Consignee? Entity, string? Error)> ResolveActiveConsigneeAsync(
         TmsDbContext db, ITenantContext tenants, IBranchContext branches,
-        string? id, string? fallbackName, CancellationToken ct = default)
+        string? id, string? fallbackName, CancellationToken ct = default,
+        bool requireValue = true)
     {
         if (!string.IsNullOrWhiteSpace(id))
         {
@@ -80,7 +82,7 @@ public static class PartyMasterHelper
         }
 
         if (string.IsNullOrWhiteSpace(fallbackName))
-            return (null, "Consignee is required.");
+            return requireValue ? (null, "Consignee is required.") : (null, null);
 
         return (null, null);
     }

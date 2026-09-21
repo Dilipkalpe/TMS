@@ -144,6 +144,7 @@ builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<LookupQuickCreateService>();
 builder.Services.AddScoped<DriverSyncService>();
 builder.Services.AddScoped<DocumentFlowService>();
+builder.Services.AddScoped<FieldConfigurationService>();
 builder.Services.AddScoped<LrLabelService>();
 builder.Services.AddScoped<DocumentNumberService>();
 builder.Services.AddScoped<EwayBillSyncService>();

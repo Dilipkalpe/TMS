@@ -19,16 +19,8 @@ import { scrollToFirstFieldError, focusFirstFieldError } from '../../utils/formV
 import { syncLrRouteFields } from '../../utils/partyMasterLr'
 import { useKeyboardPageActions, useAutoFocus } from '../../hooks/useKeyboardPageActions'
 import { clearControlsAfterSave } from '../../utils/formResetAfterSave'
-
-function buildFieldErrors(form) {
-  const errors = {}
-  if (!form.lrDate?.trim()) errors.lrDate = 'LR Date is required.'
-  if (!form.consignorId && !form.consignor?.trim()) errors.consignor = 'Please select Consignor.'
-  if (!form.consigneeId && !form.consignee?.trim()) errors.consignee = 'Please select Consignee.'
-  if (!form.from?.trim() && !form.pickupCity?.trim()) errors.from = 'Pickup city is required.'
-  if (!form.to?.trim()) errors.to = 'Delivery city is required.'
-  return errors
-}
+import { useFieldConfig } from '../../hooks/useFieldConfig'
+import { buildLrFieldErrors, fieldLabel } from '../../utils/fieldConfig'
 
 export default function LrEntryPage() {
   const navigate = useNavigate()
@@ -37,6 +29,7 @@ export default function LrEntryPage() {
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const { isFirstBookingThenLr, loading: flowLoading } = useDocumentFlow()
+  const { map: fieldMap } = useFieldConfig('LR')
   const [form, setForm] = useState(emptyLrEntryForm)
   const [fieldErrors, setFieldErrors] = useState({})
   const [validationOpen, setValidationOpen] = useState(false)
@@ -122,7 +115,7 @@ export default function LrEntryPage() {
     if (synced.from !== form.from || synced.pickupCity !== form.pickupCity || synced.to !== form.to) {
       setForm(synced)
     }
-    const errors = buildFieldErrors(synced)
+    const errors = buildLrFieldErrors(synced, fieldMap)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
       scrollToFirstFieldError(errors)
@@ -163,7 +156,7 @@ export default function LrEntryPage() {
     } finally {
       setSaving(false)
     }
-  }, [form, company, print, toast, user?.branchName])
+  }, [form, fieldMap, company, print, toast, user?.branchName])
 
   const handlePreview = useCallback(() => {
     printModuleDocument({
@@ -209,9 +202,10 @@ export default function LrEntryPage() {
     },
   }, [handleSave, handleCancel, handleClear])
 
+  const bookingLabelText = fieldLabel(fieldMap, 'BookingId', 'Booking No. (Optional)')
   const bookingSlot = isFirstBookingThenLr ? (
     <Select
-      label="Booking No. (Optional)"
+      label={bookingLabelText}
       value={form.bookingId}
       options={bookingOptions}
       error={fieldErrors.bookingId}
@@ -223,7 +217,7 @@ export default function LrEntryPage() {
     />
   ) : (
     <Input
-      label="Booking No. (Optional)"
+      label={bookingLabelText}
       value={form.bookingId}
       error={fieldErrors.bookingId}
       onChange={(e) => update('bookingId', e.target.value)}
@@ -260,6 +254,7 @@ export default function LrEntryPage() {
             update={update}
             bookingSlot={bookingSlot}
             fieldErrors={fieldErrors}
+            fieldMap={fieldMap}
             formActionsRef={formActionsRef}
             onClearFieldErrors={clearFieldErrors}
           />

@@ -41,18 +41,21 @@ export default function BookingDetails() {
     { label: 'Booking ID', value: booking.id },
     { label: 'Date', value: booking.date },
     { label: 'Branch', value: booking.branchName || '—' },
-    { label: 'Customer', value: booking.customer },
-    { label: 'Consignor', value: booking.consignor },
-    { label: 'Consignee', value: booking.consignee },
-    { label: 'Route', value: `${booking.from} → ${booking.to}` },
-    { label: 'Material', value: booking.material },
-    { label: 'Quantity', value: booking.quantity },
-    { label: 'Vehicle', value: booking.vehicle },
-    { label: 'Driver', value: booking.driver },
+    { label: 'Consignor', value: booking.consignor || '—' },
+    { label: 'Consignee', value: booking.consignee || '—' },
+    { label: 'Route', value: `${booking.from || '—'} → ${booking.to || '—'}` },
+    { label: 'Material', value: booking.material || '—' },
+    { label: 'Quantity', value: booking.quantity || '—' },
+    { label: 'Vehicle', value: booking.vehicle || '—' },
+    { label: 'Driver', value: booking.driver || '—' },
     { label: 'Freight', value: formatCurrency(booking.freight) },
     { label: 'Advance', value: formatCurrency(booking.advance) },
     { label: 'Balance', value: formatCurrency(booking.balance) },
     ...(booking.lrNumber ? [{ label: 'Linked LR', value: booking.lrNumber }] : []),
+    // Historical billing label only when distinct from consignor
+    ...(booking.customer && booking.customer !== booking.consignor
+      ? [{ label: 'Billing party (legacy)', value: booking.customer }]
+      : []),
   ]
 
   return (

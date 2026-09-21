@@ -1,6 +1,7 @@
 import { CloudUpload, X } from 'lucide-react'
 import { Textarea } from '../../ui/Input'
 import LrEntrySectionCard from './LrEntrySectionCard'
+import { fieldLabel, fieldRequired, fieldVisible } from '../../../utils/fieldConfig'
 
 function formatFileSize(bytes) {
   if (!bytes) return ''
@@ -9,8 +10,11 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function LrEntryAdditionalSection({ form, update }) {
+export default function LrEntryAdditionalSection({ form, update, fieldMap = {} }) {
   const attachments = form.attachments || []
+  const label = (key, fallback) => fieldLabel(fieldMap, key, fallback)
+  const req = (key) => fieldRequired(fieldMap, key)
+  const showRemarks = fieldVisible(fieldMap, 'Remarks')
 
   const removeAttachment = (index) => {
     update('attachments', attachments.filter((_, i) => i !== index))
@@ -18,16 +22,18 @@ export default function LrEntryAdditionalSection({ form, update }) {
 
   return (
     <LrEntrySectionCard title="6. Additional Information" id="lr-section-additional">
-      <Textarea
-        label={`Remarks (${(form.remarks || '').length}/500)`}
-        rows={4}
-        maxLength={500}
-        value={form.remarks}
-        onChange={(e) => update('remarks', e.target.value)}
-        placeholder="Optional notes for this LR…"
-      />
+      {showRemarks ? (
+        <Textarea
+          label={`${label('Remarks', 'Remarks')} (${(form.remarks || '').length}/500)${req('Remarks') ? ' *' : ''}`}
+          rows={4}
+          maxLength={500}
+          value={form.remarks}
+          onChange={(e) => update('remarks', e.target.value)}
+          placeholder="Optional notes for this LR…"
+        />
+      ) : null}
 
-      <div className="lr-entry-v2-docs mt-4">
+      <div className={`lr-entry-v2-docs${showRemarks ? ' mt-4' : ''}`}>
         <p className="lr-entry-v2-docs-title">Documents</p>
         <label className="lr-entry-v2-attach-btn">
           <CloudUpload className="h-4 w-4" />

@@ -124,6 +124,7 @@ export default function LrEntryFormLayout({
   ultra = false,
   bookingSlot,
   fieldErrors = {},
+  fieldMap = {},
   formActionsRef,
   onClearFieldErrors,
 }) {
@@ -264,6 +265,7 @@ export default function LrEntryFormLayout({
         update={update}
         bookingSlot={bookingSlot}
         errors={fieldErrors}
+        fieldMap={fieldMap}
       />
 
       <LrEntryPartiesSection
@@ -275,6 +277,7 @@ export default function LrEntryFormLayout({
         onCopyBillingFromConsignor={copyBillingFromConsignor}
         onClearFieldErrors={onClearFieldErrors}
         errors={fieldErrors}
+        fieldMap={fieldMap}
       />
 
       <LrEntryRouteSection
@@ -282,6 +285,7 @@ export default function LrEntryFormLayout({
         setForm={setForm}
         update={update}
         errors={fieldErrors}
+        fieldMap={fieldMap}
       />
 
       <div className="lr-entry-v2-items-charges">
@@ -295,10 +299,10 @@ export default function LrEntryFormLayout({
           removeItem={removeItem}
           errors={fieldErrors}
         />
-        <LrEntryChargesSection form={form} update={update} />
+        <LrEntryChargesSection form={form} update={update} fieldMap={fieldMap} />
       </div>
 
-      <LrEntryAdditionalSection form={form} update={update} />
+      <LrEntryAdditionalSection form={form} update={update} fieldMap={fieldMap} />
     </div>
   )
 }

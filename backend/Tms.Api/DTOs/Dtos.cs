@@ -28,13 +28,15 @@ public record BookingDto(
     string? Vehicle, string? Driver, decimal Freight, string Status, string Payment,
     decimal Advance, decimal Balance, string? Remarks, string? LrNumber = null,
     Guid? BranchId = null, string? BranchName = null,
-    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
+    string? ConsignorId = null, string? ConsigneeId = null, string? MaterialId = null);
 
 public record CreateBookingRequest(
-    string Date, string Customer, string? Consignor, string? Consignee,
+    string Date, string? Customer, string? Consignor, string? Consignee,
     string From, string To, string? Material, string? Quantity,
     string? Vehicle, string? Driver, decimal Freight, string Status, string Payment,
-    decimal Advance, string? Remarks, string? LrNumber = null);
+    decimal Advance, string? Remarks, string? LrNumber = null,
+    string? ConsignorId = null, string? ConsigneeId = null, string? MaterialId = null);
 
 public record VehicleDto(
     string Id, string Number, string? Type, string? Model, string? Capacity, string? Owner,

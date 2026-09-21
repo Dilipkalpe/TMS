@@ -9,6 +9,7 @@ export const settingsCards = withHubTheme([
   { title: 'Portal user access', path: '/settings/portal-users', icon: 'UserCircle', description: 'Customer portal login and permissions' },
   { title: 'Branch locations', path: '/settings/branches', icon: 'GitBranch', description: 'Branch master and isolation settings' },
   { title: 'Document numbering', path: '/settings/document-numbering', icon: 'Hash', description: 'Number series for LR, invoices, and vouchers' },
+  { title: 'Field configuration', path: '/settings/field-configuration', icon: 'SlidersHorizontal', description: 'Show/hide, require, and rename Booking & LR form fields' },
   { title: 'SMS & WhatsApp', path: '/settings/notifications', icon: 'Bell', description: 'Notification channels and templates' },
   { title: 'Data cleanup', path: '/settings/data-cleanup', icon: 'Trash2', description: 'Delete transaction & master data; keep configuration' },
 ])
@@ -22,6 +23,7 @@ export const settingsHubSections = [
     '/settings/print-templates',
     '/settings/label-templates',
     '/settings/document-numbering',
+    '/settings/field-configuration',
   ), { chip: 'Setup' }),
   hubSection('Users & branches', 'Access control and locations', pick(
     '/settings/users',
