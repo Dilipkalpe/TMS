@@ -1,5 +1,10 @@
-import { createContext, useCallback, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { CheckCircle2, Info, AlertTriangle, XCircle, X } from 'lucide-react'
+import {
+  getNotificationDisplayDurationMs,
+  subscribeNotificationDisplayDuration,
+} from '../config/notificationUiSettings'
 
 const ToastContext = createContext(null)
 
@@ -28,6 +33,7 @@ function ToastContainer(props) {
     return (
       <div
         key={t.id}
+        role="status"
         className={`pointer-events-auto flex items-start space-x-3 rounded-xl border shadow-lg ${
           isTop ? 'p-4' : 'p-3'
         } ${STYLES[t.type] ?? STYLES.info}`}
@@ -37,7 +43,7 @@ function ToastContainer(props) {
           {t.title && <p className={`font-semibold ${isTop ? 'text-base' : 'text-sm'}`}>{t.title}</p>}
           {t.message && <p className={`whitespace-pre-line opacity-90 ${isTop ? 'text-sm' : 'text-xs'}`}>{t.message}</p>}
         </div>
-        <button type="button" onClick={() => onDismiss(t.id)} className="shrink-0 rounded p-0.5 opacity-70 hover:opacity-100">
+        <button type="button" onClick={() => onDismiss(t.id)} className="shrink-0 rounded p-0.5 opacity-70 hover:opacity-100" aria-label="Close">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -58,30 +64,95 @@ function ToastContainer(props) {
   )
 }
 
+/** Clears toasts on route change so popups do not linger on the parent page. */
+function ToastRouteCleanup({ clearAll }) {
+  const location = useLocation()
+  const prevPath = useRef(location.pathname + location.search)
+  useEffect(() => {
+    const next = location.pathname + location.search
+    if (prevPath.current !== next) {
+      prevPath.current = next
+      clearAll()
+    }
+  }, [location.pathname, location.search, clearAll])
+  return null
+}
+
 export function ToastProvider(props) {
   const { children } = props
   const [toasts, setToasts] = useState([])
+  const timersRef = useRef(new Map())
+  const durationMsRef = useRef(getNotificationDisplayDurationMs())
+
+  useEffect(() => {
+    durationMsRef.current = getNotificationDisplayDurationMs()
+    return subscribeNotificationDisplayDuration(() => {
+      durationMsRef.current = getNotificationDisplayDurationMs()
+    })
+  }, [])
+
+  const clearTimer = useCallback((id) => {
+    const timer = timersRef.current.get(id)
+    if (timer != null) {
+      window.clearTimeout(timer)
+      timersRef.current.delete(id)
+    }
+  }, [])
 
   const dismiss = useCallback((id) => {
+    clearTimer(id)
     setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [clearTimer])
+
+  const clearAll = useCallback(() => {
+    for (const id of timersRef.current.keys()) {
+      window.clearTimeout(timersRef.current.get(id))
+    }
+    timersRef.current.clear()
+    setToasts([])
+  }, [])
+
+  useEffect(() => () => {
+    for (const id of timersRef.current.keys()) {
+      window.clearTimeout(timersRef.current.get(id))
+    }
+    timersRef.current.clear()
   }, [])
 
   const toast = useCallback(
     (options = {}) => {
       const { title, message, type = 'info', duration, position = 'bottom' } = options
-      const autoDuration = duration ?? (type === 'error' && message?.includes('\n') ? 6000 : type === 'warning' && position === 'top' ? 8000 : 3500)
-      const id = crypto.randomUUID?.() ?? String(Date.now())
-      setToasts((prev) => [...prev.slice(-4), { id, title, message, type, position }])
-      if (duration > 0) {
-        setTimeout(() => dismiss(id), autoDuration)
+      const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+      // duration === 0 or negative → no auto-close; undefined → use centralized setting
+      let autoMs
+      if (duration === 0 || duration < 0) {
+        autoMs = 0
+      } else if (typeof duration === 'number' && duration > 0) {
+        autoMs = duration
+      } else {
+        autoMs = durationMsRef.current
       }
+
+      setToasts((prev) => [...prev.slice(-4), { id, title, message, type, position }])
+
+      if (autoMs > 0) {
+        clearTimer(id)
+        const timer = window.setTimeout(() => {
+          timersRef.current.delete(id)
+          setToasts((prev) => prev.filter((t) => t.id !== id))
+        }, autoMs)
+        timersRef.current.set(id, timer)
+      }
+
       return id
     },
-    [dismiss],
+    [clearTimer],
   )
 
   return (
-    <ToastContext.Provider value={{ toast, dismiss }}>
+    <ToastContext.Provider value={{ toast, dismiss, clearAll }}>
+      <ToastRouteCleanup clearAll={clearAll} />
       {children}
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </ToastContext.Provider>

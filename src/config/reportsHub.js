@@ -2,6 +2,7 @@ import { hubSection, withHubTheme } from './hubTheme'
 
 export const reportCards = withHubTheme([
   { title: 'LR / Trip Register', path: '/reports/trips', icon: 'Route', description: 'All LRs — Booking→LR and Direct LR, with stage & profit' },
+  { title: 'LR Movement Report', path: '/reports/lr-movement', icon: 'GitBranch', description: 'LR No-wise journey — loading, dispatch, hub, delivery, POD' },
   { title: 'Loading & Dispatch', path: '/reports/loading-dispatch', icon: 'Package', description: 'Loading sheets and dispatch (both workflows)' },
   { title: 'Hub Transfer', path: '/reports/hub-transfer', icon: 'GitBranch', description: 'Hub manifests and transfer movements' },
   { title: 'Delivery & POD', path: '/reports/delivery-pod', icon: 'PackageCheck', description: 'Delivery complete and proof of delivery' },
@@ -27,6 +28,7 @@ const pick = (...paths) => paths.map((p) => byPath[p]).filter(Boolean)
 export const reportsHubSections = [
   hubSection('Operations reports', 'Booking→LR and Direct LR through delivery', pick(
     '/reports/trips',
+    '/reports/lr-movement',
     '/reports/loading-dispatch',
     '/reports/hub-transfer',
     '/reports/delivery-pod',

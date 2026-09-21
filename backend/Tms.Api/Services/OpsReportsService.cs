@@ -206,6 +206,242 @@ public class OpsReportsService(ReadOnlyTmsDbContext db, ITenantContext tenants, 
         };
     }
 
+    /// <summary>
+    /// LR No-wise movement journey: pages LRs, expands each into chronological event rows.
+    /// Hub-transfer LRs use <c>lr_movements</c>; Direct LRs synthesize from process docs + status history.
+    /// </summary>
+    public async Task<object> LrMovementReportAsync(
+        string? search,
+        string? lrNumber,
+        string? fromDate,
+        string? toDate,
+        string? consignor,
+        string? consignee,
+        string? vehicle,
+        string? driver,
+        string? origin,
+        string? destination,
+        string? status,
+        string? currentLocation,
+        string? movementType,
+        int page,
+        int pageSize,
+        bool includeTotal,
+        CancellationToken ct = default)
+    {
+        var q = Lrs();
+        var from = ParseDate(fromDate);
+        var to = ParseDate(toDate);
+        if (from != null) q = q.Where(l => l.LrDate >= from);
+        if (to != null) q = q.Where(l => l.LrDate <= to);
+
+        if (!string.IsNullOrWhiteSpace(lrNumber))
+        {
+            var n = lrNumber.Trim().ToLower();
+            q = q.Where(l => l.LrNumber.ToLower().Contains(n));
+        }
+        if (!string.IsNullOrWhiteSpace(consignor))
+        {
+            var c = consignor.Trim().ToLower();
+            q = q.Where(l => l.Consignor != null && l.Consignor.ToLower().Contains(c));
+        }
+        if (!string.IsNullOrWhiteSpace(consignee))
+        {
+            var c = consignee.Trim().ToLower();
+            q = q.Where(l => l.Consignee != null && l.Consignee.ToLower().Contains(c));
+        }
+        if (!string.IsNullOrWhiteSpace(vehicle))
+        {
+            var v = vehicle.Trim().ToLower();
+            q = q.Where(l => l.VehicleNumber != null && l.VehicleNumber.ToLower().Contains(v));
+        }
+        if (!string.IsNullOrWhiteSpace(driver))
+        {
+            var d = driver.Trim().ToLower();
+            q = q.Where(l => l.DriverName != null && l.DriverName.ToLower().Contains(d));
+        }
+        if (!string.IsNullOrWhiteSpace(origin))
+        {
+            var o = origin.Trim().ToLower();
+            q = q.Where(l => l.FromCity.ToLower().Contains(o));
+        }
+        if (!string.IsNullOrWhiteSpace(destination))
+        {
+            var dest = destination.Trim().ToLower();
+            q = q.Where(l => l.ToCity.ToLower().Contains(dest));
+        }
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var st = status.Trim();
+            q = q.Where(l => l.Status == st);
+        }
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            q = q.Where(l =>
+                l.LrNumber.ToLower().Contains(s)
+                || (l.VehicleNumber != null && l.VehicleNumber.ToLower().Contains(s))
+                || (l.DriverName != null && l.DriverName.ToLower().Contains(s))
+                || (l.Consignor != null && l.Consignor.ToLower().Contains(s))
+                || (l.Consignee != null && l.Consignee.ToLower().Contains(s))
+                || (l.BookingId != null && l.BookingId.ToLower().Contains(s))
+                || l.FromCity.ToLower().Contains(s)
+                || l.ToCity.ToLower().Contains(s)
+                || l.Status.ToLower().Contains(s));
+        }
+
+        // Movement-type pre-filter via existence of hub movements
+        if (!string.IsNullOrWhiteSpace(movementType))
+        {
+            var mt = movementType.Trim();
+            var hubLr = TenantScope.LrMovements(db, tenants).AsNoTracking()
+                .Where(m => m.MovementType == LrMovementTypes.HubTransfer
+                    || m.MovementType == LrMovementTypes.FinalDelivery)
+                .Select(m => m.LrNumber)
+                .Distinct();
+            if (string.Equals(mt, LrMovementTypes.Direct, StringComparison.OrdinalIgnoreCase))
+                q = q.Where(l => !hubLr.Contains(l.LrNumber));
+            else if (string.Equals(mt, LrMovementTypes.HubTransfer, StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(mt, LrMovementTypes.FinalDelivery, StringComparison.OrdinalIgnoreCase))
+                q = q.Where(l => hubLr.Contains(l.LrNumber));
+        }
+
+        q = q.OrderByDescending(l => l.LrDate).ThenByDescending(l => l.LrNumber);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize, QueryExtensions.ReportMaxPageSize);
+        var (list, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal, ct);
+
+        var lrNos = list.Select(l => l.LrNumber).ToList();
+        if (lrNos.Count == 0)
+        {
+            return new
+            {
+                items = Array.Empty<object>(),
+                total,
+                page = p,
+                pageSize = size,
+                hasMore,
+                totalIsApproximate = approx,
+                summary = new { lrCount = total, eventCount = 0, hubCount = 0, directCount = 0 },
+            };
+        }
+
+        var loadings = await tenants.Filter(db.LrLoadingSheets.AsNoTracking())
+            .Where(s => lrNos.Contains(s.LrNumber))
+            .ToListAsync(ct);
+        var loadByLr = loadings
+            .GroupBy(s => s.LrNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.LoadingAt).First(), StringComparer.OrdinalIgnoreCase);
+
+        var passes = await tenants.Filter(db.LrTransitPasses.AsNoTracking())
+            .Where(t => lrNos.Contains(t.LrNumber))
+            .ToListAsync(ct);
+        var passByLr = passes
+            .GroupBy(t => t.LrNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.IssueDate).First(), StringComparer.OrdinalIgnoreCase);
+
+        var deliveries = await tenants.Filter(db.LrDeliverySheets.AsNoTracking())
+            .Where(d => lrNos.Contains(d.LrNumber))
+            .ToListAsync(ct);
+        var delByLr = deliveries
+            .GroupBy(d => d.LrNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.UpdatedAt).First(), StringComparer.OrdinalIgnoreCase);
+
+        var movements = await TenantScope.LrMovements(db, tenants).AsNoTracking()
+            .Where(m => lrNos.Contains(m.LrNumber))
+            .ToListAsync(ct);
+        var movByLr = movements
+            .GroupBy(m => m.LrNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<LrMovement>)g.OrderBy(x => x.MovementNo).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var histories = await tenants.Filter(db.LrStatusHistories.AsNoTracking())
+            .Where(h => lrNos.Contains(h.LrNumber))
+            .ToListAsync(ct);
+        var histByLr = histories
+            .GroupBy(h => h.LrNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<LrStatusHistory>)g.OrderBy(x => x.ChangedAt).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var locFilter = currentLocation?.Trim();
+        var eventRows = new List<object>();
+        var hubCount = 0;
+        var directCount = 0;
+
+        foreach (var lr in list)
+        {
+            movByLr.TryGetValue(lr.LrNumber, out var movs);
+            movs ??= Array.Empty<LrMovement>();
+            loadByLr.TryGetValue(lr.LrNumber, out var loading);
+            passByLr.TryGetValue(lr.LrNumber, out var transit);
+            delByLr.TryGetValue(lr.LrNumber, out var delivery);
+            histByLr.TryGetValue(lr.LrNumber, out var hist);
+            hist ??= Array.Empty<LrStatusHistory>();
+
+            var type = LrMovementReportBuilder.ResolveMovementType(movs);
+            if (type == LrMovementTypes.Direct) directCount++;
+            else hubCount++;
+
+            var events = LrMovementReportBuilder.BuildEvents(lr, loading, transit, delivery, movs, hist);
+            if (!string.IsNullOrWhiteSpace(locFilter))
+            {
+                var lf = locFilter.ToLowerInvariant();
+                events = events
+                    .Where(e => (e.CurrentLocation != null && e.CurrentLocation.ToLowerInvariant().Contains(lf))
+                        || (e.FromLocation != null && e.FromLocation.ToLowerInvariant().Contains(lf))
+                        || (e.ToLocation != null && e.ToLocation.ToLowerInvariant().Contains(lf)))
+                    .ToList();
+                if (events.Count == 0) continue;
+            }
+
+            foreach (var e in events)
+            {
+                eventRows.Add(new
+                {
+                    lrNumber = e.LrNumber,
+                    lr = e.LrNumber,
+                    lrDate = e.LrDate,
+                    date = e.LrDate,
+                    bookingNo = e.BookingNo,
+                    bookingId = e.BookingNo,
+                    vehicleNo = e.VehicleNo,
+                    vehicle = e.VehicleNo,
+                    driver = e.Driver,
+                    consignor = e.Consignor,
+                    consignee = e.Consignee,
+                    origin = e.Origin,
+                    destination = e.Destination,
+                    movementType = e.MovementType,
+                    fromLocation = e.FromLocation,
+                    toLocation = e.ToLocation,
+                    eventName = e.Event,
+                    @event = e.Event,
+                    status = e.Status,
+                    stage = FlowStage(e.Status),
+                    eventDate = e.EventDate,
+                    eventTime = e.EventTime,
+                    currentLocation = e.CurrentLocation,
+                    remarks = e.Remarks,
+                    sortAt = e.SortAt,
+                });
+            }
+        }
+
+        return new
+        {
+            items = eventRows,
+            total,
+            page = p,
+            pageSize = size,
+            hasMore,
+            totalIsApproximate = approx,
+            summary = new
+            {
+                lrCount = total,
+                eventCount = eventRows.Count,
+                hubCount,
+                directCount,
+            },
+        };
+    }
+
     public async Task<object> LoadingDispatchAsync(
         string? search, string? fromDate, string? toDate, string? workflow,
         int page, int pageSize, bool includeTotal, CancellationToken ct = default)

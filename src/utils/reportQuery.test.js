@@ -33,5 +33,29 @@ describe('reportQuery', () => {
     expect(filters.vehicle).toBe('')
     expect(filters.hubBranchId).toBe('')
     expect(filters.workflow).toBe('')
+    expect(filters.lrNumber).toBe('')
+    expect(filters.movementType).toBe('')
+  })
+
+  it('maps movement filter fields', () => {
+    expect(toReportQuery({
+      lrNumber: 'LR-1',
+      consignor: 'A',
+      consignee: 'B',
+      driver: 'D',
+      origin: 'Pune',
+      destination: 'Mumbai',
+      currentLocation: 'Hub',
+      movementType: 'HubTransfer',
+    })).toEqual({
+      lrNumber: 'LR-1',
+      consignor: 'A',
+      consignee: 'B',
+      driver: 'D',
+      origin: 'Pune',
+      destination: 'Mumbai',
+      currentLocation: 'Hub',
+      movementType: 'HubTransfer',
+    })
   })
 })

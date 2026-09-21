@@ -515,6 +515,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
 
         // Reports hub
         Add("/reports/trips", "LR / Trip Register", "Reports hub");
+        Add("/reports/lr-movement", "LR Movement Report", "Reports hub");
         Add("/reports/loading-dispatch", "Loading & Dispatch", "Reports hub");
         Add("/reports/hub-transfer", "Hub Transfer Report", "Reports hub");
         Add("/reports/delivery-pod", "Delivery & POD", "Reports hub");

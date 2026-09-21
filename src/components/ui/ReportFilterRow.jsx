@@ -8,6 +8,7 @@ import {
   DELIVERY_POD_STATUSES,
   HUB_MANIFEST_STATUSES,
   LR_REPORT_STATUSES,
+  MOVEMENT_TYPE_OPTIONS,
   WORKFLOW_OPTIONS,
 } from '../../utils/reportQuery'
 
@@ -22,6 +23,14 @@ function emptyFilters() {
     vehicle: '',
     hubBranchId: '',
     workflow: '',
+    lrNumber: '',
+    consignor: '',
+    consignee: '',
+    driver: '',
+    origin: '',
+    destination: '',
+    currentLocation: '',
+    movementType: '',
   }
 }
 
@@ -43,6 +52,14 @@ function countActiveFilters(v = {}) {
   if (v.vehicle) n += 1
   if (v.hubBranchId) n += 1
   if (v.workflow) n += 1
+  if (v.lrNumber) n += 1
+  if (v.consignor) n += 1
+  if (v.consignee) n += 1
+  if (v.driver) n += 1
+  if (v.origin) n += 1
+  if (v.destination) n += 1
+  if (v.currentLocation) n += 1
+  if (v.movementType) n += 1
   return n
 }
 
@@ -57,6 +74,11 @@ function summarizeFilters(v = {}) {
     parts.push(label)
   }
   if (v.vehicle) parts.push(v.vehicle)
+  if (v.lrNumber) parts.push(v.lrNumber)
+  if (v.movementType) {
+    const label = MOVEMENT_TYPE_OPTIONS.find((o) => o.value === v.movementType)?.label ?? v.movementType
+    parts.push(label)
+  }
   return parts.join(' · ')
 }
 
@@ -72,6 +94,7 @@ export default function ReportFilterRow({
   showVehicle,
   showHub,
   showWorkflow,
+  showMovementFilters,
   statusOptions,
   inline: _inline = false,
   value,
@@ -254,6 +277,61 @@ export default function ReportFilterRow({
               onChange={(e) => set({ vendorId: e.target.value })}
               options={vendorOptions}
             />
+          )}
+          {showMovementFilters && (
+            <>
+              <Input
+                label="LR No"
+                placeholder="LR number"
+                value={draft.lrNumber ?? ''}
+                onChange={(e) => set({ lrNumber: e.target.value })}
+              />
+              <Input
+                label="Consignor"
+                placeholder="Consignor"
+                value={draft.consignor ?? ''}
+                onChange={(e) => set({ consignor: e.target.value })}
+              />
+              <Input
+                label="Consignee"
+                placeholder="Consignee"
+                value={draft.consignee ?? ''}
+                onChange={(e) => set({ consignee: e.target.value })}
+              />
+              <Input
+                label="Driver"
+                placeholder="Driver name"
+                value={draft.driver ?? ''}
+                onChange={(e) => set({ driver: e.target.value })}
+              />
+              <Input
+                label="Origin"
+                placeholder="From city"
+                value={draft.origin ?? ''}
+                onChange={(e) => set({ origin: e.target.value })}
+              />
+              <Input
+                label="Destination"
+                placeholder="To city"
+                value={draft.destination ?? ''}
+                onChange={(e) => set({ destination: e.target.value })}
+              />
+              <Input
+                label="Current Location"
+                placeholder="Hub / en route"
+                value={draft.currentLocation ?? ''}
+                onChange={(e) => set({ currentLocation: e.target.value })}
+              />
+              <Select
+                label="Movement Type"
+                value={draft.movementType ?? ''}
+                onChange={(e) => set({ movementType: e.target.value })}
+                options={[
+                  { value: '', label: '(All types)' },
+                  ...MOVEMENT_TYPE_OPTIONS,
+                ]}
+              />
+            </>
           )}
         </div>
       </SlideDrawer>

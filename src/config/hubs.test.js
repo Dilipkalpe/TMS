@@ -63,6 +63,7 @@ describe('hub navigation config', () => {
 
   it('reports hub includes cash flow report', () => {
     expect(reportCards.some((c) => c.path === '/reports/cash-flow')).toBe(true)
+    expect(reportCards.some((c) => c.path === '/reports/lr-movement')).toBe(true)
     expect(reportCards.some((c) => c.path === '/reports/loading-dispatch')).toBe(true)
     expect(reportCards.some((c) => c.path === '/reports/hub-transfer')).toBe(true)
     expect(reportCards.some((c) => c.path === '/reports/delivery-pod')).toBe(true)

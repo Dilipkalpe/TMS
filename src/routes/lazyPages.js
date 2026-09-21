@@ -105,6 +105,7 @@ export const GSTReports = lazy(() => import('../pages/accounting/GSTReports'))
 
 export const ReportsHub = lazy(() => import('../pages/reports/ReportsHub'))
 export const TripReport = lazy(() => import('../pages/reports/TripReport'))
+export const LrMovementReport = lazy(() => import('../pages/reports/LrMovementReport'))
 export const LoadingDispatchReport = lazy(() => import('../pages/reports/LoadingDispatchReport'))
 export const HubTransferReport = lazy(() => import('../pages/reports/HubTransferReport'))
 export const DeliveryPodReport = lazy(() => import('../pages/reports/DeliveryPodReport'))

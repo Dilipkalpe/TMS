@@ -464,6 +464,7 @@ export const importApi = {
 
 export const reportsApi = {
   trips: (params = {}) => apiRequest(`/reports/trips?${queryString(params)}`),
+  lrMovement: (params = {}) => apiRequest(`/reports/lr-movement?${queryString(params)}`),
   loadingDispatch: (params = {}) => apiRequest(`/reports/loading-dispatch?${queryString(params)}`),
   hubTransfer: (params = {}) => apiRequest(`/reports/hub-transfer?${queryString(params)}`),
   deliveryPod: (params = {}) => apiRequest(`/reports/delivery-pod?${queryString(params)}`),

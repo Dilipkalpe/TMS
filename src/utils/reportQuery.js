@@ -15,6 +15,14 @@ export function toReportQuery(filters = {}) {
   if (filters.vehicle) q.vehicle = filters.vehicle
   if (filters.hubBranchId) q.hubBranchId = filters.hubBranchId
   if (filters.workflow) q.workflow = filters.workflow
+  if (filters.lrNumber) q.lrNumber = filters.lrNumber
+  if (filters.consignor) q.consignor = filters.consignor
+  if (filters.consignee) q.consignee = filters.consignee
+  if (filters.driver) q.driver = filters.driver
+  if (filters.origin) q.origin = filters.origin
+  if (filters.destination) q.destination = filters.destination
+  if (filters.currentLocation) q.currentLocation = filters.currentLocation
+  if (filters.movementType) q.movementType = filters.movementType
   return q
 }
 
@@ -30,6 +38,14 @@ export function defaultReportFilters() {
     vehicle: '',
     hubBranchId: '',
     workflow: '',
+    lrNumber: '',
+    consignor: '',
+    consignee: '',
+    driver: '',
+    origin: '',
+    destination: '',
+    currentLocation: '',
+    movementType: '',
   }
 }
 
@@ -68,4 +84,10 @@ export const DELIVERY_POD_STATUSES = [
   'POD Uploaded',
   'Invoice Generated',
   'Closed',
+]
+
+export const MOVEMENT_TYPE_OPTIONS = [
+  { value: 'Direct', label: 'Direct' },
+  { value: 'HubTransfer', label: 'Hub Transfer' },
+  { value: 'FinalDelivery', label: 'Final Delivery' },
 ]

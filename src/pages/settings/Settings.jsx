@@ -12,6 +12,12 @@ import { useToast } from '../../context/ToastContext'
 import { getStoredPrintLogoUrl, resolveCompanyLogoUrl } from '../../utils/printLogo'
 import { Save, Download, Shield, Loader2, Upload, X, ImageIcon, GitBranch, Building2 } from 'lucide-react'
 import { DOCUMENT_FLOW, DOCUMENT_FLOW_LABELS } from '../../hooks/useDocumentFlow'
+import {
+  DEFAULT_NOTIFICATION_DISPLAY_DURATION_SECONDS,
+  NOTIFICATION_DISPLAY_DURATION_OPTIONS,
+  getNotificationDisplayDurationSeconds,
+  setNotificationDisplayDurationSeconds,
+} from '../../config/notificationUiSettings'
 
 export default function Settings() {
   const { theme, setTheme } = useTheme()
@@ -20,6 +26,7 @@ export default function Settings() {
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [notificationDuration, setNotificationDuration] = useState(DEFAULT_NOTIFICATION_DISPLAY_DURATION_SECONDS)
 
   const [uploadingLogo, setUploadingLogo] = useState(false)
 
@@ -28,6 +35,7 @@ export default function Settings() {
       .then((s) => setSettings({ ...s, printLogoUrl: s.logoUrl || getStoredPrintLogoUrl() }))
       .catch(() => setSettings({ printLogoUrl: getStoredPrintLogoUrl() }))
       .finally(() => setLoading(false))
+    setNotificationDuration(getNotificationDisplayDurationSeconds())
   }, [])
 
   const update = (key, value) => setSettings((s) => ({ ...s, [key]: value }))
@@ -279,6 +287,59 @@ export default function Settings() {
       id: 'keyboard',
       label: 'Keyboard',
       content: <TallyModeToggle />,
+    },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      content: (
+        <div className="max-w-lg space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Popup display duration</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              How long success, error, warning, and info popups stay visible before auto-closing.
+              You can still close them manually with the X button.
+            </p>
+          </div>
+          <Select
+            label="Notification Display Duration (Seconds)"
+            value={String(notificationDuration)}
+            onChange={(e) => setNotificationDuration(Number(e.target.value))}
+            options={NOTIFICATION_DISPLAY_DURATION_OPTIONS.map((s) => ({
+              value: String(s),
+              label: `${s} second${s === 1 ? '' : 's'}`,
+            }))}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              icon={saving ? Loader2 : Save}
+              disabled={saving}
+              onClick={() => {
+                try {
+                  const saved = setNotificationDisplayDurationSeconds(notificationDuration)
+                  setNotificationDuration(saved)
+                  toast({ title: 'Saved', message: `Popups will auto-close after ${saved} second${saved === 1 ? '' : 's'}.`, type: 'success' })
+                } catch (err) {
+                  toast({ title: 'Invalid value', message: err.message, type: 'error' })
+                }
+              }}
+            >
+              Save Notification Duration
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                toast({
+                  title: 'Preview',
+                  message: `This popup uses the current setting (${getNotificationDisplayDurationSeconds()}s).`,
+                  type: 'info',
+                })
+              }}
+            >
+              Preview popup
+            </Button>
+          </div>
+        </div>
+      ),
     },
     {
       id: 'theme',

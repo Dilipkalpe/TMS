@@ -583,6 +583,30 @@ public class ReportsController(OpsReportsService reports, ReadOnlyTmsDbContext d
         CancellationToken ct = default) =>
         Ok(await reports.LrRegisterAsync(search, fromDate, toDate, status, vehicle, workflow, page, pageSize, includeTotal, ct));
 
+    [HttpGet("lr-movement")]
+    public async Task<ActionResult<object>> LrMovement(
+        [FromQuery] string? search,
+        [FromQuery] string? lrNumber,
+        [FromQuery] string? fromDate,
+        [FromQuery] string? toDate,
+        [FromQuery] string? consignor,
+        [FromQuery] string? consignee,
+        [FromQuery] string? vehicle,
+        [FromQuery] string? driver,
+        [FromQuery] string? origin,
+        [FromQuery] string? destination,
+        [FromQuery] string? status,
+        [FromQuery] string? currentLocation,
+        [FromQuery] string? movementType,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true,
+        CancellationToken ct = default) =>
+        Ok(await reports.LrMovementReportAsync(
+            search, lrNumber, fromDate, toDate, consignor, consignee, vehicle, driver,
+            origin, destination, status, currentLocation, movementType,
+            page, pageSize, includeTotal, ct));
+
     [HttpGet("loading-dispatch")]
     public async Task<ActionResult<object>> LoadingDispatch(
         [FromQuery] string? search,
