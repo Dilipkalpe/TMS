@@ -3,6 +3,7 @@ export const addRecordRoutes = {
   bookings: '/bookings/new',
   lr: '/lr/entry',
   vehicles: '/vehicles/new',
+  drivers: '/drivers/new',
   employees: '/hr/employees/new',
   customers: '/customers/new',
   consignors: '/consignors/new',

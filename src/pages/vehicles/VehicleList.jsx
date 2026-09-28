@@ -9,6 +9,17 @@ import { useToast } from '../../context/ToastContext'
 import { importTemplates } from '../../config/importTemplates'
 import { withAuditColumns } from '../../utils/auditColumns'
 
+function formatAge(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function trackingVariant(status) {
+  if (status === 'Tracking Active') return 'success'
+  if (status === 'Location Stale') return 'warning'
+  return 'default'
+}
+
 export default function VehicleList() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -19,11 +30,16 @@ export default function VehicleList() {
   )
 
   const columns = withAuditColumns([
-    { key: 'number', label: 'Vehicle No.' },
-    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
+    { key: 'number', label: 'Vehicle' },
+    { key: 'currentDriverName', label: 'Driver', render: (r) => r.currentDriverName || '—' },
+    { key: 'currentLocation', label: 'Current Location', render: (r) => r.currentLocation || '—' },
+    { key: 'locationUpdatedAt', label: 'Last Updated', render: (r) => formatAge(r.locationUpdatedAt) },
+    {
+      key: 'trackingStatus',
+      label: 'Tracking',
+      render: (r) => <Badge variant={trackingVariant(r.trackingStatus)}>{r.trackingStatus || 'Not Started'}</Badge>,
+    },
     { key: 'type', label: 'Type' },
-    { key: 'model', label: 'Model' },
-    { key: 'capacity', label: 'Capacity' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
     { key: 'trips', label: 'Trips' },
     { key: 'revenue', label: 'Revenue', render: (r) => formatCurrency(r.revenue) },
@@ -33,7 +49,7 @@ export default function VehicleList() {
     <ERPListPage
       onAdd={() => navigate(addRecordRoutes.vehicles)}
       module="Vehicles"
-      title="Vehicle Management"
+      title="Vehicle Master"
       statusCards={[{ label: 'Total Fleet', color: 'blue', icon: 'Layers', count: paged.total }]}
       searchPlaceholder="Vehicle no., type, model..."
       filterOptions={['(All)', 'Active', 'Maintenance']}

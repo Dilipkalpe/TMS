@@ -8,6 +8,18 @@ import { driversApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
 
+function formatAge(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function trackingVariant(status) {
+  if (status === 'Tracking Active') return 'success'
+  if (status === 'Location Stale') return 'warning'
+  return 'default'
+}
+
 export default function DriverList() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -18,22 +30,35 @@ export default function DriverList() {
   )
 
   const columns = withAuditColumns([
-    { key: 'name', label: 'Name' },
-    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
-    { key: 'license', label: 'License No.' },
-    { key: 'phone', label: 'Contact' },
-    { key: 'salary', label: 'Salary', render: (r) => formatCurrency(r.salary) },
-    { key: 'advance', label: 'Advance', render: (r) => formatCurrency(r.advance) },
+    { key: 'id', label: 'Driver ID' },
+    { key: 'name', label: 'Driver' },
+    { key: 'phone', label: 'Mobile' },
+    {
+      key: 'driverAppStatus',
+      label: 'App Access',
+      render: (r) => (
+        <Badge variant={r.portalEnabled ? 'success' : 'default'}>
+          {r.driverAppStatus || (r.portalEnabled ? 'Enabled' : 'Disabled')}
+        </Badge>
+      ),
+    },
+    { key: 'currentVehicleNumber', label: 'Vehicle', render: (r) => r.currentVehicleNumber || '—' },
+    { key: 'currentLocation', label: 'Current Location', render: (r) => r.currentLocation || '—' },
+    { key: 'locationUpdatedAt', label: 'Last Updated', render: (r) => formatAge(r.locationUpdatedAt) },
+    {
+      key: 'trackingStatus',
+      label: 'Tracking',
+      render: (r) => <Badge variant={trackingVariant(r.trackingStatus)}>{r.trackingStatus || 'Not Started'}</Badge>,
+    },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-    { key: 'trips', label: 'Trips' },
-    { key: 'rating', label: 'Rating', render: (r) => `⭐ ${r.rating}` },
+    { key: 'salary', label: 'Salary', render: (r) => formatCurrency(r.salary) },
   ])
 
   return (
     <ERPListPage
       onAdd={() => navigate(addRecordRoutes.drivers)}
       module="Drivers"
-      title="Driver Management"
+      title="Driver Master"
       statusCards={[{ label: 'Total Drivers', color: 'blue', icon: 'Users', count: paged.total }]}
       searchPlaceholder="Name, license, phone..."
       filterOptions={['(All)', 'Active', 'On Leave']}

@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react'
 import LocalSearchSelect from './LocalSearchSelect'
 
+/** Shared control chrome for text and number inputs — appearance is identical. */
+export const INPUT_CONTROL_CLASS =
+  'w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500'
+
+export const INPUT_CONTROL_OK_CLASS =
+  'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700'
+
+export const INPUT_CONTROL_ERROR_CLASS =
+  'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-red-500'
+
 export default function Input({ label, error, className = '', ...props }) {
   return (
     <div className={className}>
@@ -10,12 +20,8 @@ export default function Input({ label, error, className = '', ...props }) {
         </label>
       )}
       <input
-        className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 ${
-          error
-            ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-red-500'
-            : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700'
-        }`}
         {...props}
+        className={`${INPUT_CONTROL_CLASS} ${error ? INPUT_CONTROL_ERROR_CLASS : INPUT_CONTROL_OK_CLASS}`}
       />
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>

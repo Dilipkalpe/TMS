@@ -24,6 +24,9 @@ export const VehicleList = lazy(() => import('../pages/vehicles/VehicleList'))
 export const VehicleDetails = lazy(() => import('../pages/vehicles/VehicleDetails'))
 export const NewVehicle = lazy(() => import('../pages/vehicles/NewVehicle'))
 export const EditVehicle = lazy(() => import('../pages/vehicles/EditVehicle'))
+export const DriverList = lazy(() => import('../pages/drivers/DriverList'))
+export const DriverDetails = lazy(() => import('../pages/drivers/DriverDetails'))
+export const NewDriver = lazy(() => import('../pages/drivers/NewDriver'))
 export const CustomerList = lazy(() => import('../pages/customers/CustomerList'))
 export const CustomerDetails = lazy(() => import('../pages/customers/CustomerDetails'))
 export const NewCustomer = lazy(() => import('../pages/customers/NewCustomer'))
@@ -73,6 +76,11 @@ export const PortalTrackPage = lazy(() => import('../pages/portal/PortalTrackPag
 export const PortalInvoices = lazy(() => import('../pages/portal/PortalInvoices'))
 export const PortalInvoiceView = lazy(() => import('../pages/portal/PortalInvoiceView'))
 export const PortalPublicTrack = lazy(() => import('../pages/portal/PortalPublicTrack'))
+
+// Driver Web Portal (browser GPS / PWA-ready)
+export const DriverLogin = lazy(() => import('../pages/driver/DriverLogin'))
+export const DriverTripPage = lazy(() => import('../pages/driver/DriverTripPage'))
+export const DriverPortalUsersPage = lazy(() => import('../pages/settings/DriverPortalUsersPage'))
 
 // Heavy modules — code-split to reduce initial bundle on low-resource VPS clients
 export const AccountingHub = lazy(() => import('../pages/accounting/AccountingHub'))

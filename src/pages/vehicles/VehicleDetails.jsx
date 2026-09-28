@@ -93,9 +93,24 @@ export default function VehicleDetails() {
     { label: 'Model', value: vehicle.model },
     { label: 'Capacity', value: vehicle.capacity },
     { label: 'Owner', value: vehicle.owner },
+    { label: 'Current Driver', value: vehicle.currentDriverName },
+    { label: 'Current Trip', value: vehicle.currentTripNo },
+    { label: 'Current Location', value: vehicle.currentLocation },
+    { label: 'Tracking', value: vehicle.trackingStatus },
     { label: 'Total Trips', value: vehicle.trips },
     { label: 'Revenue', value: formatCurrency(vehicle.revenue) },
     ...compliance.map((f) => ({ label: f.label, value: f.value ?? '—' })),
+  ]
+
+  const locationFields = [
+    { label: 'Current Driver', value: vehicle.currentDriverName || '—' },
+    { label: 'Current Trip', value: vehicle.currentTripNo || '—' },
+    { label: 'Loading Slip', value: vehicle.currentLoadingSlipNumber || '—' },
+    { label: 'Current Location', value: vehicle.currentLocation || '—' },
+    { label: 'Latitude', value: vehicle.latitude != null ? Number(vehicle.latitude).toFixed(6) : '—' },
+    { label: 'Longitude', value: vehicle.longitude != null ? Number(vehicle.longitude).toFixed(6) : '—' },
+    { label: 'Location Updated At', value: vehicle.locationUpdatedAt ? new Date(vehicle.locationUpdatedAt).toLocaleString() : '—' },
+    { label: 'Tracking Status', value: vehicle.trackingStatus || 'Not Started' },
   ]
 
   const tabs = [
@@ -118,6 +133,35 @@ export default function VehicleDetails() {
               <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">{f.value}</p>
             </div>
           ))}
+        </div>
+      ),
+    },
+    {
+      id: 'location',
+      label: 'Current Location',
+      content: (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {locationFields.map((f) => (
+              <div key={f.label}>
+                <p className="text-xs font-medium uppercase text-slate-500">{f.label}</p>
+                <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">{f.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {vehicle.currentDriverId && (
+              <Link to={`/drivers/${vehicle.currentDriverId}`} className="text-sm text-primary hover:underline">
+                Open driver →
+              </Link>
+            )}
+            <Link to={`/operations/gps/vehicles/${id}`} className="text-sm text-primary hover:underline">
+              Map & location history →
+            </Link>
+            <Link to="/operations/gps" className="text-sm text-primary hover:underline">
+              Live Vehicle Tracking →
+            </Link>
+          </div>
         </div>
       ),
     },
@@ -151,6 +195,9 @@ export default function VehicleDetails() {
           <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/vehicles')}>Back</Button>
           <div className="flex items-center gap-2">
             <Badge variant={statusVariant(vehicle.status)}>{vehicle.status}</Badge>
+            <Badge variant={vehicle.trackingStatus === 'Tracking Active' ? 'success' : vehicle.trackingStatus === 'Location Stale' ? 'warning' : 'default'}>
+              {vehicle.trackingStatus || 'Not Started'}
+            </Badge>
             <Button variant="outline" icon={Pencil} onClick={() => navigate(`/vehicles/${id}/edit`)}>Edit</Button>
             <PrintButton title="Vehicle Profile" subtitle={vehicle.number} fields={printFields} />
           </div>

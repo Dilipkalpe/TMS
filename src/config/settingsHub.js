@@ -7,6 +7,7 @@ export const settingsCards = withHubTheme([
   { title: 'Staff users', path: '/settings/users', icon: 'Users', description: 'Staff accounts, User Role Type, and branch access' },
   { title: 'User role types', path: '/settings/role-menus', icon: 'Shield', description: 'Provision role types and show/hide menus per User Role Type' },
   { title: 'Portal user access', path: '/settings/portal-users', icon: 'UserCircle', description: 'Customer portal login and permissions' },
+  { title: 'Driver portal access', path: '/settings/driver-portal-users', icon: 'Truck', description: 'Driver mobile web portal login (phone + PIN) for browser GPS' },
   { title: 'Branch locations', path: '/settings/branches', icon: 'GitBranch', description: 'Branch master and isolation settings' },
   { title: 'Document numbering', path: '/settings/document-numbering', icon: 'Hash', description: 'Number series for LR, invoices, and vouchers' },
   { title: 'Field configuration', path: '/settings/field-configuration', icon: 'SlidersHorizontal', description: 'Show/hide, require, and rename Booking & LR form fields' },
@@ -29,6 +30,7 @@ export const settingsHubSections = [
     '/settings/users',
     '/settings/role-menus',
     '/settings/portal-users',
+    '/settings/driver-portal-users',
     '/settings/branches',
   ), { chip: 'Access' }),
   hubSection('Channels & data', 'Notifications and cleanup tools', pick(

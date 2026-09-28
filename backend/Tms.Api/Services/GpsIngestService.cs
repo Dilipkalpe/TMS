@@ -6,7 +6,8 @@ namespace Tms.Api.Services;
 
 public record GpsIngestRequest(
     string VehicleId, decimal Lat, decimal Lng, decimal? SpeedKmh, decimal? Heading,
-    Guid? TripId, DateTime? RecordedAt, decimal? AccuracyMeters, string? Source);
+    Guid? TripId, DateTime? RecordedAt, decimal? AccuracyMeters, string? Source,
+    string? DriverId = null, Guid? LoadingSlipId = null, string? TrackingStatus = null);
 
 public record GpsIngestResult(Guid TrackId, string VehicleId, List<GeofenceEventDto> GeofenceEvents);
 
@@ -43,6 +44,8 @@ public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenant
             Id = Guid.NewGuid(),
             VehicleId = req.VehicleId,
             TripId = req.TripId,
+            DriverId = req.DriverId,
+            LoadingSlipId = req.LoadingSlipId,
             Lat = req.Lat,
             Lng = req.Lng,
             SpeedKmh = req.SpeedKmh,
@@ -54,6 +57,7 @@ public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenant
         };
         db.GpsTracks.Add(track);
 
+        var trackingStatus = string.IsNullOrWhiteSpace(req.TrackingStatus) ? "ACTIVE" : req.TrackingStatus;
         var lastPos = await db.VehicleLastPositions.FindAsync([req.VehicleId], ct);
         if (lastPos == null)
         {
@@ -65,6 +69,10 @@ public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenant
                 SpeedKmh = req.SpeedKmh,
                 Heading = req.Heading,
                 TripId = req.TripId,
+                DriverId = req.DriverId,
+                LoadingSlipId = req.LoadingSlipId,
+                TrackingStatus = trackingStatus,
+                AccuracyMeters = req.AccuracyMeters,
                 Source = track.Source,
                 RecordedAt = recordedAt,
                 UpdatedAt = now,
@@ -79,6 +87,10 @@ public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenant
                 lastPos.SpeedKmh = req.SpeedKmh;
                 lastPos.Heading = req.Heading;
                 lastPos.TripId = req.TripId;
+                if (req.DriverId != null) lastPos.DriverId = req.DriverId;
+                if (req.LoadingSlipId != null) lastPos.LoadingSlipId = req.LoadingSlipId;
+                lastPos.TrackingStatus = trackingStatus;
+                lastPos.AccuracyMeters = req.AccuracyMeters;
                 lastPos.Source = track.Source;
                 lastPos.RecordedAt = recordedAt;
                 lastPos.UpdatedAt = now;

@@ -159,6 +159,9 @@ public class Driver : IBranchScoped, IAuditable
     public string Status { get; set; } = "Active";
     public int Trips { get; set; }
     public decimal Rating { get; set; }
+    public bool PortalEnabled { get; set; }
+    public string? PortalPinHash { get; set; }
+    public string? PortalPhone { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }

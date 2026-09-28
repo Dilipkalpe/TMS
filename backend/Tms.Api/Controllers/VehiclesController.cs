@@ -11,7 +11,11 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class VehiclesController(TmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
+public class VehiclesController(
+    TmsDbContext db,
+    IBranchContext branches,
+    ITenantContext tenants,
+    MasterLiveLocationService liveLocations) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<VehicleDto>>> GetAll(
@@ -28,8 +32,10 @@ public class VehiclesController(TmsDbContext db, IBranchContext branches, ITenan
         q = q.OrderBy(v => v.Number);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var live = await liveLocations.ForVehiclesAsync(items.Select(v => v.Id).ToList());
         return Ok(new PagedResult<VehicleDto>(
-            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+            items.Select(v => EntityMappers.ToDto(v, live.GetValueOrDefault(v.Id))).ToList(),
+            total, p, size, hasMore, approx));
     }
 
     [HttpGet("{id}")]
@@ -37,7 +43,8 @@ public class VehiclesController(TmsDbContext db, IBranchContext branches, ITenan
     {
         var v = await db.Vehicles.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (v == null || !TenantScope.CanAccessBranchEntity(tenants, branches, v)) return NotFound();
-        return Ok(EntityMappers.ToDto(v));
+        var live = await liveLocations.ForVehiclesAsync([id]);
+        return Ok(EntityMappers.ToDto(v, live.GetValueOrDefault(id)));
     }
 
     [HttpPost]

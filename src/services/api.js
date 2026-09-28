@@ -737,6 +737,79 @@ export const portalApi = {
     apiRequest(`/customers/${customerId}/portal`, { method: 'PUT', body: data }),
 }
 
+const DRIVER_TOKEN_KEY = 'tms-driver-token'
+
+export function getDriverToken() {
+  return localStorage.getItem(DRIVER_TOKEN_KEY)
+}
+
+export function setDriverToken(token) {
+  if (token) localStorage.setItem(DRIVER_TOKEN_KEY, token)
+  else localStorage.removeItem(DRIVER_TOKEN_KEY)
+}
+
+export async function driverRequest(path, options = {}) {
+  const { method = 'GET', body, auth = true } = options
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json' }
+  if (auth) {
+    const token = getDriverToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers,
+    body: body != null ? JSON.stringify(sanitizeApiBody(body)) : undefined,
+  })
+
+  if (res.status === 401) {
+    if (auth && getDriverToken()) {
+      setDriverToken(null)
+      window.dispatchEvent(new CustomEvent('tms-driver-unauthorized'))
+    }
+    let message = 'Session expired. Please sign in again.'
+    if (!auth) {
+      try {
+        const err = await res.json()
+        message = formatApiErrorBody(err) || err.message || err.Message || 'Invalid phone or PIN'
+      } catch {
+        message = 'Invalid phone or PIN'
+      }
+    }
+    throw new ApiError(message, 401)
+  }
+
+  if (!res.ok) {
+    const { message, details } = await readApiError(res, res.statusText)
+    throw new ApiError(message, res.status, details)
+  }
+
+  if (res.status === 204) return null
+  return res.json()
+}
+
+export const driverPortalApi = {
+  login: async (phone, pin) => {
+    const res = await driverRequest('/driver/auth/login', { method: 'POST', body: { phone, pin }, auth: false })
+    setDriverToken(res.token)
+    return res
+  },
+  me: () => driverRequest('/driver/auth/me'),
+  logout: () => setDriverToken(null),
+  getTrip: () => driverRequest('/driver/trip'),
+  startTrip: (sessionId) => driverRequest(`/driver/trip/${sessionId}/start`, { method: 'POST', body: {} }),
+  updateStatus: (sessionId, status) =>
+    driverRequest(`/driver/trip/${sessionId}/status`, { method: 'PATCH', body: { status } }),
+  submitLocation: (data) => driverRequest('/driver/location', { method: 'POST', body: data }),
+  currentLocation: (sessionId) => driverRequest(`/driver/location/current?sessionId=${sessionId}`),
+  locationHistory: (sessionId, params = {}) =>
+    driverRequest(`/driver/location/history?sessionId=${sessionId}&${new URLSearchParams(params)}`),
+  setDriverPortal: (driverId, data) =>
+    apiRequest(`/drivers/${driverId}/portal`, { method: 'PUT', body: data }),
+  portalAccessList: (params = {}) =>
+    apiRequest(`/drivers/portal-access/list?${new URLSearchParams(params)}`),
+}
+
 export const shipmentsApi = {
   list: () => apiRequest('/shipments'),
   track: (id) => apiRequest(`/shipments/${id}/track`),

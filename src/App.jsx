@@ -11,6 +11,7 @@ import {
   LrDetailPage, LrListPage, LrEntryPage, UltraLrEntryPage,
   BookingManagementLayout, BookingQuotationsTab, BookingPendingTab, BookingConfirmedTab, BookingCancelledTab,
   VehicleList, VehicleDetails, NewVehicle, EditVehicle,
+  DriverList, DriverDetails, NewDriver,
   CustomerList, CustomerDetails, NewCustomer,
   FreightRateList, NewFreightRate, FreightRateDetails,
   QuotationList, NewQuotation, QuotationDetails,
@@ -23,6 +24,7 @@ import {
   BranchesPage, PortalUsersPage, UsersPage, RoleMenusPage, DocumentNumberingPage, FieldConfigurationPage, NotificationSettings, PrintTemplateSettingsPage, LabelTemplatesSettingsPage,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
+  DriverLogin, DriverTripPage, DriverPortalUsersPage,
   AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry,
   LedgerReport, CustomerLedgerReport, VendorLedgerReport, DriverLedgerReport,
   VehicleLedgerReport, CashBook, BankBook, DayBook, JournalRegister,
@@ -50,6 +52,8 @@ import {
 } from './routes/lazyPages'
 import { PortalAuthProvider } from './context/PortalAuthContext'
 import PortalProtectedRoute from './components/portal/PortalProtectedRoute'
+import { DriverAuthProvider } from './context/DriverAuthContext'
+import DriverProtectedRoute from './components/driver/DriverProtectedRoute'
 
 function LrRootRedirect() {
   const { search } = useLocation()
@@ -69,6 +73,8 @@ export default function App() {
         <Route path="invoices" element={<PortalInvoices />} />
         <Route path="invoices/:id" element={<PortalInvoiceView />} />
       </Route>
+      <Route path="/driver/login" element={<DriverAuthProvider><DriverLogin /></DriverAuthProvider>} />
+      <Route path="/driver" element={<DriverAuthProvider><DriverProtectedRoute><DriverTripPage /></DriverProtectedRoute></DriverAuthProvider>} />
       <Route
         element={
           <ProtectedRoute>
@@ -162,9 +168,9 @@ export default function App() {
         <Route path="operations/warehouse" element={<WarehousePage />} />
         <Route path="operations/iot" element={<IotPage />} />
         <Route path="operations/ai" element={<AiPage />} />
-        <Route path="drivers" element={<Navigate to="/hr/employees" replace />} />
-        <Route path="drivers/new" element={<Navigate to="/hr/employees/new" replace />} />
-        <Route path="drivers/:id" element={<Navigate to="/hr/employees" replace />} />
+        <Route path="drivers" element={<DriverList />} />
+        <Route path="drivers/new" element={<NewDriver />} />
+        <Route path="drivers/:id" element={<DriverDetails />} />
         <Route path="customers" element={<CustomerList />} />
         <Route path="customers/new" element={<NewCustomer />} />
         <Route path="customers/:id" element={<CustomerDetails />} />
@@ -261,6 +267,7 @@ export default function App() {
         <Route path="settings/document-numbering" element={<DocumentNumberingPage />} />
         <Route path="settings/field-configuration" element={<FieldConfigurationPage />} />
         <Route path="settings/portal-users" element={<PortalUsersPage />} />
+        <Route path="settings/driver-portal-users" element={<DriverPortalUsersPage />} />
         <Route path="settings/notifications" element={<NotificationSettings />} />
         <Route path="settings/print-templates" element={<PrintTemplateSettingsPage />} />
         <Route path="settings/label-templates" element={<LabelTemplatesSettingsPage />} />

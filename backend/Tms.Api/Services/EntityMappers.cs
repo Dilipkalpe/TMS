@@ -20,7 +20,7 @@ public static class EntityMappers
         b.CreatedBy, b.CreatedAt, b.UpdatedBy, b.UpdatedAt,
         b.ConsignorId, b.ConsigneeId, b.MaterialId);
 
-    public static VehicleDto ToDto(Vehicle v) => new(
+    public static VehicleDto ToDto(Vehicle v, MasterLiveLocation? live = null) => new(
         v.Id, v.Number, v.Type, v.Model, v.Capacity, v.Owner, v.Status,
         v.Insurance?.ToString("yyyy-MM-dd"),
         v.Fitness?.ToString("yyyy-MM-dd"),
@@ -29,14 +29,36 @@ public static class EntityMappers
         v.LastMaintenance?.ToString("yyyy-MM-dd"),
         v.Trips, v.Revenue,
         v.BranchId, v.Branch?.Name,
-        v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt);
+        v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt,
+        live?.DriverId,
+        live?.DriverName,
+        live?.TripNo,
+        live?.LoadingSlipNumber,
+        live?.Latitude,
+        live?.Longitude,
+        string.IsNullOrWhiteSpace(live?.CurrentLocation) ? null : live!.CurrentLocation,
+        live?.LocationUpdatedAt,
+        live?.TrackingStatus ?? "Not Started");
 
-    public static DriverDto ToDto(Driver d) => new(
+    public static DriverDto ToDto(Driver d, MasterLiveLocation? live = null) => new(
         d.Id, d.Name, d.License,
         d.LicenseExpiry?.ToString("yyyy-MM-dd"),
         d.Phone, d.Email, d.Address,
         d.Salary, d.Advance, d.Status, d.Trips, d.Rating,
         d.BranchId, d.Branch?.Name,
+        d.PortalEnabled,
+        d.PortalPhone ?? d.Phone,
+        d.PortalPinHash != null,
+        d.PortalEnabled ? "Enabled" : "Disabled",
+        live?.VehicleId,
+        live?.VehicleNumber,
+        live?.TripNo,
+        live?.LoadingSlipNumber,
+        live?.Latitude,
+        live?.Longitude,
+        string.IsNullOrWhiteSpace(live?.CurrentLocation) ? null : live!.CurrentLocation,
+        live?.LocationUpdatedAt,
+        live?.TrackingStatus ?? "Not Started",
         d.CreatedBy, d.CreatedAt, d.UpdatedBy, d.UpdatedAt);
 
     public static CustomerDto ToDto(Customer c) => new(

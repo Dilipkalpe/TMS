@@ -101,6 +101,31 @@ public static class PortalSchemaMigrator
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Enable demo Driver Web Portal logins (phone + PIN) for seeded drivers.</summary>
+    public static async Task SeedDemoDriverPortalAccessAsync(TmsDbContext db, CancellationToken ct = default)
+    {
+        var demos = new (string DriverId, string Pin, string Phone)[]
+        {
+            ("D-001", "123456", "9876543210"),
+            ("D-002", "234567", "9876543211"),
+            ("D-005", "345678", "9876543214"),
+        };
+
+        foreach (var demo in demos)
+        {
+            var driver = await db.Drivers.FirstOrDefaultAsync(d => d.Id == demo.DriverId, ct);
+            if (driver == null) continue;
+            if (driver.PortalEnabled && driver.PortalPinHash != null) continue;
+
+            driver.PortalEnabled = true;
+            driver.PortalPinHash = BCrypt.Net.BCrypt.HashPassword(demo.Pin);
+            driver.PortalPhone = demo.Phone;
+            driver.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
     static async Task BackfillBookingHistoryAsync(TmsDbContext db, CancellationToken ct)
     {
         if (await db.BookingStatusHistories.AnyAsync(ct)) return;

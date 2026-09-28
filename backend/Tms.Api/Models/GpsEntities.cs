@@ -11,9 +11,77 @@ public class VehicleLastPosition
     public decimal? SpeedKmh { get; set; }
     public decimal? Heading { get; set; }
     public Guid? TripId { get; set; }
+    public string? DriverId { get; set; }
+    public Guid? LoadingSlipId { get; set; }
+    public string TrackingStatus { get; set; } = "STOPPED";
+    public decimal? AccuracyMeters { get; set; }
     public string Source { get; set; } = "DEVICE";
     public DateTime RecordedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>Active driver trip linked from Loading Slip assignment (browser GPS portal).</summary>
+public class DriverTripSession : ITenantScoped
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string DriverId { get; set; } = "";
+    public string VehicleId { get; set; } = "";
+    public Guid? LoadingSlipId { get; set; }
+    public string LrNumber { get; set; } = "";
+    public string? LoadingSlipNumber { get; set; }
+    public string? TripNo { get; set; }
+    public string? CustomerName { get; set; }
+    public string? Source { get; set; }
+    public string? Destination { get; set; }
+    public string Status { get; set; } = DriverTripStatuses.Assigned;
+    public bool TrackingActive { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class DriverTripStatusHistory
+{
+    public Guid Id { get; set; }
+    public Guid SessionId { get; set; }
+    public DriverTripSession? Session { get; set; }
+    public Guid CompanyId { get; set; }
+    public string? OldStatus { get; set; }
+    public string NewStatus { get; set; } = "";
+    public string? ChangedBy { get; set; }
+    public DateTime ChangedAt { get; set; }
+    public string? Notes { get; set; }
+}
+
+public static class DriverTripStatuses
+{
+    public const string Assigned = "ASSIGNED";
+    public const string Started = "STARTED";
+    public const string ReachedPickup = "REACHED_PICKUP";
+    public const string LoadingCompleted = "LOADING_COMPLETED";
+    public const string InTransit = "IN_TRANSIT";
+    public const string ReachedDestination = "REACHED_DESTINATION";
+    public const string DeliveryCompleted = "DELIVERY_COMPLETED";
+
+    public static readonly string[] Active =
+    [
+        Assigned, Started, ReachedPickup, LoadingCompleted, InTransit, ReachedDestination
+    ];
+
+    public static readonly string[] WorkflowOrder =
+    [
+        Assigned, Started, ReachedPickup, LoadingCompleted, InTransit, ReachedDestination, DeliveryCompleted
+    ];
+
+    public static bool CanTransition(string from, string to)
+    {
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return true;
+        var fi = Array.FindIndex(WorkflowOrder, s => s.Equals(from, StringComparison.OrdinalIgnoreCase));
+        var ti = Array.FindIndex(WorkflowOrder, s => s.Equals(to, StringComparison.OrdinalIgnoreCase));
+        return fi >= 0 && ti >= 0 && ti >= fi;
+    }
 }
 
 public class Geofence : ITenantScoped

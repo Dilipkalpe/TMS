@@ -25,6 +25,8 @@ public class GpsTrack
     public string VehicleId { get; set; } = "";
     public Vehicle? Vehicle { get; set; }
     public Guid? TripId { get; set; }
+    public string? DriverId { get; set; }
+    public Guid? LoadingSlipId { get; set; }
     public decimal Lat { get; set; }
     public decimal Lng { get; set; }
     public decimal? SpeedKmh { get; set; }

@@ -11,7 +11,11 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class DriversController(TmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
+public class DriversController(
+    TmsDbContext db,
+    IBranchContext branches,
+    ITenantContext tenants,
+    MasterLiveLocationService liveLocations) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<DriverDto>>> GetAll(
@@ -28,8 +32,64 @@ public class DriversController(TmsDbContext db, IBranchContext branches, ITenant
         q = q.OrderBy(d => d.Name);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var live = await liveLocations.ForDriversAsync(items.Select(d => d.Id).ToList());
         return Ok(new PagedResult<DriverDto>(
-            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+            items.Select(d => EntityMappers.ToDto(d, live.GetValueOrDefault(d.Id))).ToList(),
+            total, p, size, hasMore, approx));
+    }
+
+    public record DriverPortalAccessBody(bool Enabled, string? Pin, string? Phone);
+
+    [HttpGet("portal-access/list")]
+    public async Task<ActionResult<PagedResult<object>>> PortalAccessList(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
+    {
+        var q = tenants.Filter(branches.Filter(db.Drivers.AsNoTracking().Include(d => d.Branch)));
+        q = SearchHelper.Filter(q, search);
+        q = q.OrderBy(d => d.Name);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var rows = items.Select(d => (object)new
+        {
+            d.Id,
+            d.Name,
+            d.Phone,
+            portalPhone = d.PortalPhone ?? d.Phone,
+            d.PortalEnabled,
+            allowDriverAppAccess = d.PortalEnabled,
+            hasPin = d.PortalPinHash != null,
+            driverAppStatus = d.PortalEnabled ? "Enabled" : "Disabled",
+            branchId = d.BranchId,
+            branchName = d.Branch?.Name,
+        }).ToList();
+        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
+    }
+
+    [HttpPut("{id}/portal")]
+    public async Task<IActionResult> SetPortalAccess(string id, [FromBody] DriverPortalAccessBody body)
+    {
+        var d = await db.Drivers.FindAsync(id);
+        if (d == null || !TenantScope.CanAccessBranchEntity(tenants, branches, d)) return NotFound();
+        d.PortalEnabled = body.Enabled;
+        if (body.Phone != null) d.PortalPhone = string.IsNullOrWhiteSpace(body.Phone) ? null : body.Phone.Trim();
+        if (!string.IsNullOrWhiteSpace(body.Pin))
+            d.PortalPinHash = BCrypt.Net.BCrypt.HashPassword(body.Pin.Trim());
+        else if (!body.Enabled)
+            d.PortalPinHash = null;
+        d.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(new
+        {
+            d.Id,
+            d.PortalEnabled,
+            allowDriverAppAccess = d.PortalEnabled,
+            portalPhone = d.PortalPhone ?? d.Phone,
+            hasPin = d.PortalPinHash != null,
+            driverAppStatus = d.PortalEnabled ? "Enabled" : "Disabled",
+        });
     }
 
     [HttpGet("{id}")]
@@ -37,7 +97,8 @@ public class DriversController(TmsDbContext db, IBranchContext branches, ITenant
     {
         var d = await db.Drivers.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (d == null || !TenantScope.CanAccessBranchEntity(tenants, branches, d)) return NotFound();
-        return Ok(EntityMappers.ToDto(d));
+        var live = await liveLocations.ForDriversAsync([id]);
+        return Ok(EntityMappers.ToDto(d, live.GetValueOrDefault(id)));
     }
 
     [HttpPost]
@@ -56,11 +117,13 @@ public class DriversController(TmsDbContext db, IBranchContext branches, ITenant
             Salary = decimal.TryParse(body.GetValueOrDefault("salary")?.ToString(), out var sal) ? sal : 0,
             Advance = decimal.TryParse(body.GetValueOrDefault("advance")?.ToString(), out var adv) ? adv : 0,
             Status = body.GetValueOrDefault("status")?.ToString() ?? "Active",
+            PortalEnabled = false,
             BranchId = branches.AssignBranchId,
             CompanyId = TenantScope.ResolveCompanyId(tenants),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+        ApplyPortalFields(body, d, creating: true);
         db.Drivers.Add(d);
         await db.SaveChangesAsync();
         return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(d));
@@ -78,9 +141,11 @@ public class DriversController(TmsDbContext db, IBranchContext branches, ITenant
         if (body.ContainsKey("address")) d.Address = body["address"]?.ToString();
         if (body.ContainsKey("status")) d.Status = body["status"]?.ToString() ?? d.Status;
         if (body.ContainsKey("salary") && decimal.TryParse(body["salary"]?.ToString(), out var sal)) d.Salary = sal;
+        ApplyPortalFields(body, d, creating: false);
         d.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return Ok(EntityMappers.ToDto(d));
+        var live = await liveLocations.ForDriversAsync([id]);
+        return Ok(EntityMappers.ToDto(d, live.GetValueOrDefault(id)));
     }
 
     [HttpDelete("{id}")]
@@ -91,6 +156,33 @@ public class DriversController(TmsDbContext db, IBranchContext branches, ITenant
         db.Drivers.Remove(d);
         await db.SaveChangesAsync();
         return NoContent();
+    }
+
+    static void ApplyPortalFields(Dictionary<string, object?> body, Driver d, bool creating)
+    {
+        // Allow Driver App Access — optional, default OFF
+        var enabledKey = body.ContainsKey("allowDriverAppAccess") ? "allowDriverAppAccess"
+            : body.ContainsKey("portalEnabled") ? "portalEnabled" : null;
+        if (enabledKey != null)
+        {
+            var raw = body[enabledKey]?.ToString();
+            d.PortalEnabled = raw is "true" or "True" or "1" or "yes" or "Yes";
+        }
+        else if (creating)
+        {
+            d.PortalEnabled = false;
+        }
+
+        if (body.ContainsKey("portalPhone"))
+            d.PortalPhone = string.IsNullOrWhiteSpace(body["portalPhone"]?.ToString())
+                ? null : body["portalPhone"]!.ToString()!.Trim();
+
+        var pin = body.ContainsKey("portalPin") ? body["portalPin"]?.ToString()
+            : body.ContainsKey("accessPin") ? body["accessPin"]?.ToString() : null;
+        if (!string.IsNullOrWhiteSpace(pin))
+            d.PortalPinHash = BCrypt.Net.BCrypt.HashPassword(pin.Trim());
+        else if (!d.PortalEnabled)
+            d.PortalPinHash = null;
     }
 }
 

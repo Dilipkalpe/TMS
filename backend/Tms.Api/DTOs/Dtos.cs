@@ -43,13 +43,37 @@ public record VehicleDto(
     string Status, string? Insurance, string? Fitness, string? Permit, string? Puc,
     string? LastMaintenance, int Trips, decimal Revenue,
     Guid? BranchId = null, string? BranchName = null,
-    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
+    // Live tracking (from central vehicle_last_position — same record as Driver Master)
+    string? CurrentDriverId = null,
+    string? CurrentDriverName = null,
+    string? CurrentTripNo = null,
+    string? CurrentLoadingSlipNumber = null,
+    decimal? Latitude = null,
+    decimal? Longitude = null,
+    string? CurrentLocation = null,
+    DateTime? LocationUpdatedAt = null,
+    string? TrackingStatus = null);
 
 public record DriverDto(
     string Id, string Name, string? License, string? LicenseExpiry, string? Phone,
     string? Email, string? Address, decimal Salary, decimal Advance, string Status,
     int Trips, decimal Rating,
     Guid? BranchId = null, string? BranchName = null,
+    /// <summary>Allow Driver App Access (optional; default OFF).</summary>
+    bool PortalEnabled = false,
+    string? PortalPhone = null,
+    bool HasPin = false,
+    string? DriverAppStatus = null,
+    string? CurrentVehicleId = null,
+    string? CurrentVehicleNumber = null,
+    string? CurrentTripNo = null,
+    string? CurrentLoadingSlipNumber = null,
+    decimal? Latitude = null,
+    decimal? Longitude = null,
+    string? CurrentLocation = null,
+    DateTime? LocationUpdatedAt = null,
+    string? TrackingStatus = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
 
 public record CustomerDto(

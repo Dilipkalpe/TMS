@@ -117,6 +117,8 @@ builder.Services.AddScoped<GeofenceService>();
 builder.Services.AddScoped<GpsIngestService>();
 
 builder.Services.AddScoped<FleetLiveService>();
+builder.Services.AddScoped<DriverTripService>();
+builder.Services.AddScoped<MasterLiveLocationService>();
 
 builder.Services.AddScoped<NotificationDispatcher>();
 
@@ -290,6 +292,9 @@ if (!app.Environment.IsEnvironment("Testing"))
             {
                 logger.LogInformation("Ensuring portal schema…");
                 await PortalSchemaMigrator.EnsureSchemaAsync(db);
+
+                logger.LogInformation("Ensuring driver portal / GPS location columns…");
+                await GpsSchemaMigrator.EnsureDriverPortalAsync(db);
 
                 logger.LogInformation("Ensuring branch schema…");
                 await BranchSchemaMigrator.EnsureAsync(db);

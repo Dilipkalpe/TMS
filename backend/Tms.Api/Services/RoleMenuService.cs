@@ -37,6 +37,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
                 "/settings/notifications",
                 "/settings/print-templates",
                 "/settings/portal-users",
+                "/settings/driver-portal-users",
                 "/settings/field-configuration",
             };
             all.RemoveWhere(k => hide.Contains(k));
@@ -131,6 +132,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
             "/operations/ai",
             "/maintenance",
             "/vehicles",
+            "/drivers",
             "/customers",
             "/vendors",
             "/consignors",
@@ -533,6 +535,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
         // Masters hub
         Add("/vehicles", "Vehicles", "Masters hub");
         Add("/customers", "Customers", "Masters hub");
+        Add("/drivers", "Drivers", "Masters hub");
         Add("/hr/employees", "Drivers / HR", "Masters hub");
         Add("/vendors", "Vendors", "Masters hub");
         Add("/consignors", "Consignors", "Masters hub");
@@ -563,6 +566,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
         Add("/settings/users", "Staff users", "Settings hub");
         Add("/settings/role-menus", "Role menus", "Settings hub");
         Add("/settings/portal-users", "Portal user access", "Settings hub");
+        Add("/settings/driver-portal-users", "Driver portal access", "Settings hub");
         Add("/settings/branches", "Branch locations", "Settings hub");
         Add("/settings/document-numbering", "Document numbering", "Settings hub");
         Add("/settings/field-configuration", "Field configuration", "Settings hub");

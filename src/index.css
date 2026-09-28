@@ -29,6 +29,22 @@
   --scrollbar-thumb-active: #3b82f6;
 }
 
+/*
+ * Number inputs must look identical to text inputs app-wide.
+ * Keep type="number" behavior (numeric keyboard / parsing); only remove spinner chrome.
+ */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
 /* Subtle route-map grid on main app shell */
 .app-shell-bg {
   background-color: var(--color-surface);

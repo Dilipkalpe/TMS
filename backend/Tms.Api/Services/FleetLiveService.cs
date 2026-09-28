@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tms.Api.Data;
+using Tms.Api.Models;
 
 namespace Tms.Api.Services;
 
@@ -8,12 +9,17 @@ public record FleetLiveItemDto(
     string RegistrationNo,
     string Status,
     string? DriverName,
+    string? DriverId,
+    string? TripNo,
+    string? LoadingSlipNumber,
+    string? TripStatus,
+    string? TrackingStatus,
     FleetPositionDto? LastPosition,
     IReadOnlyList<GeofenceNameDto> InsideGeofences);
 
 public record FleetPositionDto(
     decimal Lat, decimal Lng, decimal? SpeedKmh, decimal? Heading,
-    DateTime RecordedAt, string Source, bool IsStale);
+    DateTime RecordedAt, string Source, bool IsStale, string? TrackingStatus = null);
 
 public record GeofenceNameDto(Guid Id, string Name);
 
@@ -65,16 +71,44 @@ public class FleetLiveService(TmsDbContext db, ITenantContext tenants, IBranchCo
             .GroupBy(t => t.VehicleId!)
             .ToDictionary(g => g.Key, g => g.First().Driver?.Name);
 
+        var driverSessions = await db.DriverTripSessions.AsNoTracking()
+            .Where(s => vehicleIds.Contains(s.VehicleId) && DriverTripStatuses.Active.Contains(s.Status))
+            .OrderByDescending(s => s.UpdatedAt)
+            .ToListAsync(ct);
+        var sessionByVehicle = driverSessions
+            .GroupBy(s => s.VehicleId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var driverIds = sessionByVehicle.Values.Select(s => s.DriverId).Distinct().ToList();
+        var drivers = await db.Drivers.AsNoTracking()
+            .Where(d => driverIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, d => d.Name, ct);
+
         return vehicles.Select(v =>
         {
             positions.TryGetValue(v.Id, out var pos);
+            sessionByVehicle.TryGetValue(v.Id, out var sess);
+            var isStale = pos != null && pos.RecordedAt < staleCutoff;
+            var trackingStatus = pos == null ? null
+                : isStale ? "STALE"
+                : (pos.TrackingStatus ?? (sess?.TrackingActive == true ? "ACTIVE" : "STOPPED"));
+
             FleetPositionDto? last = pos == null ? null : new FleetPositionDto(
                 pos.Lat, pos.Lng, pos.SpeedKmh, pos.Heading,
-                pos.RecordedAt, pos.Source, pos.RecordedAt < staleCutoff);
+                pos.RecordedAt, pos.Source, isStale, trackingStatus);
+
+            var driverName = sess != null
+                ? drivers.GetValueOrDefault(sess.DriverId) ?? driverByVehicle.GetValueOrDefault(v.Id)
+                : driverByVehicle.GetValueOrDefault(v.Id);
 
             return new FleetLiveItemDto(
                 v.Id, v.Number, v.Status,
-                driverByVehicle.GetValueOrDefault(v.Id),
+                driverName,
+                sess?.DriverId ?? pos?.DriverId,
+                sess?.TripNo,
+                sess?.LoadingSlipNumber,
+                sess?.Status,
+                trackingStatus,
                 last,
                 insideByVehicle.GetValueOrDefault(v.Id) ?? []);
         }).ToList();

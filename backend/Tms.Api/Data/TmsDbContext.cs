@@ -25,6 +25,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<FuelEntry> FuelEntries => Set<FuelEntry>();
     public DbSet<GpsTrack> GpsTracks => Set<GpsTrack>();
     public DbSet<VehicleLastPosition> VehicleLastPositions => Set<VehicleLastPosition>();
+    public DbSet<DriverTripSession> DriverTripSessions => Set<DriverTripSession>();
+    public DbSet<DriverTripStatusHistory> DriverTripStatusHistories => Set<DriverTripStatusHistory>();
     public DbSet<Geofence> Geofences => Set<Geofence>();
     public DbSet<GeofenceAssignment> GeofenceAssignments => Set<GeofenceAssignment>();
     public DbSet<GeofenceVehicleState> GeofenceVehicleStates => Set<GeofenceVehicleState>();
@@ -285,6 +287,9 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Status).HasColumnName("status");
             e.Property(x => x.Trips).HasColumnName("trips");
             e.Property(x => x.Rating).HasColumnName("rating");
+            e.Property(x => x.PortalEnabled).HasColumnName("portal_enabled");
+            e.Property(x => x.PortalPinHash).HasColumnName("portal_pin_hash");
+            e.Property(x => x.PortalPhone).HasColumnName("portal_phone");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
@@ -610,6 +615,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.VehicleId).HasColumnName("vehicle_id");
             e.Property(x => x.TripId).HasColumnName("trip_id");
+            e.Property(x => x.DriverId).HasColumnName("driver_id");
+            e.Property(x => x.LoadingSlipId).HasColumnName("loading_slip_id");
             e.Property(x => x.Lat).HasColumnName("lat");
             e.Property(x => x.Lng).HasColumnName("lng");
             e.Property(x => x.SpeedKmh).HasColumnName("speed_kmh");
@@ -955,6 +962,10 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.SpeedKmh).HasColumnName("speed_kmh");
             e.Property(x => x.Heading).HasColumnName("heading");
             e.Property(x => x.TripId).HasColumnName("trip_id");
+            e.Property(x => x.DriverId).HasColumnName("driver_id");
+            e.Property(x => x.LoadingSlipId).HasColumnName("loading_slip_id");
+            e.Property(x => x.TrackingStatus).HasColumnName("tracking_status");
+            e.Property(x => x.AccuracyMeters).HasColumnName("accuracy_meters");
             e.Property(x => x.Source).HasColumnName("source");
             e.Property(x => x.RecordedAt).HasColumnName("recorded_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -962,6 +973,44 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
                 .WithOne()
                 .HasForeignKey<VehicleLastPosition>(x => x.VehicleId)
                 .HasPrincipalKey<Vehicle>(v => v.Id);
+        });
+
+        modelBuilder.Entity<DriverTripSession>(e =>
+        {
+            e.ToTable("driver_trip_sessions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.DriverId).HasColumnName("driver_id");
+            e.Property(x => x.VehicleId).HasColumnName("vehicle_id");
+            e.Property(x => x.LoadingSlipId).HasColumnName("loading_slip_id");
+            e.Property(x => x.LrNumber).HasColumnName("lr_number");
+            e.Property(x => x.LoadingSlipNumber).HasColumnName("loading_slip_number");
+            e.Property(x => x.TripNo).HasColumnName("trip_no");
+            e.Property(x => x.CustomerName).HasColumnName("customer_name");
+            e.Property(x => x.Source).HasColumnName("source");
+            e.Property(x => x.Destination).HasColumnName("destination");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.TrackingActive).HasColumnName("tracking_active");
+            e.Property(x => x.StartedAt).HasColumnName("started_at");
+            e.Property(x => x.CompletedAt).HasColumnName("completed_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<DriverTripStatusHistory>(e =>
+        {
+            e.ToTable("driver_trip_status_history");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.SessionId).HasColumnName("session_id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.OldStatus).HasColumnName("old_status");
+            e.Property(x => x.NewStatus).HasColumnName("new_status");
+            e.Property(x => x.ChangedBy).HasColumnName("changed_by");
+            e.Property(x => x.ChangedAt).HasColumnName("changed_at");
+            e.Property(x => x.Notes).HasColumnName("notes");
+            e.HasOne(x => x.Session).WithMany().HasForeignKey(x => x.SessionId);
         });
 
         modelBuilder.Entity<Geofence>(e =>

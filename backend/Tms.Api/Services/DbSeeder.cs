@@ -60,6 +60,17 @@ public static class DbSeeder
 
         await PortalSchemaMigrator.SeedDemoPortalAccessAsync(db);
 
+        try
+        {
+            await GpsSchemaMigrator.EnsureDriverPortalAsync(db);
+            await PortalSchemaMigrator.SeedDemoDriverPortalAccessAsync(db);
+        }
+        catch (Exception ex)
+        {
+            // Do not block API startup if driver portal columns/seed fail after ensure
+            Console.Error.WriteLine($"Driver portal seed skipped: {ex.Message}");
+        }
+
         if (!demo) return;
 
         var largeDataset = await db.Customers.AsNoTracking().CountAsync() > 10_000;
@@ -111,6 +122,15 @@ public static class DbSeeder
         }
 
         await PortalSchemaMigrator.SeedDemoPortalAccessAsync(db);
+        try
+        {
+            await GpsSchemaMigrator.EnsureDriverPortalAsync(db);
+            await PortalSchemaMigrator.SeedDemoDriverPortalAccessAsync(db);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Driver portal seed skipped: {ex.Message}");
+        }
     }
 
     /// <summary>

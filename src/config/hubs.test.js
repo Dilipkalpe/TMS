@@ -79,7 +79,7 @@ describe('hub navigation config', () => {
     expectUniquePaths(mastersCards)
     expectCardShape(mastersCards)
     expect(mastersCards.map((c) => c.path)).toEqual(expect.arrayContaining([
-      '/vehicles', '/customers', '/vendors', '/consignors', '/consignees', '/items', '/freight-rates', '/hr/employees',
+      '/vehicles', '/drivers', '/customers', '/vendors', '/consignors', '/consignees', '/items', '/freight-rates', '/hr/employees',
     ]))
   })
 

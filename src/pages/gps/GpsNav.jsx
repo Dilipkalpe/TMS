@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 
 const tabs = [
-  { to: '/operations/gps', label: 'Live Map', end: true },
+  { to: '/operations/gps', label: 'Live Vehicle Tracking', end: true },
   { to: '/operations/gps/geofences', label: 'Geofences', end: false },
   { to: '/operations/gps/alerts', label: 'Alerts', end: false },
 ]

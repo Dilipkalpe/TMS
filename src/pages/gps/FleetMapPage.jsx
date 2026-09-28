@@ -19,6 +19,29 @@ const statusColor = {
   Maintenance: '#f97316',
 }
 
+function formatAge(iso) {
+  if (!iso) return ''
+  const sec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000))
+  if (sec < 60) return `${sec} seconds ago`
+  const min = Math.round(sec / 60)
+  if (min < 60) return `${min} minute${min === 1 ? '' : 's'} ago`
+  const hr = Math.round(min / 60)
+  return `${hr} hour${hr === 1 ? '' : 's'} ago`
+}
+
+function TrackingBadge({ position, trackingStatus }) {
+  const stale = position?.isStale || trackingStatus === 'STALE'
+  const live = !stale && position && (trackingStatus === 'ACTIVE' || !trackingStatus)
+  if (!position) {
+    return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500">No GPS</span>
+  }
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${live ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+      {live ? 'LIVE' : 'STALE'}
+    </span>
+  )
+}
+
 function FlyTo({ lat, lng }) {
   const map = useMap()
   useEffect(() => {
@@ -64,7 +87,7 @@ export default function FleetMapPage() {
   const withPosition = useMemo(() => fleet.filter((v) => v.lastPosition), [fleet])
 
   return (
-    <ERPContentPage module="Operations" title="GPS Tracking">
+    <ERPContentPage module="Operations" title="Live Vehicle Tracking">
       <GpsNav />
       {summary && (
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -113,7 +136,10 @@ export default function FleetMapPage() {
                   >
                     <Popup>
                       <strong>{v.registrationNo}</strong><br />
-                      {v.status} · {p.speedKmh ?? '—'} km/h
+                      {v.driverName ? `${v.driverName} · ` : ''}
+                      {v.loadingSlipNumber ? `LS ${v.loadingSlipNumber} · ` : ''}
+                      {p.speedKmh ?? '—'} km/h<br />
+                      {p.isStale ? 'STALE' : 'LIVE'} · {formatAge(p.recordedAt)}
                     </Popup>
                   </CircleMarker>
                 )
@@ -133,8 +159,15 @@ export default function FleetMapPage() {
                     selectedId === v.vehicleId ? 'border-primary bg-primary/5' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700'
                   }`}
                 >
-                  <p className="font-medium">{v.registrationNo}</p>
-                  <p className="text-xs text-slate-500">{v.status}{v.lastPosition?.isStale ? ' · stale' : ''}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{v.registrationNo}</p>
+                    <TrackingBadge position={v.lastPosition} trackingStatus={v.trackingStatus} />
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {v.driverName || '—'}
+                    {v.loadingSlipNumber ? ` · ${v.loadingSlipNumber}` : ''}
+                    {v.lastPosition ? ` · ${formatAge(v.lastPosition.recordedAt)}` : ''}
+                  </p>
                 </button>
               </li>
             ))}
@@ -145,13 +178,21 @@ export default function FleetMapPage() {
         <Card className="mt-4 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-semibold">{selected.registrationNo}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">{selected.registrationNo}</p>
+                <TrackingBadge position={selected.lastPosition} trackingStatus={selected.trackingStatus} />
+              </div>
               <p className="text-sm text-slate-500">
-                {selected.status}
-                {selected.driverName ? ` · ${selected.driverName}` : ''}
+                Driver: {selected.driverName || '—'}
+                {selected.tripNo ? ` · Trip: ${selected.tripNo}` : ''}
+                {selected.loadingSlipNumber ? ` · LS: ${selected.loadingSlipNumber}` : ''}
+                {selected.tripStatus ? ` · ${selected.tripStatus}` : ''}
+              </p>
+              <p className="text-sm text-slate-500">
                 {selected.lastPosition
-                  ? ` · ${selected.lastPosition.speedKmh ?? '—'} km/h · ${new Date(selected.lastPosition.recordedAt).toLocaleString()}`
-                  : ' · No GPS fix'}
+                  ? `Current: ${Number(selected.lastPosition.lat).toFixed(5)}, ${Number(selected.lastPosition.lng).toFixed(5)} · ${selected.lastPosition.speedKmh ?? '—'} km/h · Last GPS: ${formatAge(selected.lastPosition.recordedAt)}`
+                  : 'No GPS fix'}
+                {selected.lastPosition?.source ? ` · Source: ${selected.lastPosition.source}` : ''}
               </p>
               {selected.insideGeofences?.length > 0 && (
                 <p className="text-sm text-emerald-700">Inside: {selected.insideGeofences.map((g) => g.name).join(', ')}</p>
