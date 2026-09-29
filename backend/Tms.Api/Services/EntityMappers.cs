@@ -91,14 +91,24 @@ public static class EntityMappers
         i.BranchId, i.Branch?.Name,
         i.CreatedBy, i.CreatedAt, i.UpdatedBy, i.UpdatedAt);
 
-    public static ExpenseDto ToDto(Expense e) => new(
+    public static ExpenseAttachmentDto ToDto(ExpenseAttachment a) => new(
+        a.Id,
+        a.ExpenseId,
+        a.FileName,
+        a.FileExtension,
+        a.FileSize,
+        a.UploadedAt,
+        a.ContentType);
+
+    public static ExpenseDto ToDto(Expense e, IReadOnlyList<ExpenseAttachmentDto>? attachments = null) => new(
         e.Id,
         e.ExpenseDate.ToString("yyyy-MM-dd"),
         e.Category, e.Description,
         e.VehicleNumber, e.VendorName,
         e.Amount, e.PaymentMode, e.Status,
         e.BranchId, e.Branch?.Name,
-        e.CreatedBy, e.CreatedAt, e.UpdatedBy, e.UpdatedAt);
+        e.CreatedBy, e.CreatedAt, e.UpdatedBy, e.UpdatedAt,
+        attachments);
 
     public static LrDto ToDto(LorryReceipt l, Guid? branchId = null, string? branchName = null) => new(
         l.LrNumber,

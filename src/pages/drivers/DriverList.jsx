@@ -7,6 +7,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { driversApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { formatCurrentLocation } from '../../utils/formatCurrentLocation'
 
 function formatAge(iso) {
   if (!iso) return '—'
@@ -43,7 +44,7 @@ export default function DriverList() {
       ),
     },
     { key: 'currentVehicleNumber', label: 'Vehicle', render: (r) => r.currentVehicleNumber || '—' },
-    { key: 'currentLocation', label: 'Current Location', render: (r) => r.currentLocation || '—' },
+    { key: 'currentLocation', label: 'Current Location', render: (r) => formatCurrentLocation(r.currentLocation) },
     { key: 'locationUpdatedAt', label: 'Last Updated', render: (r) => formatAge(r.locationUpdatedAt) },
     {
       key: 'trackingStatus',

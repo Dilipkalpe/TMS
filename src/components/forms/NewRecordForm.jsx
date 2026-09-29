@@ -24,6 +24,8 @@ export default function NewRecordForm({
   saveLabel,
   onSubmit,
   initialValues = {},
+  children,
+  onAfterReset,
 }) {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -43,7 +45,10 @@ export default function NewRecordForm({
       await onSubmit(form)
       toast({ title: 'Saved', message: `${saveLabel} created successfully.`, type: 'success' })
       clearControlsAfterSave({
-        reset: () => setForm(buildEmptyForm(fields)),
+        reset: () => {
+          setForm(buildEmptyForm(fields))
+          onAfterReset?.()
+        },
         formRoot: formRootRef.current,
       })
     } catch (err) {
@@ -78,6 +83,7 @@ export default function NewRecordForm({
               />
             )
           })}
+          {children}
         </div>
         <div className="mt-6 flex gap-2">
           <Button icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>

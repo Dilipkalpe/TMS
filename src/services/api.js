@@ -312,6 +312,49 @@ export const expensesApi = {
   update: (id, data) => apiRequest(`/expenses/${id}`, { method: 'PUT', body: data }),
   remove: (id) => apiRequest(`/expenses/${id}`, { method: 'DELETE' }),
   categories: () => apiRequest('/expenses/categories'),
+  listAttachments: (id) => apiRequest(`/expenses/${encodeURIComponent(id)}/attachments`),
+  uploadAttachment: async (id, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    const headers = buildAuthHeaders({ json: false })
+    const res = await fetch(`${API_BASE_URL}/expenses/${encodeURIComponent(id)}/attachments`, {
+      method: 'POST',
+      headers,
+      body: form,
+    })
+    if (!res.ok) {
+      const { message } = await readApiError(res, res.statusText)
+      throw new ApiError(message, res.status)
+    }
+    return res.json()
+  },
+  removeAttachment: (id, attachmentId) =>
+    apiRequest(`/expenses/${encodeURIComponent(id)}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  /** Authenticated download/view — never uses a raw disk path. */
+  openAttachment: async (id, attachmentId, fileName = 'attachment') => {
+    const headers = buildAuthHeaders({ json: false })
+    const res = await fetch(
+      `${API_BASE_URL}/expenses/${encodeURIComponent(id)}/attachments/${attachmentId}/download`,
+      { headers },
+    )
+    if (!res.ok) {
+      const { message } = await readApiError(res, res.statusText)
+      throw new ApiError(message, res.status)
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!win) {
+      // Popup blocked — fall back to download
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  },
 }
 
 export const lrApi = {

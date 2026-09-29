@@ -24,6 +24,7 @@ publish/
 backend/**/bin/
 backend/**/obj/
 backend/.vs/
+backend/Tms.Api/App_Data/expense-attachments/
 **/*.user
 
 # Editor directories and files

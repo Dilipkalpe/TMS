@@ -25,6 +25,9 @@ ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS trip_id UUID;
 ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS source VARCHAR(30) DEFAULT 'DEVICE';
 ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS recorded_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS location_label VARCHAR(300);
+ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS geocoded_lat DECIMAL(10,7);
+ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS geocoded_lng DECIMAL(10,7);
 
 CREATE TABLE IF NOT EXISTS geofences (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

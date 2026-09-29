@@ -11,7 +11,13 @@ public record GpsIngestRequest(
 
 public record GpsIngestResult(Guid TrackId, string VehicleId, List<GeofenceEventDto> GeofenceEvents);
 
-public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenantContext tenants, IConfiguration config)
+public class GpsIngestService(
+    TmsDbContext db,
+    GeofenceService geofence,
+    ITenantContext tenants,
+    IConfiguration config,
+    ReverseGeocodeService reverseGeocode,
+    ILogger<GpsIngestService> logger)
 {
     int RejectStaleHours => config.GetValue("Gps:RejectStaleIngestHours", 24);
 
@@ -59,9 +65,10 @@ public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenant
 
         var trackingStatus = string.IsNullOrWhiteSpace(req.TrackingStatus) ? "ACTIVE" : req.TrackingStatus;
         var lastPos = await db.VehicleLastPositions.FindAsync([req.VehicleId], ct);
+        var shouldGeocode = false;
         if (lastPos == null)
         {
-            db.VehicleLastPositions.Add(new VehicleLastPosition
+            lastPos = new VehicleLastPosition
             {
                 VehicleId = req.VehicleId,
                 Lat = req.Lat,
@@ -76,12 +83,17 @@ public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenant
                 Source = track.Source,
                 RecordedAt = recordedAt,
                 UpdatedAt = now,
-            });
+            };
+            db.VehicleLastPositions.Add(lastPos);
+            shouldGeocode = true;
         }
         else
         {
             if (recordedAt >= lastPos.RecordedAt)
             {
+                shouldGeocode = reverseGeocode.NeedsRefresh(
+                    req.Lat, req.Lng, lastPos.LocationLabel, lastPos.GeocodedLat, lastPos.GeocodedLng);
+
                 lastPos.Lat = req.Lat;
                 lastPos.Lng = req.Lng;
                 lastPos.SpeedKmh = req.SpeedKmh;
@@ -94,15 +106,47 @@ public class GpsIngestService(TmsDbContext db, GeofenceService geofence, ITenant
                 lastPos.Source = track.Source;
                 lastPos.RecordedAt = recordedAt;
                 lastPos.UpdatedAt = now;
+                // Keep LocationLabel / GeocodedLat/Lng on failure or when move is small
             }
         }
 
         await db.SaveChangesAsync(ct);
 
+        if (shouldGeocode && lastPos != null)
+            await TryRefreshLocationLabelAsync(lastPos, req.Lat, req.Lng, ct);
+
         var events = await geofence.EvaluateVehicleAsync(
             req.VehicleId, (double)req.Lat, (double)req.Lng, req.SpeedKmh, recordedAt);
 
         return new GpsIngestResult(track.Id, req.VehicleId, events);
+    }
+
+    async Task TryRefreshLocationLabelAsync(VehicleLastPosition lastPos, decimal lat, decimal lng, CancellationToken ct)
+    {
+        try
+        {
+            var label = await reverseGeocode.ResolveAsync(lat, lng, ct);
+            if (string.IsNullOrWhiteSpace(label)) return;
+
+            // Re-attach in case context was disposed / entity detached (shouldn't be)
+            var tracked = await db.VehicleLastPositions.FindAsync([lastPos.VehicleId], ct);
+            if (tracked == null) return;
+
+            tracked.LocationLabel = label;
+            tracked.GeocodedLat = lat;
+            tracked.GeocodedLng = lng;
+            tracked.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // request aborted — leave previous label
+        }
+        catch (Exception ex)
+        {
+            // Never break GPS ingest because reverse geocode failed
+            logger.LogWarning(ex, "Keeping previous location label for vehicle {VehicleId}", lastPos.VehicleId);
+        }
     }
 
     static void ValidateCoordinates(decimal lat, decimal lng)

@@ -10,6 +10,7 @@ import { useApiItem } from '../../hooks/useApiResource'
 import { maintenanceApi, vehiclesApi } from '../../services/api'
 import { ArrowLeft, Pencil } from 'lucide-react'
 import PrintButton from '../../components/print/PrintButton'
+import { formatCurrentLocation } from '../../utils/formatCurrentLocation'
 
 const RISK_VARIANT = { LOW: 'success', MEDIUM: 'warning', HIGH: 'danger' }
 
@@ -95,7 +96,7 @@ export default function VehicleDetails() {
     { label: 'Owner', value: vehicle.owner },
     { label: 'Current Driver', value: vehicle.currentDriverName },
     { label: 'Current Trip', value: vehicle.currentTripNo },
-    { label: 'Current Location', value: vehicle.currentLocation },
+    { label: 'Current Location', value: formatCurrentLocation(vehicle.currentLocation) },
     { label: 'Tracking', value: vehicle.trackingStatus },
     { label: 'Total Trips', value: vehicle.trips },
     { label: 'Revenue', value: formatCurrency(vehicle.revenue) },
@@ -106,9 +107,7 @@ export default function VehicleDetails() {
     { label: 'Current Driver', value: vehicle.currentDriverName || '—' },
     { label: 'Current Trip', value: vehicle.currentTripNo || '—' },
     { label: 'Loading Slip', value: vehicle.currentLoadingSlipNumber || '—' },
-    { label: 'Current Location', value: vehicle.currentLocation || '—' },
-    { label: 'Latitude', value: vehicle.latitude != null ? Number(vehicle.latitude).toFixed(6) : '—' },
-    { label: 'Longitude', value: vehicle.longitude != null ? Number(vehicle.longitude).toFixed(6) : '—' },
+    { label: 'Current Location', value: formatCurrentLocation(vehicle.currentLocation) },
     { label: 'Location Updated At', value: vehicle.locationUpdatedAt ? new Date(vehicle.locationUpdatedAt).toLocaleString() : '—' },
     { label: 'Tracking Status', value: vehicle.trackingStatus || 'Not Started' },
   ]

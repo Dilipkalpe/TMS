@@ -68,6 +68,9 @@ public static class GpsSchemaMigrator
             await EnsureColumnAsync(conn, "vehicle_last_position", "loading_slip_id", "loading_slip_id UUID", ct);
             await EnsureColumnAsync(conn, "vehicle_last_position", "tracking_status", "tracking_status VARCHAR(30) NOT NULL DEFAULT 'STOPPED'", ct);
             await EnsureColumnAsync(conn, "vehicle_last_position", "accuracy_meters", "accuracy_meters DECIMAL(8,2)", ct);
+            await EnsureColumnAsync(conn, "vehicle_last_position", "location_label", "location_label VARCHAR(300)", ct);
+            await EnsureColumnAsync(conn, "vehicle_last_position", "geocoded_lat", "geocoded_lat DECIMAL(10,7)", ct);
+            await EnsureColumnAsync(conn, "vehicle_last_position", "geocoded_lng", "geocoded_lng DECIMAL(10,7)", ct);
             await EnsureColumnAsync(conn, "gps_tracks", "driver_id", "driver_id VARCHAR(20)", ct);
             await EnsureColumnAsync(conn, "gps_tracks", "loading_slip_id", "loading_slip_id UUID", ct);
         }

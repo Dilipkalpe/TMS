@@ -16,6 +16,11 @@ public class VehicleLastPosition
     public string TrackingStatus { get; set; } = "STOPPED";
     public decimal? AccuracyMeters { get; set; }
     public string Source { get; set; } = "DEVICE";
+    /// <summary>Human-readable "Area, City, State" from reverse geocode. Lat/lng remain source of truth.</summary>
+    public string? LocationLabel { get; set; }
+    /// <summary>Coordinates at which <see cref="LocationLabel"/> was last resolved (for move threshold).</summary>
+    public decimal? GeocodedLat { get; set; }
+    public decimal? GeocodedLng { get; set; }
     public DateTime RecordedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

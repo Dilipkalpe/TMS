@@ -108,11 +108,21 @@ public record ItemMasterDto(
     Guid? BranchId = null, string? BranchName = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
 
+public record ExpenseAttachmentDto(
+    Guid Id,
+    string ExpenseId,
+    string FileName,
+    string FileExtension,
+    long FileSize,
+    DateTime UploadedDate,
+    string? ContentType = null);
+
 public record ExpenseDto(
     string Id, string Date, string Category, string? Description, string? Vehicle,
     string? Vendor, decimal Amount, string? PaymentMode, string Status,
     Guid? BranchId = null, string? BranchName = null,
-    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
+    IReadOnlyList<ExpenseAttachmentDto>? Attachments = null);
 
 public record LrDto(
     string LrNumber, string LrDate, string? Consignor, string? Consignee,

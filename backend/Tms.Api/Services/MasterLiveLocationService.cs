@@ -25,15 +25,19 @@ public record MasterLiveLocation(
     string TrackingStatus,
     string? Source);
 
-public class MasterLiveLocationService(TmsDbContext db, IConfiguration config)
+public class MasterLiveLocationService(
+    TmsDbContext db,
+    IConfiguration config,
+    ReverseGeocodeService reverseGeocode,
+    ILogger<MasterLiveLocationService> logger)
 {
     int StaleMinutes => config.GetValue("Gps:StaleThresholdMinutes", 15);
+    /// <summary>Max reverse-geocode backfills per master list/detail request (avoids Nominatim storms).</summary>
+    int MaxBackfillPerRequest => config.GetValue("Gps:ReverseGeocode:MaxBackfillPerRequest", 5);
 
-    public static string FormatLocation(decimal? lat, decimal? lng)
-    {
-        if (lat == null || lng == null) return "";
-        return $"{lat.Value:F5}, {lng.Value:F5}";
-    }
+    /// <summary>Display helper — readable label only (never lat/lng).</summary>
+    public static string FormatLocation(string? locationLabel)
+        => string.IsNullOrWhiteSpace(locationLabel) ? "" : locationLabel.Trim();
 
     public string ResolveTrackingStatus(string? rawStatus, DateTime? recordedAt, bool hasActiveTrip, bool tripJustCompleted)
     {
@@ -59,6 +63,17 @@ public class MasterLiveLocationService(TmsDbContext db, IConfiguration config)
         var positions = await db.VehicleLastPositions.AsNoTracking()
             .Where(p => vehicleIds.Contains(p.VehicleId))
             .ToDictionaryAsync(p => p.VehicleId, ct);
+
+        await BackfillMissingLabelsAsync(positions.Values, ct);
+
+        // Reload labels that may have been persisted by backfill
+        if (positions.Values.Any(p => string.IsNullOrWhiteSpace(p.LocationLabel)))
+        {
+            var refreshed = await db.VehicleLastPositions.AsNoTracking()
+                .Where(p => vehicleIds.Contains(p.VehicleId))
+                .ToDictionaryAsync(p => p.VehicleId, ct);
+            foreach (var kv in refreshed) positions[kv.Key] = kv.Value;
+        }
 
         var sessions = await db.DriverTripSessions.AsNoTracking()
             .Where(s => vehicleIds.Contains(s.VehicleId) && DriverTripStatuses.Active.Contains(s.Status))
@@ -100,7 +115,7 @@ public class MasterLiveLocationService(TmsDbContext db, IConfiguration config)
                 sess?.Status,
                 pos?.Lat,
                 pos?.Lng,
-                FormatLocation(pos?.Lat, pos?.Lng),
+                FormatLocation(pos?.LocationLabel),
                 pos?.RecordedAt,
                 status,
                 pos?.Source);
@@ -125,6 +140,15 @@ public class MasterLiveLocationService(TmsDbContext db, IConfiguration config)
             : await db.VehicleLastPositions.AsNoTracking()
                 .Where(p => vehicleIds.Contains(p.VehicleId))
                 .ToDictionaryAsync(p => p.VehicleId, ct);
+
+        await BackfillMissingLabelsAsync(positions.Values, ct);
+        if (positions.Count > 0 && positions.Values.Any(p => string.IsNullOrWhiteSpace(p.LocationLabel)))
+        {
+            var refreshed = await db.VehicleLastPositions.AsNoTracking()
+                .Where(p => vehicleIds.Contains(p.VehicleId))
+                .ToDictionaryAsync(p => p.VehicleId, ct);
+            foreach (var kv in refreshed) positions[kv.Key] = kv.Value;
+        }
 
         var vehicles = vehicleIds.Count == 0
             ? new Dictionary<string, string>()
@@ -166,11 +190,51 @@ public class MasterLiveLocationService(TmsDbContext db, IConfiguration config)
                 sess.Status,
                 pos?.Lat,
                 pos?.Lng,
-                FormatLocation(pos?.Lat, pos?.Lng),
+                FormatLocation(pos?.LocationLabel),
                 pos?.RecordedAt,
                 status,
                 pos?.Source);
         }
         return result;
+    }
+
+    /// <summary>
+    /// One-time / sparse backfill when masters open and label is missing.
+    /// Never clears an existing label; never throws into the master API.
+    /// </summary>
+    async Task BackfillMissingLabelsAsync(IEnumerable<VehicleLastPosition> positions, CancellationToken ct)
+    {
+        var missing = positions
+            .Where(p => string.IsNullOrWhiteSpace(p.LocationLabel))
+            .Take(MaxBackfillPerRequest)
+            .ToList();
+        if (missing.Count == 0) return;
+
+        foreach (var pos in missing)
+        {
+            try
+            {
+                var label = await reverseGeocode.ResolveAsync(pos.Lat, pos.Lng, ct);
+                if (string.IsNullOrWhiteSpace(label)) continue;
+
+                var tracked = await db.VehicleLastPositions.FindAsync([pos.VehicleId], ct);
+                if (tracked == null) continue;
+                // Keep previous if somehow filled concurrently
+                if (!string.IsNullOrWhiteSpace(tracked.LocationLabel) &&
+                    !reverseGeocode.NeedsRefresh(pos.Lat, pos.Lng, tracked.LocationLabel, tracked.GeocodedLat, tracked.GeocodedLng))
+                    continue;
+
+                tracked.LocationLabel = label;
+                tracked.GeocodedLat = pos.Lat;
+                tracked.GeocodedLng = pos.Lng;
+                tracked.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+                pos.LocationLabel = label;
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Location label backfill skipped for {VehicleId}", pos.VehicleId);
+            }
+        }
     }
 }

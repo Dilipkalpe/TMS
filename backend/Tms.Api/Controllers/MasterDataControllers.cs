@@ -629,8 +629,15 @@ public class ItemsController(TmsDbContext db, ITenantContext tenants, IBranchCon
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenantContext tenants) : ControllerBase
+public class ExpensesController(
+    TmsDbContext db,
+    IBranchContext branches,
+    ITenantContext tenants,
+    IWebHostEnvironment env) : ControllerBase
 {
+    string AttachmentRoot => Path.Combine(env.ContentRootPath, "App_Data", "expense-attachments");
+    string? CurrentUser() => User.Identity?.Name;
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<ExpenseDto>>> GetAll(
         [FromQuery] string? category,
@@ -646,15 +653,20 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
         return Ok(new PagedResult<ExpenseDto>(
-            items.Select(EntityMappers.ToDto).ToList(), total, p, size, hasMore, approx));
+            items.Select(e => EntityMappers.ToDto(e)).ToList(), total, p, size, hasMore, approx));
     }
+
+    [HttpGet("categories")]
+    public ActionResult<string[]> Categories() =>
+        Ok(new[] { "Fuel", "Toll", "Maintenance", "Salary", "Office Expense", "Miscellaneous" });
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ExpenseDto>> Get(string id)
     {
         var e = await db.Expenses.AsNoTracking().Include(x => x.Branch).FirstOrDefaultAsync(x => x.Id == id);
         if (e == null || !TenantScope.CanAccessBranchEntity(tenants, branches, e)) return NotFound();
-        return Ok(EntityMappers.ToDto(e));
+        var attachments = await ListAttachmentDtosAsync(id);
+        return Ok(EntityMappers.ToDto(e, attachments));
     }
 
     [HttpPost]
@@ -679,11 +691,12 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
             BranchId = branches.AssignBranchId,
             CompanyId = TenantScope.ResolveCompanyId(tenants),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            CreatedBy = CurrentUser(),
         };
         db.Expenses.Add(exp);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(exp));
+        return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(exp, []));
     }
 
     [HttpPut("{id}")]
@@ -691,13 +704,27 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
     {
         var exp = await db.Expenses.FindAsync(id);
         if (exp == null || !TenantScope.CanAccessBranchEntity(tenants, branches, exp)) return NotFound();
+        if (body.ContainsKey("date") && DateOnly.TryParse(body["date"]?.ToString(), out var dt))
+            exp.ExpenseDate = dt;
         if (body.ContainsKey("category")) exp.Category = body["category"]?.ToString() ?? exp.Category;
         if (body.ContainsKey("description")) exp.Description = body["description"]?.ToString();
+        if (body.ContainsKey("vehicle"))
+        {
+            var vehicleNum = body["vehicle"]?.ToString();
+            var vehicle = !string.IsNullOrEmpty(vehicleNum)
+                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleNum) : null;
+            exp.VehicleId = vehicle?.Id;
+            exp.VehicleNumber = vehicleNum;
+        }
+        if (body.ContainsKey("vendor")) exp.VendorName = body["vendor"]?.ToString();
         if (body.ContainsKey("amount") && decimal.TryParse(body["amount"]?.ToString(), out var amt)) exp.Amount = amt;
+        if (body.ContainsKey("paymentMode")) exp.PaymentMode = body["paymentMode"]?.ToString();
         if (body.ContainsKey("status")) exp.Status = body["status"]?.ToString() ?? exp.Status;
         exp.UpdatedAt = DateTime.UtcNow;
+        exp.UpdatedBy = CurrentUser();
         await db.SaveChangesAsync();
-        return Ok(EntityMappers.ToDto(exp));
+        var attachments = await ListAttachmentDtosAsync(id);
+        return Ok(EntityMappers.ToDto(exp, attachments));
     }
 
     [HttpDelete("{id}")]
@@ -705,14 +732,157 @@ public class ExpensesController(TmsDbContext db, IBranchContext branches, ITenan
     {
         var exp = await db.Expenses.FindAsync(id);
         if (exp == null || !TenantScope.CanAccessBranchEntity(tenants, branches, exp)) return NotFound();
+
+        var attachments = await db.ExpenseAttachments.Where(a => a.ExpenseId == id).ToListAsync();
+        foreach (var a in attachments)
+            TryDeletePhysicalFile(a.RelativePath);
+
+        // Cascade removes attachment rows; also remove local folder leftovers
         db.Expenses.Remove(exp);
+        await db.SaveChangesAsync();
+        TryDeleteExpenseFolder(id);
+        return NoContent();
+    }
+
+    [HttpGet("{id}/attachments")]
+    public async Task<ActionResult<IReadOnlyList<ExpenseAttachmentDto>>> ListAttachments(string id)
+    {
+        var exp = await db.Expenses.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (exp == null || !TenantScope.CanAccessBranchEntity(tenants, branches, exp)) return NotFound();
+        return Ok(await ListAttachmentDtosAsync(id));
+    }
+
+    [HttpPost("{id}/attachments")]
+    [RequestSizeLimit(ExpenseAttachmentRules.MaxUploadBytes + 1024 * 64)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ExpenseAttachmentRules.MaxUploadBytes + 1024 * 64)]
+    public async Task<ActionResult<ExpenseAttachmentDto>> UploadAttachment(string id, IFormFile? file)
+    {
+        var exp = await db.Expenses.FirstOrDefaultAsync(x => x.Id == id);
+        if (exp == null || !TenantScope.CanAccessBranchEntity(tenants, branches, exp)) return NotFound();
+
+        var activeCount = await db.ExpenseAttachments.CountAsync(a => a.ExpenseId == id && a.IsActive);
+        var validationError = ExpenseAttachmentRules.ValidateUpload(file?.FileName, file?.Length ?? 0, activeCount);
+        if (validationError != null)
+            return BadRequest(new ApiError(validationError));
+
+        var ext = Path.GetExtension(file!.FileName).ToLowerInvariant();
+        var originalName = Path.GetFileName(file.FileName);
+        if (string.IsNullOrWhiteSpace(originalName)) originalName = $"document{ext}";
+        if (originalName.Length > 240) originalName = originalName[..240] + ext;
+
+        var storedName = $"{Guid.NewGuid():N}{ext}";
+        var relativePath = Path.Combine(id, storedName).Replace('\\', '/');
+        var dir = Path.Combine(AttachmentRoot, id);
+        Directory.CreateDirectory(dir);
+        var fullPath = Path.Combine(dir, storedName);
+
+        await using (var stream = System.IO.File.Create(fullPath))
+            await file.CopyToAsync(stream);
+
+        var row = new ExpenseAttachment
+        {
+            Id = Guid.NewGuid(),
+            ExpenseId = id,
+            FileName = originalName,
+            StoredFileName = storedName,
+            RelativePath = relativePath,
+            FileExtension = ext.TrimStart('.'),
+            FileSize = file.Length,
+            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? null : file.ContentType,
+            UploadedAt = DateTime.UtcNow,
+            UploadedBy = CurrentUser(),
+            IsActive = true,
+        };
+        db.ExpenseAttachments.Add(row);
+        exp.UpdatedAt = DateTime.UtcNow;
+        exp.UpdatedBy = CurrentUser();
+        await db.SaveChangesAsync();
+        return Ok(EntityMappers.ToDto(row));
+    }
+
+    [HttpGet("{id}/attachments/{attachmentId:guid}/download")]
+    public async Task<IActionResult> DownloadAttachment(string id, Guid attachmentId)
+    {
+        var exp = await db.Expenses.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (exp == null || !TenantScope.CanAccessBranchEntity(tenants, branches, exp)) return NotFound();
+
+        var row = await db.ExpenseAttachments.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == attachmentId && a.ExpenseId == id && a.IsActive);
+        if (row == null) return NotFound();
+
+        var fullPath = ResolveSafePath(row.RelativePath);
+        if (fullPath == null || !System.IO.File.Exists(fullPath))
+            return NotFound(new ApiError("File not found on server."));
+
+        var contentType = row.ContentType;
+        if (string.IsNullOrWhiteSpace(contentType))
+            contentType = "application/octet-stream";
+        return PhysicalFile(fullPath, contentType, row.FileName);
+    }
+
+    [HttpDelete("{id}/attachments/{attachmentId:guid}")]
+    public async Task<IActionResult> DeleteAttachment(string id, Guid attachmentId)
+    {
+        var exp = await db.Expenses.FirstOrDefaultAsync(x => x.Id == id);
+        if (exp == null || !TenantScope.CanAccessBranchEntity(tenants, branches, exp)) return NotFound();
+
+        var row = await db.ExpenseAttachments
+            .FirstOrDefaultAsync(a => a.Id == attachmentId && a.ExpenseId == id);
+        if (row == null) return NotFound();
+
+        TryDeletePhysicalFile(row.RelativePath);
+        db.ExpenseAttachments.Remove(row);
+        exp.UpdatedAt = DateTime.UtcNow;
+        exp.UpdatedBy = CurrentUser();
         await db.SaveChangesAsync();
         return NoContent();
     }
 
-    [HttpGet("categories")]
-    public ActionResult<string[]> Categories() =>
-        Ok(new[] { "Fuel", "Toll", "Maintenance", "Salary", "Office Expense", "Miscellaneous" });
+    async Task<IReadOnlyList<ExpenseAttachmentDto>> ListAttachmentDtosAsync(string expenseId)
+    {
+        var rows = await db.ExpenseAttachments.AsNoTracking()
+            .Where(a => a.ExpenseId == expenseId && a.IsActive)
+            .OrderByDescending(a => a.UploadedAt)
+            .ToListAsync();
+        return rows.Select(EntityMappers.ToDto).ToList();
+    }
+
+    string? ResolveSafePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath)) return null;
+        var combined = Path.GetFullPath(Path.Combine(AttachmentRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        var root = Path.GetFullPath(AttachmentRoot);
+        if (!combined.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return null;
+        return combined;
+    }
+
+    void TryDeletePhysicalFile(string relativePath)
+    {
+        try
+        {
+            var full = ResolveSafePath(relativePath);
+            if (full != null && System.IO.File.Exists(full))
+                System.IO.File.Delete(full);
+        }
+        catch
+        {
+            // best-effort cleanup
+        }
+    }
+
+    void TryDeleteExpenseFolder(string expenseId)
+    {
+        try
+        {
+            var dir = Path.Combine(AttachmentRoot, expenseId);
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, recursive: true);
+        }
+        catch
+        {
+            // best-effort cleanup
+        }
+    }
 }
 
 [Authorize]

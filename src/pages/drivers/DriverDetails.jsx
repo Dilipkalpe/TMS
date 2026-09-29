@@ -10,6 +10,7 @@ import { formatCurrency } from '../../components/ui/ReportFilters'
 import { driversApi, driverPortalApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import PrintButton from '../../components/print/PrintButton'
+import { formatCurrentLocation } from '../../utils/formatCurrentLocation'
 
 function formatAge(iso) {
   if (!iso) return '—'
@@ -123,7 +124,7 @@ export default function DriverDetails() {
     { label: 'Mobile Number', value: driver.phone },
     { label: 'Driver App Access', value: driver.driverAppStatus || (driver.portalEnabled ? 'Enabled' : 'Disabled') },
     { label: 'Current Vehicle', value: driver.currentVehicleNumber },
-    { label: 'Current Location', value: driver.currentLocation },
+    { label: 'Current Location', value: formatCurrentLocation(driver.currentLocation) },
     { label: 'Tracking', value: driver.trackingStatus },
   ]
 
@@ -221,9 +222,7 @@ export default function DriverDetails() {
               { label: 'Current Trip', value: driver.currentTripNo || '—' },
               { label: 'Loading Slip', value: driver.currentLoadingSlipNumber || '—' },
               { label: 'Tracking Status', value: driver.trackingStatus || 'Not Started' },
-              { label: 'Current Location', value: driver.currentLocation || '—' },
-              { label: 'Latitude', value: driver.latitude != null ? Number(driver.latitude).toFixed(6) : '—' },
-              { label: 'Longitude', value: driver.longitude != null ? Number(driver.longitude).toFixed(6) : '—' },
+              { label: 'Current Location', value: formatCurrentLocation(driver.currentLocation) },
               { label: 'Last Location Update', value: formatAge(driver.locationUpdatedAt) },
             ].map((f) => (
               <div key={f.label}>

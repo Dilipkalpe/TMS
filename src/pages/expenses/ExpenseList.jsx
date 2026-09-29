@@ -35,6 +35,8 @@ export default function ExpenseList() {
   return (
     <ERPListPage
       onAdd={() => navigate(addRecordRoutes.expenses)}
+      onEdit={(r) => navigate(`/expenses/${encodeURIComponent(r.id)}/edit`)}
+      onRowClick={(r) => navigate(`/expenses/${encodeURIComponent(r.id)}/edit`)}
       module="Expenses"
       title="Expense Management"
       statusCards={[{ label: 'Total Expenses', color: 'blue', icon: 'Receipt', count: paged.total }]}

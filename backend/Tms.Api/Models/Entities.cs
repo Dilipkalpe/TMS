@@ -336,6 +336,25 @@ public class Expense : IBranchScoped, IAuditable
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
+    public ICollection<ExpenseAttachment> Attachments { get; set; } = [];
+}
+
+/// <summary>Supporting document for a company expense (bill, invoice, receipt, etc.).</summary>
+public class ExpenseAttachment
+{
+    public Guid Id { get; set; }
+    public string ExpenseId { get; set; } = "";
+    public Expense? Expense { get; set; }
+    public string FileName { get; set; } = "";
+    public string StoredFileName { get; set; } = "";
+    /// <summary>Path relative to App_Data root (never expose physical path to clients).</summary>
+    public string RelativePath { get; set; } = "";
+    public string FileExtension { get; set; } = "";
+    public long FileSize { get; set; }
+    public string? ContentType { get; set; }
+    public DateTime UploadedAt { get; set; }
+    public string? UploadedBy { get; set; }
+    public bool IsActive { get; set; } = true;
 }
 
 public class LedgerAccount : ITenantScoped

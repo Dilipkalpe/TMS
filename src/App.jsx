@@ -19,7 +19,7 @@ import {
   ConsignorList, ConsignorDetails, NewConsignor,
   ConsigneeList, ConsigneeDetails, NewConsignee,
   ItemList, ItemDetails, NewItem,
-  ExpensesHub, ExpenseList, NewExpense,
+  ExpensesHub, ExpenseList, NewExpense, EditExpense,
   SettingsHub, Settings, DataCleanupPage, MastersHub, ShipmentManagementHub, HubTransferPage, DeliveryManagementHub,
   BranchesPage, PortalUsersPage, UsersPage, RoleMenusPage, DocumentNumberingPage, FieldConfigurationPage, NotificationSettings, PrintTemplateSettingsPage, LabelTemplatesSettingsPage,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
@@ -195,6 +195,7 @@ export default function App() {
         <Route path="expenses" element={<ExpensesHub />} />
         <Route path="expenses/management" element={<ExpenseList />} />
         <Route path="expenses/new" element={<NewExpense />} />
+        <Route path="expenses/:id/edit" element={<EditExpense />} />
         <Route path="payroll" element={<PayrollHub />} />
         <Route path="payroll/runs" element={<PayrollList />} />
         <Route path="payroll/runs/:id" element={<PayrollDetails />} />

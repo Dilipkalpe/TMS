@@ -9,6 +9,9 @@ ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS driver_id VARCHAR(20)
 ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS loading_slip_id UUID;
 ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS tracking_status VARCHAR(30) NOT NULL DEFAULT 'STOPPED';
 ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS accuracy_meters DECIMAL(8,2);
+ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS location_label VARCHAR(300);
+ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS geocoded_lat DECIMAL(10,7);
+ALTER TABLE vehicle_last_position ADD COLUMN IF NOT EXISTS geocoded_lng DECIMAL(10,7);
 
 ALTER TABLE gps_tracks ADD COLUMN IF NOT EXISTS driver_id VARCHAR(20);
 ALTER TABLE gps_tracks ADD COLUMN IF NOT EXISTS loading_slip_id UUID;

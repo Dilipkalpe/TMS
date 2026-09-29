@@ -70,6 +70,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<LrMovement> LrMovements => Set<LrMovement>();
     public DbSet<HubTransferAudit> HubTransferAudits => Set<HubTransferAudit>();
     public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
     public DbSet<Voucher> Vouchers => Set<Voucher>();
     public DbSet<VoucherLine> VoucherLines => Set<VoucherLine>();
@@ -474,6 +475,27 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
             e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            e.HasMany(x => x.Attachments)
+                .WithOne(x => x.Expense!)
+                .HasForeignKey(x => x.ExpenseId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ExpenseAttachment>(e =>
+        {
+            e.ToTable("expense_attachments");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ExpenseId).HasColumnName("expense_id");
+            e.Property(x => x.FileName).HasColumnName("file_name").HasMaxLength(260);
+            e.Property(x => x.StoredFileName).HasColumnName("stored_file_name").HasMaxLength(260);
+            e.Property(x => x.RelativePath).HasColumnName("relative_path").HasMaxLength(500);
+            e.Property(x => x.FileExtension).HasColumnName("file_extension").HasMaxLength(20);
+            e.Property(x => x.FileSize).HasColumnName("file_size");
+            e.Property(x => x.ContentType).HasColumnName("content_type").HasMaxLength(120);
+            e.Property(x => x.UploadedAt).HasColumnName("uploaded_at");
+            e.Property(x => x.UploadedBy).HasColumnName("uploaded_by").HasMaxLength(100);
+            e.Property(x => x.IsActive).HasColumnName("is_active");
         });
 
         modelBuilder.Entity<LedgerAccount>(e =>
@@ -967,6 +989,9 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.TrackingStatus).HasColumnName("tracking_status");
             e.Property(x => x.AccuracyMeters).HasColumnName("accuracy_meters");
             e.Property(x => x.Source).HasColumnName("source");
+            e.Property(x => x.LocationLabel).HasColumnName("location_label").HasMaxLength(300);
+            e.Property(x => x.GeocodedLat).HasColumnName("geocoded_lat");
+            e.Property(x => x.GeocodedLng).HasColumnName("geocoded_lng");
             e.Property(x => x.RecordedAt).HasColumnName("recorded_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.HasOne(x => x.Vehicle)

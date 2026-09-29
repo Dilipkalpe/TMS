@@ -8,6 +8,7 @@ import { vehiclesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { importTemplates } from '../../config/importTemplates'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { formatCurrentLocation } from '../../utils/formatCurrentLocation'
 
 function formatAge(iso) {
   if (!iso) return '—'
@@ -32,7 +33,7 @@ export default function VehicleList() {
   const columns = withAuditColumns([
     { key: 'number', label: 'Vehicle' },
     { key: 'currentDriverName', label: 'Driver', render: (r) => r.currentDriverName || '—' },
-    { key: 'currentLocation', label: 'Current Location', render: (r) => r.currentLocation || '—' },
+    { key: 'currentLocation', label: 'Current Location', render: (r) => formatCurrentLocation(r.currentLocation) },
     { key: 'locationUpdatedAt', label: 'Last Updated', render: (r) => formatAge(r.locationUpdatedAt) },
     {
       key: 'trackingStatus',

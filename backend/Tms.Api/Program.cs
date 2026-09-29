@@ -119,6 +119,16 @@ builder.Services.AddScoped<GpsIngestService>();
 builder.Services.AddScoped<FleetLiveService>();
 builder.Services.AddScoped<DriverTripService>();
 builder.Services.AddScoped<MasterLiveLocationService>();
+builder.Services.AddSingleton<ReverseGeocodeService>();
+builder.Services.AddHttpClient("Nominatim", client =>
+{
+    client.DefaultRequestHeaders.TryAddWithoutValidation(
+        "User-Agent",
+        builder.Configuration["Gps:ReverseGeocode:UserAgent"] ?? "TMS-Pro/1.0 (transport-management)");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "en");
+    client.Timeout = TimeSpan.FromSeconds(
+        builder.Configuration.GetValue("Gps:ReverseGeocode:TimeoutSeconds", 5));
+});
 
 builder.Services.AddScoped<NotificationDispatcher>();
 
@@ -323,6 +333,7 @@ if (!app.Environment.IsEnvironment("Testing"))
 
                 logger.LogInformation("Ensuring commercial schema…");
                 await CommercialSchemaMigrator.EnsureAsync(db);
+                await ExpenseAttachmentSchemaMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring document numbering schema…");
                 await DocumentNumberingSchemaMigrator.EnsureAsync(db);
