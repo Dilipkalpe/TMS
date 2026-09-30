@@ -6,13 +6,27 @@ import { TablePrintButton } from '../../components/print/ReportPrintButton'
 import { useApiObject } from '../../hooks/useApiResource'
 import { accountingApi } from '../../services/api'
 
+function asAmountRows(value) {
+  if (Array.isArray(value)) return value.map((r) => ({ name: r.name ?? r.code ?? '—', amount: Number(r.amount ?? 0) }))
+  // GL payload: income/expenses are totals; detail lists are incomeRows / expenseRows
+  return null
+}
+
 export default function ProfitLoss() {
   const { data: profitLoss, loading, error } = useApiObject(() => accountingApi.profitLoss())
-  const income = profitLoss?.income ?? []
-  const expenses = profitLoss?.expenses ?? []
-  const totalIncome = income.reduce((s, i) => s + (i.amount ?? 0), 0)
-  const totalExpenses = expenses.reduce((s, e) => s + (e.amount ?? 0), 0)
-  const grossProfit = totalIncome - totalExpenses
+  const income = asAmountRows(profitLoss?.income)
+    ?? (profitLoss?.incomeRows ?? []).map((r) => ({ name: r.name ?? r.code ?? '—', amount: Number(r.amount ?? 0) }))
+  const expenses = asAmountRows(profitLoss?.expenses)
+    ?? (profitLoss?.expenseRows ?? []).map((r) => ({ name: r.name ?? r.code ?? '—', amount: Number(r.amount ?? 0) }))
+  const totalIncome = typeof profitLoss?.income === 'number'
+    ? Number(profitLoss.income)
+    : income.reduce((s, i) => s + (i.amount ?? 0), 0)
+  const totalExpenses = typeof profitLoss?.expenses === 'number'
+    ? Number(profitLoss.expenses)
+    : expenses.reduce((s, e) => s + (e.amount ?? 0), 0)
+  const grossProfit = profitLoss?.netProfit != null
+    ? Number(profitLoss.netProfit)
+    : totalIncome - totalExpenses
 
   const statusCards = [
     { label: 'Total Income', color: 'green', icon: 'TrendingUp', count: formatCurrency(totalIncome) },

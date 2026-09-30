@@ -19,8 +19,9 @@ export function useApiResource(fetcher, deps = []) {
     try {
       const result = await stableFetch()
       if (Array.isArray(result)) setData(result)
-      else if (result?.items) setData(result.items)
-      else setData(result ?? [])
+      else if (Array.isArray(result?.items)) setData(result.items)
+      else if (Array.isArray(result?.rows)) setData(result.rows)
+      else setData([])
     } catch (err) {
       setError(err.message || 'Failed to load data')
       setData([])

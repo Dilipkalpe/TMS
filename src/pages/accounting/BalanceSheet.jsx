@@ -9,6 +9,14 @@ import { TablePrintButton } from '../../components/print/ReportPrintButton'
 import { useApiObject } from '../../hooks/useApiResource'
 import { accountingApi } from '../../services/api'
 
+function normalizeItems(items) {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    ...item,
+    name: item.name ?? item.code ?? '—',
+    amount: Number(item.amount ?? item.balance ?? 0),
+  }))
+}
+
 function Section({ title, items }) {
   const total = items.reduce((s, i) => s + (i.amount ?? 0), 0)
   return (
@@ -37,14 +45,19 @@ export default function BalanceSheet() {
   const params = useMemo(() => ({ month, year }), [month, year])
   const { data, loading, error, refresh } = useApiObject(() => accountingApi.balanceSheet(params), [month, year])
 
-  const assets = data?.assets ?? []
-  const liabilities = data?.liabilities ?? []
-  const capital = data?.capital ?? []
-  const totalAssets = assets.reduce((s, i) => s + (i.amount ?? 0), 0)
-  const totalLiab = liabilities.reduce((s, i) => s + (i.amount ?? 0), 0) + capital.reduce((s, i) => s + (i.amount ?? 0), 0)
+  const assets = normalizeItems(data?.assets)
+  const liabilities = normalizeItems(data?.liabilities)
+  const capital = normalizeItems(data?.capital)
+  const totalAssets = data?.totalAssets != null
+    ? Number(data.totalAssets)
+    : assets.reduce((s, i) => s + (i.amount ?? 0), 0)
+  const totalLiab = data?.totalLiabilitiesCapital != null
+    ? Number(data.totalLiabilitiesCapital)
+    : liabilities.reduce((s, i) => s + (i.amount ?? 0), 0) + capital.reduce((s, i) => s + (i.amount ?? 0), 0)
+  const periodLabel = data?.periodLabel ?? data?.asOf ?? 'Current'
 
   const statusCards = [
-    { label: 'Period', color: 'blue', icon: 'Calendar', count: data?.periodLabel ?? 'Current' },
+    { label: 'Period', color: 'blue', icon: 'Calendar', count: periodLabel },
     { label: 'Total Assets', color: 'green', icon: 'Landmark', count: formatCurrency(totalAssets) },
     { label: 'Total Liabilities', color: 'orange', icon: 'Scale', count: formatCurrency(liabilities.reduce((s, i) => s + i.amount, 0)) },
     { label: 'Balanced', color: 'violet', icon: 'CheckCircle', count: Math.abs(totalAssets - totalLiab) < 1 ? 'Yes' : 'No' },
@@ -79,7 +92,7 @@ export default function BalanceSheet() {
           <Input label="Year" type="number" min="2000" max="2100" value={year} onChange={(e) => setYear(e.target.value)} className="w-28" />
           <Button variant="outline" onClick={refresh}>Apply</Button>
           <TablePrintButton
-            title={`Balance Sheet — ${data?.periodLabel ?? ''}`}
+            title={`Balance Sheet — ${periodLabel}`}
             columns={printColumns}
             rows={printRows}
             summary={`Total Assets: ${formatCurrency(totalAssets)} · Total Liabilities & Capital: ${formatCurrency(totalLiab)}`}
