@@ -131,8 +131,8 @@
     text-align: center;
   }
 
-  /* Template variants T1–T5 */
-  .print-variant-T1 { /* Classic — default styles */ }
+  /* Template variants T1-T5 */
+  .print-variant-T1 { /* Classic - default styles */ }
 
   .print-variant-T2 {
     font-size: 10pt;
@@ -164,7 +164,7 @@
   .print-variant-T5 .print-table th { background: transparent !important; border-top: 2px solid #333; border-bottom: 2px solid #333; }
 }
 
-/* Classic Balaji / Morbi bilty (T6) � screen preview + print */
+/* Classic Balaji / Morbi bilty (T6) - screen preview + print */
 .lr-bilty {
   font-family: "Times New Roman", Times, Georgia, serif;
   color: #111;
