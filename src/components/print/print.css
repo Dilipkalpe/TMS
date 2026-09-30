@@ -163,3 +163,197 @@
   .print-variant-T5 .print-table td { border-left: none; border-right: none; }
   .print-variant-T5 .print-table th { background: transparent !important; border-top: 2px solid #333; border-bottom: 2px solid #333; }
 }
+
+/* Classic Balaji / Morbi bilty (T6) — screen preview + print */
+.lr-bilty {
+  font-family: "Times New Roman", Times, Georgia, serif;
+  color: #111;
+  background: #fff;
+  font-size: 10pt;
+  line-height: 1.25;
+}
+
+.lr-bilty-sheet {
+  position: relative;
+  border: 2px solid #111;
+  padding: 6px;
+  max-width: 210mm;
+  margin: 0 auto;
+}
+
+.lr-bilty-copy {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: 1px solid #111;
+  border-radius: 10px;
+  padding: 2px 10px;
+  font-size: 8.5pt;
+  font-weight: 700;
+  background: #fff;
+  z-index: 1;
+}
+
+.lr-bilty-header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 4px 4px 8px;
+  border-bottom: 1px solid #111;
+  margin-bottom: 0;
+}
+
+.lr-bilty-logo {
+  width: 72px;
+  flex-shrink: 0;
+}
+
+.lr-bilty-logo img,
+.lr-bilty-logo svg,
+.lr-bilty-logo .print-logo-img,
+.lr-bilty-logo .print-logo-svg {
+  width: 68px !important;
+  height: 68px !important;
+  object-fit: contain;
+}
+
+.lr-bilty-brand {
+  flex: 1;
+  text-align: center;
+  padding-right: 90px;
+}
+
+.lr-bilty-jurisdiction {
+  font-size: 8pt;
+  margin: 0;
+}
+
+.lr-bilty-name {
+  margin: 2px 0;
+  font-size: 22pt;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #1d4ed8;
+  line-height: 1.1;
+}
+
+.lr-bilty-tagline {
+  display: inline-block;
+  margin: 2px auto 4px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 9pt;
+  font-weight: 700;
+  padding: 2px 14px;
+  letter-spacing: 0.3px;
+}
+
+.lr-bilty-addr,
+.lr-bilty-phone {
+  margin: 1px 0;
+  font-size: 9.5pt;
+  color: #1d4ed8;
+  white-space: pre-line;
+}
+
+.lr-bilty-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.lr-bilty-table th,
+.lr-bilty-table td {
+  border: 1px solid #111;
+  padding: 4px 6px;
+  vertical-align: top;
+  font-size: 9.5pt;
+}
+
+.lr-bilty-table th {
+  background: #fff;
+  font-weight: 700;
+  text-align: center;
+}
+
+.lr-bilty-table .center { text-align: center; }
+.lr-bilty-table .num { text-align: right; }
+.lr-bilty-table .bold { font-weight: 700; }
+.lr-bilty-table .w-lr { width: 32%; }
+.lr-bilty-table .w-truck { width: 38%; }
+.lr-bilty-table .w-date { width: 30%; }
+.lr-bilty-table .w-half { width: 50%; }
+.lr-bilty-table .w-articles { width: 14%; }
+.lr-bilty-table .w-wt { width: 12%; }
+.lr-bilty-table .w-rate { width: 12%; }
+.lr-bilty-table .w-freight { width: 22%; }
+.lr-bilty-table .w-note { width: 68%; }
+.lr-bilty-table .w-sign { width: 32%; text-align: center; }
+
+.lr-bilty-parties td { min-height: 90px; height: 96px; }
+.lr-bilty-pre { margin: 2px 0 0; white-space: pre-line; min-height: 42px; }
+.lr-bilty-lines { margin-top: 4px; }
+.lr-bilty-line {
+  border-bottom: 1px solid #999;
+  height: 14px;
+  margin-bottom: 2px;
+}
+
+.lr-bilty-table .notice {
+  font-size: 8.5pt;
+  font-weight: 600;
+  padding: 3px 6px;
+}
+
+.lr-bilty-goods-row td { height: 70px; }
+.lr-bilty-goods-fill td { height: 56px; }
+
+.lr-bilty-charges {
+  padding: 0 !important;
+  vertical-align: top !important;
+}
+
+.lr-bilty-charges .charge-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px;
+  border-bottom: 1px solid #111;
+  font-size: 9pt;
+}
+
+.lr-bilty-charges .charge-row:last-child { border-bottom: none; }
+.lr-bilty-charges .charge-row.total {
+  font-weight: 800;
+  background: #f8fafc;
+}
+
+.lr-bilty-bank-cell { font-size: 8.5pt; }
+.lr-bilty-banks { display: grid; gap: 4px; }
+.lr-bilty-bank { line-height: 1.3; }
+.lr-bilty-bank-empty { color: #666; }
+
+.lr-bilty-footer td { min-height: 90px; }
+.lr-bilty-footnote {
+  margin: 0;
+  font-size: 8.5pt;
+  line-height: 1.35;
+}
+.lr-bilty-sign-space { height: 54px; }
+.lr-bilty-computer {
+  text-align: center;
+  font-size: 8.5pt;
+  margin: 6px 0 0;
+  font-weight: 600;
+}
+
+@media print {
+  .lr-bilty-name,
+  .lr-bilty-tagline,
+  .lr-bilty-addr,
+  .lr-bilty-phone {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .lr-bilty-sheet { border-width: 1.5pt; }
+}

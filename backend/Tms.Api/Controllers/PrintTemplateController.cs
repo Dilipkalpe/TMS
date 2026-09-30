@@ -21,7 +21,7 @@ public class PrintTemplateController(
         "IN_TRANSIT", "DELIVERY_COMPLETE", "POD", "BILLING",
     ];
 
-    public static readonly string[] TemplateCodes = ["T1", "T2", "T3", "T4", "T5"];
+    public static readonly string[] TemplateCodes = ["T1", "T2", "T3", "T4", "T5", "T6"];
 
     static readonly Dictionary<string, string> ModuleLabels = new(StringComparer.OrdinalIgnoreCase)
     {

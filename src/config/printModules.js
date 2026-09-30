@@ -12,7 +12,7 @@ export const PRINT_MODULE_CODES = {
   HUB_RECEIVING: 'HUB_RECEIVING',
 }
 
-export const PRINT_TEMPLATE_CODES = ['T1', 'T2', 'T3', 'T4', 'T5']
+export const PRINT_TEMPLATE_CODES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']
 
 /** Standard transport-business layout styles for a single document. */
 export const PRINT_TEMPLATE_LABELS = {
@@ -21,6 +21,7 @@ export const PRINT_TEMPLATE_LABELS = {
   T3: 'T3 — Full Border (office copy)',
   T4: 'T4 — Branded Modern',
   T5: 'T5 — Minimal (thermal-friendly)',
+  T6: 'T6 — Classic Bilty (Balaji / Morbi style)',
 }
 
 /** Individual document types — not list printouts. */

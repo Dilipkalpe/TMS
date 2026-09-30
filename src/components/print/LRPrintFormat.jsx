@@ -1,4 +1,5 @@
 import PrintCompanyHeader, { PrintFooter } from './PrintCompanyHeader'
+import LRBalajiBiltyPrintFormat from './LRBalajiBiltyPrintFormat'
 import { formatPrintCurrency, formatPrintDate, lrTotalCharges } from '../../utils/printUtils'
 
 function Cell({ label, value, wide }) {
@@ -11,6 +12,10 @@ function Cell({ label, value, wide }) {
 }
 
 export default function LRPrintFormat({ lr, company, variant = 'T1' }) {
+  if (variant === 'T6') {
+    return <LRBalajiBiltyPrintFormat lr={lr} company={company} />
+  }
+
   const total = lrTotalCharges(lr)
   const balance = lr.balance != null ? Number(lr.balance) : total - Number(lr.advance || 0)
 
