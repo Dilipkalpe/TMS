@@ -11,7 +11,13 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api")]
-public class BookingFinanceController(TmsDbContext db, IBranchContext branches, ITenantContext tenants, DocumentNumberService documentNumbers) : ControllerBase
+public class BookingFinanceController(
+    TmsDbContext db,
+    IBranchContext branches,
+    ITenantContext tenants,
+    DocumentNumberService documentNumbers,
+    TdsService tds,
+    Tms.Api.Services.Accounting.GlOpsPostingService glPosting) : ControllerBase
 {
     [HttpGet("bookings/{bookingId}/finance")]
     public async Task<ActionResult<object>> GetFinanceSummary(string bookingId)
@@ -116,6 +122,10 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
             return BadRequest(new ApiError(ex.Message));
         }
 
+        var tdsAmount = ApiParseHelper.BodyDecimal(body, "tdsAmount");
+        var grossAmount = ApiParseHelper.BodyDecimal(body, "grossAmount", amount + Math.Max(0, tdsAmount));
+        Guid? tdsSectionId = Guid.TryParse(ApiParseHelper.BodyString(body, "tdsSectionId"), out var tsid) ? tsid : null;
+
         var payment = new BookingPayment
         {
             Id = Guid.NewGuid(),
@@ -125,6 +135,9 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
             ReceiptNo = receiptNo,
             PaymentDate = paymentDate,
             Amount = amount,
+            GrossAmount = grossAmount > 0 ? grossAmount : amount,
+            TdsAmount = Math.Max(0, tdsAmount),
+            TdsSectionId = tdsSectionId,
             PaymentMode = ApiParseHelper.BodyString(body, "paymentMode") ?? "Cash",
             ReferenceNo = ApiParseHelper.BodyString(body, "referenceNo"),
             Remarks = ApiParseHelper.BodyString(body, "remarks"),
@@ -136,6 +149,33 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
             await BookingFinanceService.RecalculateFreightInvoiceStatusAsync(db, invoice);
         await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
         await db.SaveChangesAsync();
+
+        if (payment.TdsAmount > 0 && !string.IsNullOrWhiteSpace(booking.CustomerId))
+        {
+            var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == booking.CustomerId);
+            await tds.RecordReceivableAsync(
+                booking.CustomerId,
+                customer?.Name ?? booking.CustomerName ?? booking.CustomerId,
+                customer?.Pan,
+                payment.TdsSectionId ?? customer?.DefaultTdsSectionId,
+                payment.GrossAmount ?? (payment.Amount + payment.TdsAmount),
+                payment.Amount,
+                payment.TdsAmount,
+                paymentDate,
+                payment.FreightInvoiceId != null ? TdsSourceTypes.FreightInvoicePayment : TdsSourceTypes.BookingPayment,
+                payment.Id.ToString("N"),
+                receiptNo,
+                payment.PaymentMode,
+                payment.Remarks,
+                skipVoucher: true);
+        }
+
+        try
+        {
+            await glPosting.TryPostCustomerReceiptAsync(
+                payment, booking.CustomerId, booking.CustomerName, User.Identity?.Name);
+        }
+        catch { /* GL reconcile later */ }
 
         return Ok(new
         {
@@ -203,6 +243,8 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
             db.BookingBrokerCharges.Add(charge);
             await BookingFinanceService.SyncBrokerOutstandingAsync(db, booking.CompanyId, brokerName);
             await db.SaveChangesAsync();
+            try { await glPosting.TryPostBrokerChargeAsync(charge, User.Identity?.Name); }
+            catch { /* GL posting must not block ops */ }
             return Ok(MapBrokerCharge(charge));
         }
         catch (DbUpdateException ex)
@@ -246,6 +288,8 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
         db.BookingExpenses.Add(expense);
         await BookingFinanceService.SyncVendorOutstandingAsync(db, booking.CompanyId, expense.VendorId);
         await db.SaveChangesAsync();
+        try { await glPosting.TryPostBookingExpenseAsync(expense, User.Identity?.Name); }
+        catch { /* GL posting must not block ops */ }
         return Ok(MapExpense(expense));
     }
 
@@ -455,6 +499,8 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
         else
             await BookingFinanceService.SyncCustomerOutstandingAsync(db, prov.CompanyId, partyId);
         await db.SaveChangesAsync();
+        try { await glPosting.TryPostProvisionAsync(prov, User.Identity?.Name); }
+        catch { /* GL posting must not block ops */ }
         return Ok(MapProvision(prov));
     }
 
@@ -487,6 +533,9 @@ public class BookingFinanceController(TmsDbContext db, IBranchContext branches, 
         receiptNo = p.ReceiptNo,
         paymentDate = p.PaymentDate.ToString("yyyy-MM-dd"),
         amount = p.Amount,
+        grossAmount = p.GrossAmount ?? p.Amount,
+        tdsAmount = p.TdsAmount,
+        tdsSectionId = p.TdsSectionId,
         paymentMode = p.PaymentMode,
         referenceNo = p.ReferenceNo,
         remarks = p.Remarks

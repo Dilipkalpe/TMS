@@ -117,7 +117,10 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
                 variant="dense"
                 displayValue={common.vehicle}
                 placeholder="Search vehicle…"
-                onSelect={(row) => onChange('vehicle', row.number ?? '')}
+                onSelect={(row) => {
+                  onChange('vehicleId', row?.id ?? '')
+                  onChange('vehicle', row?.number ?? '')
+                }}
               />
             </Field>
             <Field>
@@ -126,7 +129,10 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
                 variant="dense"
                 displayValue={common.driver}
                 placeholder="Search driver…"
-                onSelect={(row) => onChange('driver', row.name ?? '')}
+                onSelect={(row) => {
+                  onChange('driverId', row?.id ?? '')
+                  onChange('driver', row?.name ?? '')
+                }}
               />
             </Field>
             <Field>

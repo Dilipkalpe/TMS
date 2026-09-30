@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ERPListPage from '../../components/ui/ERPListPage'
 import Badge, { statusVariant } from '../../components/ui/Badge'
@@ -7,17 +8,21 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { expensesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
-
-const expenseCategories = ['Fuel', 'Toll', 'Maintenance', 'Salary', 'Office Expense', 'Miscellaneous']
+import { DEFAULT_EXPENSE_CATEGORIES, loadExpenseCategories } from '../../constants/expenseCategories'
 
 export default function ExpenseList() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const [expenseCategories, setExpenseCategories] = useState(DEFAULT_EXPENSE_CATEGORIES)
   const paged = usePagedApiResource(
     ({ page, pageSize, search, filter }) =>
       expensesApi.list(buildListParams({ page, pageSize, search, filter, filterKey: 'category' })),
     [],
   )
+
+  useEffect(() => {
+    loadExpenseCategories(expensesApi).then(setExpenseCategories)
+  }, [])
 
   const columns = withAuditColumns([
     { key: 'id', label: 'ID' },

@@ -6,7 +6,7 @@ export const SUPPORTED_BILL_TYPES = [
 ]
 
 export const PAYMENT_TERMS = ['Immediate', '7 Days', '15 Days', '30 Days', '45 Days', '60 Days']
-export const PAYMENT_MODES = ['Cash', 'Cheque', 'NEFT', 'RTGS', 'UPI', 'Credit']
+export { PAYMENT_MODES } from '../constants/paymentModes'
 
 export function normalizeBillType(type) {
   const t = String(type || 'FC').toUpperCase()

@@ -4,8 +4,9 @@ import ERPContentPage from '../../components/ui/ERPContentPage'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea } from '../../components/ui/Input'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
-import { freightRatesApi } from '../../services/api'
+import { customersApi, freightRatesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 
 const vehicleTypes = ['', '32 FT Container', '20 FT Container', 'Trailer', '16 FT Truck']
@@ -25,6 +26,7 @@ export default function FreightRateDetails() {
         toCity: r.toCity || '',
         vehicleType: r.vehicleType || '',
         customerId: r.customerId || '',
+        customerName: r.customerName || '',
         rateAmount: r.rateAmount ?? '',
         rateUnit: r.rateUnit || 'PerTrip',
         validFrom: r.validFrom || '',
@@ -78,7 +80,19 @@ export default function FreightRateDetails() {
         <Input label="To City" value={form.toCity} onChange={(e) => setForm((f) => ({ ...f, toCity: e.target.value }))} />
         <Select label="Vehicle Type" value={form.vehicleType} onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value }))}
           options={vehicleTypes.map((v) => ({ value: v, label: v || 'Any' }))} />
-        <Input label="Customer Id" value={form.customerId} onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))} />
+        <PartyMasterSelect
+          label="Customer (optional)"
+          api={customersApi}
+          masterKey="customers"
+          valueId={form.customerId}
+          displayValue={form.customerName}
+          placeholder="Search customer…"
+          onSelect={(row) => setForm((f) => ({
+            ...f,
+            customerId: row?.id ?? '',
+            customerName: row?.name ?? row?.companyName ?? '',
+          }))}
+        />
         <Input label="Rate Amount" type="number" value={form.rateAmount} onChange={(e) => setForm((f) => ({ ...f, rateAmount: e.target.value }))} />
         <Select label="Rate Unit" value={form.rateUnit} onChange={(e) => setForm((f) => ({ ...f, rateUnit: e.target.value }))}
           options={[{ value: 'PerTrip', label: 'Per Trip' }, { value: 'PerTon', label: 'Per Ton' }, { value: 'PerKm', label: 'Per Km' }]} />

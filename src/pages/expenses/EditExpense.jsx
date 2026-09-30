@@ -6,11 +6,12 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input, { Select } from '../../components/ui/Input'
 import ExpenseAttachmentField from '../../components/expenses/ExpenseAttachmentField'
-import { expensesApi } from '../../services/api'
+import VehicleMasterSelect from '../../components/masters/VehicleMasterSelect'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
+import { expensesApi, vendorsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
-
-const CATEGORIES = ['Fuel', 'Toll', 'Maintenance', 'Salary', 'Office Expense', 'Miscellaneous']
-const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'FASTag', 'UPI']
+import { PAYMENT_MODES, DEFAULT_PAYMENT_MODE } from '../../constants/paymentModes'
+import { DEFAULT_EXPENSE_CATEGORIES, loadExpenseCategories } from '../../constants/expenseCategories'
 
 export default function EditExpense() {
   const { id } = useParams()
@@ -21,14 +22,17 @@ export default function EditExpense() {
   const [uploading, setUploading] = useState(false)
   const [attachments, setAttachments] = useState([])
   const [pendingFiles, setPendingFiles] = useState([])
+  const [categories, setCategories] = useState(DEFAULT_EXPENSE_CATEGORIES)
   const [form, setForm] = useState({
     date: '',
     category: 'Miscellaneous',
     description: '',
     vehicle: '',
+    vehicleId: '',
     vendor: '',
+    vendorId: '',
     amount: '',
-    paymentmode: 'Cash',
+    paymentmode: DEFAULT_PAYMENT_MODE,
     status: 'Approved',
   })
 
@@ -41,9 +45,11 @@ export default function EditExpense() {
         category: e.category || 'Miscellaneous',
         description: e.description || '',
         vehicle: e.vehicle || '',
+        vehicleId: e.vehicleId || '',
         vendor: e.vendor || '',
+        vendorId: e.vendorId || '',
         amount: e.amount != null ? String(e.amount) : '',
-        paymentmode: e.paymentMode || 'Cash',
+        paymentmode: e.paymentMode || DEFAULT_PAYMENT_MODE,
         status: e.status || 'Approved',
       })
       setAttachments(e.attachments || (await expensesApi.listAttachments(id)) || [])
@@ -55,9 +61,10 @@ export default function EditExpense() {
     }
   }
 
-  useEffect(() => { load() }, [id])
-
-  const setField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }))
+  useEffect(() => {
+    loadExpenseCategories(expensesApi).then(setCategories)
+    load()
+  }, [id])
 
   const save = async () => {
     setSaving(true)
@@ -67,7 +74,9 @@ export default function EditExpense() {
         category: form.category,
         description: form.description,
         vehicle: form.vehicle,
+        vehicleId: form.vehicleId || undefined,
         vendor: form.vendor,
+        vendorId: form.vendorId || undefined,
         amount: Number(form.amount) || 0,
         paymentMode: form.paymentmode,
         status: form.status,
@@ -122,14 +131,31 @@ export default function EditExpense() {
     <ERPContentPage module="Expenses" title={`Edit Expense — ${id}`}>
       <Card>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input label="Expense Date" type="date" value={form.date} onChange={(e) => setField('date', e.target.value)} />
-          <Select label="Category" value={form.category} onChange={(e) => setField('category', e.target.value)} options={CATEGORIES} />
-          <Input label="Amount (₹)" type="number" value={form.amount} onChange={(e) => setField('amount', e.target.value)} />
-          <Input label="Description" value={form.description} onChange={(e) => setField('description', e.target.value)} className="sm:col-span-2" />
-          <Input label="Vehicle" value={form.vehicle} onChange={(e) => setField('vehicle', e.target.value)} />
-          <Input label="Vendor" value={form.vendor} onChange={(e) => setField('vendor', e.target.value)} />
-          <Select label="Payment Mode" value={form.paymentmode} onChange={(e) => setField('paymentmode', e.target.value)} options={PAYMENT_MODES} />
-          <Select label="Status" value={form.status} onChange={(e) => setField('status', e.target.value)} options={['Approved', 'Pending', 'Rejected']} />
+          <Input label="Expense Date" type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+          <Select label="Category" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} options={categories} />
+          <Input label="Amount (₹)" type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+          <Input label="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="sm:col-span-2" />
+          <VehicleMasterSelect
+            label="Vehicle"
+            displayValue={form.vehicle}
+            placeholder="Search vehicle number…"
+            onSelect={(row) => setForm((f) => ({ ...f, vehicleId: row?.id ?? '', vehicle: row?.number ?? '' }))}
+          />
+          <PartyMasterSelect
+            label="Vendor"
+            api={vendorsApi}
+            masterKey="vendors"
+            valueId={form.vendorId}
+            displayValue={form.vendor}
+            placeholder="Search vendor…"
+            onSelect={(row) => setForm((f) => ({
+              ...f,
+              vendorId: row?.id ?? '',
+              vendor: row?.name ?? row?.companyName ?? '',
+            }))}
+          />
+          <Select label="Payment Mode" value={form.paymentmode} onChange={(e) => setForm((f) => ({ ...f, paymentmode: e.target.value }))} options={PAYMENT_MODES} />
+          <Select label="Status" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} options={['Approved', 'Pending', 'Rejected']} />
 
           <ExpenseAttachmentField
             pendingFiles={pendingFiles}

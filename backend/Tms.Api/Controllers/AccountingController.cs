@@ -17,7 +17,11 @@ public class AccountingController(
     IBranchContext branches,
     AccountingRegisterJobService registers,
     AccountingReadService accountingRead,
-    DocumentNumberService documentNumbers) : ControllerBase
+    DocumentNumberService documentNumbers,
+    TdsService tds,
+    Tms.Api.Services.Accounting.GlOpsPostingService glPosting,
+    Tms.Api.Services.Accounting.GlReportService glReports,
+    Tms.Api.Services.Accounting.AccountingPostingEngine glEngine) : ControllerBase
 {
     [HttpGet("chart-of-accounts")]
     public async Task<ActionResult<object>> ChartOfAccounts()
@@ -62,14 +66,18 @@ public class AccountingController(
         q = q.OrderBy(l => l.Code);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
-        var live = await AccountingReportService.BuildLiveAccountBalancesAsync(db, tenants, branches);
-        var rows = items.Select(l => (object)new
+        var useGl = await glReports.UseGlReportsAsync();
+        var live = useGl ? null : await AccountingReportService.BuildLiveAccountBalancesAsync(db, tenants, branches);
+        var rows = new List<object>();
+        foreach (var l in items)
         {
-            code = l.Code,
-            name = l.Name,
-            type = l.AccountType,
-            balance = Math.Abs(AccountingReportService.ResolveLiveBalance(live, l.Code, l.Name)),
-        }).ToList();
+            decimal bal;
+            if (useGl)
+                bal = await glEngine.GetLedgerBalanceAsync(l.Id);
+            else
+                bal = AccountingReportService.ResolveLiveBalance(live!, l.Code, l.Name);
+            rows.Add(new { code = l.Code, name = l.Name, type = l.AccountType, balance = Math.Abs(bal), id = l.Id, openingBalance = l.OpeningBalance });
+        }
         return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }
 
@@ -123,26 +131,56 @@ public class AccountingController(
             CreatedAt = DateTime.UtcNow
         };
         db.Vouchers.Add(v);
-        if (!string.IsNullOrEmpty(body.GetValueOrDefault("debitLedger")?.ToString()))
+
+        string? BodyStr(string key) =>
+            body.TryGetValue(key, out var raw) ? raw?.ToString() : null;
+
+        Guid? ParseLedgerId(string key) =>
+            Guid.TryParse(BodyStr(key), out var id) ? id : null;
+
+        async Task<(Guid? Id, string? Name)> ResolveLedgerAsync(string idKey, string nameKey)
+        {
+            var id = ParseLedgerId(idKey);
+            var name = BodyStr(nameKey);
+            if (id != null)
+            {
+                var acc = await tenants.Filter(db.LedgerAccounts.AsQueryable()).FirstOrDefaultAsync(a => a.Id == id);
+                if (acc != null) return (acc.Id, acc.Name);
+            }
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                var acc = await tenants.Filter(db.LedgerAccounts.AsQueryable())
+                    .FirstOrDefaultAsync(a => a.Name == name);
+                if (acc != null) return (acc.Id, acc.Name);
+                return (null, name);
+            }
+            return (null, null);
+        }
+
+        var debit = await ResolveLedgerAsync("debitLedgerId", "debitLedger");
+        if (debit.Name != null || debit.Id != null)
         {
             db.VoucherLines.Add(new VoucherLine
             {
                 Id = Guid.NewGuid(),
                 CompanyId = companyId,
                 VoucherId = v.Id,
-                LedgerName = body["debitLedger"]?.ToString(),
+                LedgerAccountId = debit.Id,
+                LedgerName = debit.Name,
                 Debit = amount, Credit = 0,
                 LineNarration = v.Narration
             });
         }
-        if (!string.IsNullOrEmpty(body.GetValueOrDefault("creditLedger")?.ToString()))
+        var credit = await ResolveLedgerAsync("creditLedgerId", "creditLedger");
+        if (credit.Name != null || credit.Id != null)
         {
             db.VoucherLines.Add(new VoucherLine
             {
                 Id = Guid.NewGuid(),
                 CompanyId = companyId,
                 VoucherId = v.Id,
-                LedgerName = body["creditLedger"]?.ToString(),
+                LedgerAccountId = credit.Id,
+                LedgerName = credit.Name,
                 Debit = 0, Credit = amount,
                 LineNarration = v.Narration
             });
@@ -321,12 +359,20 @@ public class AccountingController(
         Ok(await AccountingReportService.BuildVehicleLedgerAsync(db, tenants, branches));
 
     [HttpGet("trial-balance")]
-    public async Task<ActionResult<object>> TrialBalance() =>
-        Ok(await AccountingReportService.BuildTrialBalanceAsync(db, tenants, branches));
+    public async Task<ActionResult<object>> TrialBalance()
+    {
+        if (await glReports.UseGlReportsAsync())
+            return Ok(await glReports.TrialBalanceAsync());
+        return Ok(await AccountingReportService.BuildTrialBalanceAsync(db, tenants, branches));
+    }
 
     [HttpGet("profit-loss")]
-    public async Task<ActionResult<object>> ProfitLoss() =>
-        Ok(await AccountingReportService.BuildProfitLossAsync(db, tenants, branches));
+    public async Task<ActionResult<object>> ProfitLoss()
+    {
+        if (await glReports.UseGlReportsAsync())
+            return Ok(await glReports.ProfitAndLossAsync(null, null));
+        return Ok(await AccountingReportService.BuildProfitLossAsync(db, tenants, branches));
+    }
 
     [HttpGet("balance-sheet")]
     public async Task<ActionResult<object>> BalanceSheet([FromQuery] int? month, [FromQuery] int? year)
@@ -334,6 +380,8 @@ public class AccountingController(
         var refDate = DateOnly.FromDateTime(DateTime.UtcNow);
         if (month is >= 1 and <= 12 && year is >= 2000)
             refDate = new DateOnly(year.Value, month.Value, DateTime.DaysInMonth(year.Value, month.Value));
+        if (await glReports.UseGlReportsAsync())
+            return Ok(await glReports.BalanceSheetAsync(refDate));
 
         var periodStart = new DateOnly(refDate.Year, refDate.Month, 1);
         var bookings = TenantScope.Bookings(db, tenants, branches);
@@ -665,6 +713,9 @@ public class AccountingController(
         var paymentMode = ApiParseHelper.BodyString(body, "paymentMode") ?? "Cash";
         var referenceNo = ApiParseHelper.BodyString(body, "referenceNo");
         var remarks = ApiParseHelper.BodyString(body, "remarks");
+        var tdsAmount = Math.Max(0, ApiParseHelper.BodyDecimal(body, "tdsAmount"));
+        var grossAmount = ApiParseHelper.BodyDecimal(body, "grossAmount", amount + tdsAmount);
+        Guid? tdsSectionId = Guid.TryParse(ApiParseHelper.BodyString(body, "tdsSectionId"), out var tsid) ? tsid : null;
 
         if (sourceType is "booking")
         {
@@ -716,6 +767,9 @@ public class AccountingController(
                 ReceiptNo = receiptNo,
                 PaymentDate = paymentDate,
                 Amount = amount,
+                GrossAmount = grossAmount > 0 ? grossAmount : amount,
+                TdsAmount = tdsAmount,
+                TdsSectionId = tdsSectionId,
                 PaymentMode = paymentMode,
                 ReferenceNo = referenceNo,
                 Remarks = remarks,
@@ -728,6 +782,33 @@ public class AccountingController(
             await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
             await db.SaveChangesAsync();
 
+            if (payment.TdsAmount > 0 && !string.IsNullOrWhiteSpace(booking.CustomerId))
+            {
+                var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == booking.CustomerId);
+                await tds.RecordReceivableAsync(
+                    booking.CustomerId,
+                    customer?.Name ?? booking.CustomerName ?? booking.CustomerId,
+                    customer?.Pan,
+                    payment.TdsSectionId ?? customer?.DefaultTdsSectionId,
+                    payment.GrossAmount ?? (payment.Amount + payment.TdsAmount),
+                    payment.Amount,
+                    payment.TdsAmount,
+                    paymentDate,
+                    payment.FreightInvoiceId != null ? TdsSourceTypes.FreightInvoicePayment : TdsSourceTypes.BookingPayment,
+                    payment.Id.ToString("N"),
+                    receiptNo,
+                    paymentMode,
+                    remarks,
+                    skipVoucher: true);
+            }
+
+            try
+            {
+                await glPosting.TryPostCustomerReceiptAsync(
+                    payment, booking.CustomerId, booking.CustomerName, User.Identity?.Name);
+            }
+            catch { /* reconcile later */ }
+
             return Ok(new
             {
                 message = "Payment recorded.",
@@ -736,6 +817,7 @@ public class AccountingController(
                 sourceId = booking.Id,
                 outstanding = booking.Balance,
                 paymentStatus = booking.Payment,
+                tdsAmount = payment.TdsAmount,
             });
         }
 
@@ -791,6 +873,9 @@ public class AccountingController(
                 ReceiptNo = receiptNo,
                 PaymentDate = paymentDate,
                 Amount = amount,
+                GrossAmount = grossAmount > 0 ? grossAmount : amount,
+                TdsAmount = tdsAmount,
+                TdsSectionId = tdsSectionId,
                 PaymentMode = paymentMode,
                 ReferenceNo = referenceNo,
                 Remarks = remarks,
@@ -809,6 +894,34 @@ public class AccountingController(
             }
             await db.SaveChangesAsync();
 
+            var custId = booking?.CustomerId ?? inv.CustomerId;
+            if (payment.TdsAmount > 0 && !string.IsNullOrWhiteSpace(custId))
+            {
+                var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == custId);
+                await tds.RecordReceivableAsync(
+                    custId,
+                    customer?.Name ?? inv.CustomerName ?? custId,
+                    customer?.Pan,
+                    payment.TdsSectionId ?? customer?.DefaultTdsSectionId,
+                    payment.GrossAmount ?? (payment.Amount + payment.TdsAmount),
+                    payment.Amount,
+                    payment.TdsAmount,
+                    paymentDate,
+                    TdsSourceTypes.FreightInvoicePayment,
+                    payment.Id.ToString("N"),
+                    receiptNo,
+                    paymentMode,
+                    remarks,
+                    skipVoucher: true);
+            }
+
+            try
+            {
+                await glPosting.TryPostCustomerReceiptAsync(
+                    payment, custId, inv.CustomerName, User.Identity?.Name);
+            }
+            catch { /* reconcile later */ }
+
             return Ok(new
             {
                 message = "Payment recorded.",
@@ -817,6 +930,7 @@ public class AccountingController(
                 sourceId = inv.Id,
                 outstanding = inv.Balance,
                 invoiceStatus = inv.Status,
+                tdsAmount = payment.TdsAmount,
             });
         }
 
@@ -850,6 +964,9 @@ public class AccountingController(
                 ReceiptNo = receiptNo,
                 PaymentDate = paymentDate,
                 Amount = amount,
+                GrossAmount = grossAmount > 0 ? grossAmount : amount,
+                TdsAmount = tdsAmount,
+                TdsSectionId = tdsSectionId,
                 PaymentMode = paymentMode,
                 ReferenceNo = referenceNo,
                 Remarks = remarks,
@@ -874,6 +991,33 @@ public class AccountingController(
             await BookingFinanceService.SyncCustomerOutstandingAsync(db, lr.CompanyId, lr.CustomerId);
             await db.SaveChangesAsync();
 
+            if (payment.TdsAmount > 0 && !string.IsNullOrWhiteSpace(lr.CustomerId))
+            {
+                var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == lr.CustomerId);
+                await tds.RecordReceivableAsync(
+                    lr.CustomerId,
+                    customer?.Name ?? lr.CustomerName ?? lr.CustomerId,
+                    customer?.Pan,
+                    payment.TdsSectionId ?? customer?.DefaultTdsSectionId,
+                    payment.GrossAmount ?? (payment.Amount + payment.TdsAmount),
+                    payment.Amount,
+                    payment.TdsAmount,
+                    paymentDate,
+                    TdsSourceTypes.BookingPayment,
+                    payment.Id.ToString("N"),
+                    receiptNo,
+                    paymentMode,
+                    remarks,
+                    skipVoucher: true);
+            }
+
+            try
+            {
+                await glPosting.TryPostCustomerReceiptAsync(
+                    payment, lr.CustomerId, lr.CustomerName, User.Identity?.Name);
+            }
+            catch { /* reconcile later */ }
+
             return Ok(new
             {
                 message = "Payment recorded.",
@@ -881,6 +1025,7 @@ public class AccountingController(
                 sourceType,
                 sourceId = lr.LrNumber,
                 outstanding = lr.Balance,
+                tdsAmount = payment.TdsAmount,
             });
         }
 

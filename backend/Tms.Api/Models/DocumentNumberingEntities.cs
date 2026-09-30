@@ -13,11 +13,12 @@ public static class DocumentNumberTypes
     public const string TransitPass = "TransitPass";
     public const string DeliverySheet = "DeliverySheet";
     public const string HubManifest = "HubManifest";
+    public const string VendorPayment = "VendorPayment";
 
     public static readonly IReadOnlyList<string> All =
     [
         Booking, Quotation, LR, Trip, Invoice, Receipt, Pod,
-        LoadingSheet, TransitPass, DeliverySheet, HubManifest,
+        LoadingSheet, TransitPass, DeliverySheet, HubManifest, VendorPayment,
     ];
 
     public static string DefaultPrefix(string documentType) => documentType switch
@@ -33,6 +34,7 @@ public static class DocumentNumberTypes
         TransitPass => "TP",
         DeliverySheet => "DS",
         HubManifest => "HM",
+        VendorPayment => "VP",
         _ => documentType.ToUpperInvariant()[..Math.Min(3, documentType.Length)],
     };
 }

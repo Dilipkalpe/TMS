@@ -254,8 +254,12 @@ public class CustomersController(TmsDbContext db, IBranchContext branches, ITena
             Phone = body.GetValueOrDefault("phone")?.ToString(),
             Email = body.GetValueOrDefault("email")?.ToString(),
             Gst = body.GetValueOrDefault("gst")?.ToString(),
+            Pan = body.GetValueOrDefault("pan")?.ToString()?.Trim().ToUpperInvariant(),
             Address = body.GetValueOrDefault("address")?.ToString(),
             CreditLimit = decimal.TryParse(body.GetValueOrDefault("creditLimit")?.ToString(), out var cl) ? cl : 0,
+            TdsApplicable = body.GetValueOrDefault("tdsApplicable")?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
+                || body.GetValueOrDefault("tdsApplicable") is bool tba && tba,
+            DefaultTdsSectionId = Guid.TryParse(body.GetValueOrDefault("defaultTdsSectionId")?.ToString(), out var cts) ? cts : null,
             BranchId = branches.AssignBranchId,
             CompanyId = TenantScope.ResolveCompanyId(tenants),
             CreatedAt = DateTime.UtcNow,
@@ -276,7 +280,13 @@ public class CustomersController(TmsDbContext db, IBranchContext branches, ITena
         if (body.ContainsKey("phone")) c.Phone = body["phone"]?.ToString();
         if (body.ContainsKey("email")) c.Email = body["email"]?.ToString();
         if (body.ContainsKey("gst")) c.Gst = body["gst"]?.ToString();
+        if (body.ContainsKey("pan")) c.Pan = body["pan"]?.ToString()?.Trim().ToUpperInvariant();
         if (body.ContainsKey("address")) c.Address = body["address"]?.ToString();
+        if (body.ContainsKey("tdsApplicable"))
+            c.TdsApplicable = body["tdsApplicable"]?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
+                || body["tdsApplicable"] is bool tba && tba;
+        if (body.ContainsKey("defaultTdsSectionId"))
+            c.DefaultTdsSectionId = Guid.TryParse(body["defaultTdsSectionId"]?.ToString(), out var cts) ? cts : null;
         c.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return Ok(EntityMappers.ToDto(c));
@@ -355,8 +365,12 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants, IBranchC
             Phone = body.GetValueOrDefault("phone")?.ToString(),
             Email = body.GetValueOrDefault("email")?.ToString(),
             Gst = body.GetValueOrDefault("gst")?.ToString(),
+            Pan = body.GetValueOrDefault("pan")?.ToString()?.Trim().ToUpperInvariant(),
             Address = body.GetValueOrDefault("address")?.ToString(),
             Category = body.GetValueOrDefault("category")?.ToString(),
+            TdsApplicable = body.GetValueOrDefault("tdsApplicable")?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
+                || body.GetValueOrDefault("tdsApplicable") is bool tba && tba,
+            DefaultTdsSectionId = Guid.TryParse(body.GetValueOrDefault("defaultTdsSectionId")?.ToString(), out var vts) ? vts : null,
             CompanyId = TenantScope.ResolveCompanyId(tenants),
             BranchId = branches.AssignBranchId,
             CreatedAt = DateTime.UtcNow,
@@ -375,7 +389,16 @@ public class VendorsController(TmsDbContext db, ITenantContext tenants, IBranchC
         if (body.ContainsKey("name")) v.Name = body["name"]?.ToString() ?? v.Name;
         if (body.ContainsKey("contact")) v.Contact = body["contact"]?.ToString();
         if (body.ContainsKey("phone")) v.Phone = body["phone"]?.ToString();
+        if (body.ContainsKey("email")) v.Email = body["email"]?.ToString();
+        if (body.ContainsKey("gst")) v.Gst = body["gst"]?.ToString();
+        if (body.ContainsKey("pan")) v.Pan = body["pan"]?.ToString()?.Trim().ToUpperInvariant();
+        if (body.ContainsKey("address")) v.Address = body["address"]?.ToString();
         if (body.ContainsKey("category")) v.Category = body["category"]?.ToString();
+        if (body.ContainsKey("tdsApplicable"))
+            v.TdsApplicable = body["tdsApplicable"]?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
+                || body["tdsApplicable"] is bool tba && tba;
+        if (body.ContainsKey("defaultTdsSectionId"))
+            v.DefaultTdsSectionId = Guid.TryParse(body["defaultTdsSectionId"]?.ToString(), out var vts) ? vts : null;
         v.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return Ok(EntityMappers.ToDto(v));
@@ -633,7 +656,8 @@ public class ExpensesController(
     TmsDbContext db,
     IBranchContext branches,
     ITenantContext tenants,
-    IWebHostEnvironment env) : ControllerBase
+    IWebHostEnvironment env,
+    Tms.Api.Services.Accounting.GlOpsPostingService glPosting) : ControllerBase
 {
     string AttachmentRoot => Path.Combine(env.ContentRootPath, "App_Data", "expense-attachments");
     string? CurrentUser() => User.Identity?.Name;
@@ -674,8 +698,17 @@ public class ExpensesController(
     {
         var id = await IdGenerator.NextExpenseId(db);
         var vehicleNum = body.GetValueOrDefault("vehicle")?.ToString();
-        var vehicle = !string.IsNullOrEmpty(vehicleNum)
-            ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleNum) : null;
+        var vehicleIdBody = body.GetValueOrDefault("vehicleId")?.ToString();
+        var vehicle = !string.IsNullOrEmpty(vehicleIdBody) || !string.IsNullOrEmpty(vehicleNum)
+            ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleIdBody ?? vehicleNum) : null;
+        var vendorIdBody = body.GetValueOrDefault("vendorId")?.ToString();
+        var vendorName = body.GetValueOrDefault("vendor")?.ToString()
+            ?? body.GetValueOrDefault("vendorName")?.ToString();
+        Vendor? vendor = null;
+        if (!string.IsNullOrEmpty(vendorIdBody))
+            vendor = await TenantScope.FindVendorByRefAsync(db, tenants, branches, vendorIdBody);
+        else if (!string.IsNullOrEmpty(vendorName))
+            vendor = await TenantScope.FindVendorByRefAsync(db, tenants, branches, vendorName);
         var exp = new Expense
         {
             Id = id,
@@ -683,8 +716,9 @@ public class ExpensesController(
             Category = body.GetValueOrDefault("category")?.ToString() ?? "Miscellaneous",
             Description = body.GetValueOrDefault("description")?.ToString(),
             VehicleId = vehicle?.Id,
-            VehicleNumber = vehicleNum,
-            VendorName = body.GetValueOrDefault("vendor")?.ToString(),
+            VehicleNumber = vehicle?.Number ?? vehicleNum,
+            VendorId = vendor?.Id ?? vendorIdBody,
+            VendorName = vendor?.Name ?? vendorName,
             Amount = decimal.TryParse(body.GetValueOrDefault("amount")?.ToString(), out var amt) ? amt : 0,
             PaymentMode = body.GetValueOrDefault("paymentMode")?.ToString(),
             Status = body.GetValueOrDefault("status")?.ToString() ?? "Approved",
@@ -696,6 +730,8 @@ public class ExpensesController(
         };
         db.Expenses.Add(exp);
         await db.SaveChangesAsync();
+        try { await glPosting.TryPostExpenseAsync(exp, CurrentUser()); }
+        catch { /* reconcile via GL tools if posting fails */ }
         return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(exp, []));
     }
 
@@ -708,15 +744,28 @@ public class ExpensesController(
             exp.ExpenseDate = dt;
         if (body.ContainsKey("category")) exp.Category = body["category"]?.ToString() ?? exp.Category;
         if (body.ContainsKey("description")) exp.Description = body["description"]?.ToString();
-        if (body.ContainsKey("vehicle"))
+        if (body.ContainsKey("vehicle") || body.ContainsKey("vehicleId"))
         {
-            var vehicleNum = body["vehicle"]?.ToString();
-            var vehicle = !string.IsNullOrEmpty(vehicleNum)
-                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleNum) : null;
+            var vehicleNum = body.GetValueOrDefault("vehicle")?.ToString();
+            var vehicleIdBody = body.GetValueOrDefault("vehicleId")?.ToString();
+            var vehicle = !string.IsNullOrEmpty(vehicleIdBody) || !string.IsNullOrEmpty(vehicleNum)
+                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleIdBody ?? vehicleNum) : null;
             exp.VehicleId = vehicle?.Id;
-            exp.VehicleNumber = vehicleNum;
+            exp.VehicleNumber = vehicle?.Number ?? vehicleNum;
         }
-        if (body.ContainsKey("vendor")) exp.VendorName = body["vendor"]?.ToString();
+        if (body.ContainsKey("vendor") || body.ContainsKey("vendorId") || body.ContainsKey("vendorName"))
+        {
+            var vendorIdBody = body.GetValueOrDefault("vendorId")?.ToString();
+            var vendorName = body.GetValueOrDefault("vendor")?.ToString()
+                ?? body.GetValueOrDefault("vendorName")?.ToString();
+            Vendor? vendor = null;
+            if (!string.IsNullOrEmpty(vendorIdBody))
+                vendor = await TenantScope.FindVendorByRefAsync(db, tenants, branches, vendorIdBody);
+            else if (!string.IsNullOrEmpty(vendorName))
+                vendor = await TenantScope.FindVendorByRefAsync(db, tenants, branches, vendorName);
+            exp.VendorId = vendor?.Id ?? vendorIdBody;
+            exp.VendorName = vendor?.Name ?? vendorName;
+        }
         if (body.ContainsKey("amount") && decimal.TryParse(body["amount"]?.ToString(), out var amt)) exp.Amount = amt;
         if (body.ContainsKey("paymentMode")) exp.PaymentMode = body["paymentMode"]?.ToString();
         if (body.ContainsKey("status")) exp.Status = body["status"]?.ToString() ?? exp.Status;
@@ -1262,11 +1311,13 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
             return BadRequest(new ApiError(ex.Message));
         }
         var vehicleNum = Visible(fieldMap, "Vehicle") ? ApiParseHelper.BodyString(body, "vehicle") : null;
-        var vehicle = !string.IsNullOrEmpty(vehicleNum)
-            ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleNum) : null;
+        var vehicleIdBody = Visible(fieldMap, "Vehicle") ? ApiParseHelper.BodyString(body, "vehicleId") : null;
+        var vehicle = !string.IsNullOrEmpty(vehicleIdBody) || !string.IsNullOrEmpty(vehicleNum)
+            ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleIdBody ?? vehicleNum) : null;
         var driverName = Visible(fieldMap, "Driver") ? ApiParseHelper.BodyString(body, "driver") : null;
-        var driver = !string.IsNullOrEmpty(driverName)
-            ? await ResolveDriverAsync(driverName) : null;
+        var driverIdBody = Visible(fieldMap, "Driver") ? ApiParseHelper.BodyString(body, "driverId") : null;
+        var driver = !string.IsNullOrEmpty(driverIdBody) || !string.IsNullOrEmpty(driverName)
+            ? await ResolveDriverAsync(driverIdBody ?? driverName) : null;
         var freight = Visible(fieldMap, "Freight") ? ApiParseHelper.BodyDecimal(body, "freight") : 0;
         var gst = body.ContainsKey("gst") && Visible(fieldMap, "GstPercent")
             ? ApiParseHelper.BodyDecimal(body, "gst")
@@ -1430,19 +1481,21 @@ public class LrController(TmsDbContext db, ITenantContext tenants, IBranchContex
         if (body.ContainsKey("to") && !string.IsNullOrWhiteSpace(ApiParseHelper.BodyString(body, "to")))
             lr.ToCity = ApiParseHelper.BodyString(body, "to")!;
 
-        if (body.ContainsKey("vehicle"))
+        if (body.ContainsKey("vehicle") || body.ContainsKey("vehicleId"))
         {
             var vehicleNum = ApiParseHelper.BodyString(body, "vehicle");
-            var vehicle = !string.IsNullOrEmpty(vehicleNum)
-                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleNum) : null;
+            var vehicleIdBody = ApiParseHelper.BodyString(body, "vehicleId");
+            var vehicle = !string.IsNullOrEmpty(vehicleIdBody) || !string.IsNullOrEmpty(vehicleNum)
+                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleIdBody ?? vehicleNum) : null;
             lr.VehicleId = vehicle?.Id;
             lr.VehicleNumber = vehicle?.Number ?? vehicleNum;
         }
-        if (body.ContainsKey("driver"))
+        if (body.ContainsKey("driver") || body.ContainsKey("driverId"))
         {
             var driverName = ApiParseHelper.BodyString(body, "driver");
-            var driver = !string.IsNullOrEmpty(driverName)
-                ? await ResolveDriverAsync(driverName) : null;
+            var driverIdBody = ApiParseHelper.BodyString(body, "driverId");
+            var driver = !string.IsNullOrEmpty(driverIdBody) || !string.IsNullOrEmpty(driverName)
+                ? await ResolveDriverAsync(driverIdBody ?? driverName) : null;
             lr.DriverId = driver?.Id;
             lr.DriverName = driver?.Name ?? driverName;
         }

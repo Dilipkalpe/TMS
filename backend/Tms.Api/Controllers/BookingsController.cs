@@ -11,7 +11,7 @@ namespace Tms.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class BookingsController(TmsDbContext db, NotificationDispatcher notifications, IBranchContext branches, ITenantContext tenants, SubscriptionService subscriptions, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers, FieldConfigurationService fieldConfig) : ControllerBase
+public class BookingsController(TmsDbContext db, NotificationDispatcher notifications, IBranchContext branches, ITenantContext tenants, SubscriptionService subscriptions, DriverSyncService driverSync, DocumentFlowService documentFlow, DocumentNumberService documentNumbers, FieldConfigurationService fieldConfig, Tms.Api.Services.Accounting.GlOpsPostingService glPosting) : ControllerBase
 {
     async Task<Driver?> ResolveDriverAsync(string? driverName, CancellationToken ct = default)
     {
@@ -158,10 +158,12 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
 
             var branchId = await documentNumbers.ResolveBranchIdForNumberingAsync(tenants, branches, ct: ct);
             var id = await documentNumbers.NextAsync(DocumentNumberTypes.Booking, companyId, branchId, bookingDate, ct);
-            var vehicle = Visible(fieldMap, "Vehicle") && !string.IsNullOrEmpty(req.Vehicle)
-                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, req.Vehicle) : null;
-            var driver = Visible(fieldMap, "Driver") && !string.IsNullOrEmpty(req.Driver)
-                ? await ResolveDriverAsync(req.Driver, ct) : null;
+            var vehicleRef = !string.IsNullOrWhiteSpace(req.VehicleId) ? req.VehicleId : req.Vehicle;
+            var driverRef = !string.IsNullOrWhiteSpace(req.DriverId) ? req.DriverId : req.Driver;
+            var vehicle = Visible(fieldMap, "Vehicle") && !string.IsNullOrEmpty(vehicleRef)
+                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleRef, ct) : null;
+            var driver = Visible(fieldMap, "Driver") && !string.IsNullOrEmpty(driverRef)
+                ? await ResolveDriverAsync(driverRef, ct) : null;
 
             string? consignorId = null;
             string? consignorName = null;
@@ -255,6 +257,8 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
             await CustomerTrackingService.RecordStatusAsync(db, booking.Id, booking.Status, "Booking created");
             await db.SaveChangesAsync();
             await subscriptions.IncrementBookingUsageAsync(companyId);
+            try { await glPosting.TryPostBookingAdvanceAsync(booking, User.Identity?.Name); }
+            catch { /* GL posting must not block ops */ }
             return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(booking, linkedLr?.LrNumber));
         }
         catch (InvalidOperationException ex)
@@ -303,10 +307,12 @@ public class BookingsController(TmsDbContext db, NotificationDispatcher notifica
             if (validationError != null)
                 return BadRequest(new ApiError(validationError));
 
-            vehicle = Visible(fieldMap, "Vehicle") && !string.IsNullOrEmpty(req.Vehicle)
-                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, req.Vehicle) : null;
-            driver = Visible(fieldMap, "Driver") && !string.IsNullOrEmpty(req.Driver)
-                ? await ResolveDriverAsync(req.Driver, ct) : null;
+            var vehicleRefUpd = !string.IsNullOrWhiteSpace(req.VehicleId) ? req.VehicleId : req.Vehicle;
+            var driverRefUpd = !string.IsNullOrWhiteSpace(req.DriverId) ? req.DriverId : req.Driver;
+            vehicle = Visible(fieldMap, "Vehicle") && !string.IsNullOrEmpty(vehicleRefUpd)
+                ? await TenantScope.FindVehicleByRefAsync(db, tenants, branches, vehicleRefUpd, ct) : null;
+            driver = Visible(fieldMap, "Driver") && !string.IsNullOrEmpty(driverRefUpd)
+                ? await ResolveDriverAsync(driverRefUpd, ct) : null;
 
             if (Visible(fieldMap, "Consignor"))
             {

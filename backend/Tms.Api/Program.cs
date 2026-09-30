@@ -119,6 +119,12 @@ builder.Services.AddScoped<GpsIngestService>();
 builder.Services.AddScoped<FleetLiveService>();
 builder.Services.AddScoped<DriverTripService>();
 builder.Services.AddScoped<MasterLiveLocationService>();
+builder.Services.AddScoped<TdsService>();
+builder.Services.AddScoped<Tms.Api.Services.Accounting.AccountingPostingEngine>();
+builder.Services.AddScoped<Tms.Api.Services.Accounting.GlOpsPostingService>();
+builder.Services.AddScoped<Tms.Api.Services.Accounting.GlReportService>();
+builder.Services.AddScoped<Tms.Api.Services.Accounting.GstComplianceService>();
+builder.Services.AddScoped<Tms.Api.Services.Accounting.AccountingMigrationService>();
 builder.Services.AddSingleton<ReverseGeocodeService>();
 builder.Services.AddHttpClient("Nominatim", client =>
 {
@@ -334,6 +340,10 @@ if (!app.Environment.IsEnvironment("Testing"))
                 logger.LogInformation("Ensuring commercial schema…");
                 await CommercialSchemaMigrator.EnsureAsync(db);
                 await ExpenseAttachmentSchemaMigrator.EnsureAsync(db);
+                await TdsSchemaMigrator.EnsureAsync(db);
+
+                logger.LogInformation("Ensuring double-entry GL schema…");
+                await Tms.Api.Services.Accounting.AccountingGlSchemaMigrator.EnsureAsync(db);
 
                 logger.LogInformation("Ensuring document numbering schema…");
                 await DocumentNumberingSchemaMigrator.EnsureAsync(db);

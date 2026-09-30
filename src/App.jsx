@@ -32,6 +32,9 @@ import {
   FreightInvoiceList, FreightInvoiceDetails,
   TrialBalance, ProfitLoss, BalanceSheet, BookingPaymentAdjustment,
   ProvisionsPage, OutstandingReport, GSTReports,
+  TdsSettingsPage, TdsSectionsPage, TdsRatesPage, TdsExemptionsPage,
+  TdsVendorPaymentPage, TdsTransactionsPage, TdsReportsPage,
+  GlJournalPage, GlVendorBillsPage, GlCreditDebitNotesPage, GlBankReconPage, GlControlsPage, GlCompliancePage,
   ReportsHub, TripReport, LrMovementReport, LoadingDispatchReport, HubTransferReport, DeliveryPodReport,
   VehicleReport, DriverReport, IncomeReport,
   ExpenseReportPage, CustomerReport, BookingPlReport, DirectLrPlReport, BrokerOutstandingReport,
@@ -241,6 +244,19 @@ export default function App() {
         <Route path="accounting/provisions" element={<ProvisionsPage />} />
         <Route path="accounting/outstanding" element={<OutstandingReport />} />
         <Route path="accounting/gst" element={<GSTReports />} />
+        <Route path="accounting/tds/settings" element={<TdsSettingsPage />} />
+        <Route path="accounting/tds/sections" element={<TdsSectionsPage />} />
+        <Route path="accounting/tds/rates" element={<TdsRatesPage />} />
+        <Route path="accounting/tds/exemptions" element={<TdsExemptionsPage />} />
+        <Route path="accounting/tds/vendor-payment" element={<TdsVendorPaymentPage />} />
+        <Route path="accounting/tds/transactions" element={<TdsTransactionsPage />} />
+        <Route path="accounting/tds/reports" element={<TdsReportsPage />} />
+        <Route path="accounting/gl/journal" element={<GlJournalPage />} />
+        <Route path="accounting/gl/vendor-bills" element={<GlVendorBillsPage />} />
+        <Route path="accounting/gl/credit-debit-notes" element={<GlCreditDebitNotesPage />} />
+        <Route path="accounting/gl/bank-recon" element={<GlBankReconPage />} />
+        <Route path="accounting/gl/controls" element={<GlControlsPage />} />
+        <Route path="accounting/gl/compliance" element={<GlCompliancePage />} />
         <Route path="reports" element={<ReportsHub />} />
         <Route path="reports/trips" element={<TripReport />} />
         <Route path="reports/lr-movement" element={<LrMovementReport />} />

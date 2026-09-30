@@ -11,8 +11,7 @@ import { TablePrintButton } from '../../components/print/ReportPrintButton'
 import { payrollApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { ArrowLeft, Calculator, CheckCircle, Loader2, Trash2, Wallet } from 'lucide-react'
-
-const PAYMENT_MODES = ['Bank Transfer', 'Cash', 'Cheque', 'UPI']
+import { PAYMENT_MODES } from '../../constants/paymentModes'
 
 export default function PayrollDetails() {
   const { id } = useParams()

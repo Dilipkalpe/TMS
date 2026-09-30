@@ -18,7 +18,8 @@ public static class EntityMappers
         b.Advance, b.Balance, b.Remarks, lrNumber,
         b.BranchId, b.Branch?.Name,
         b.CreatedBy, b.CreatedAt, b.UpdatedBy, b.UpdatedAt,
-        b.ConsignorId, b.ConsigneeId, b.MaterialId);
+        b.ConsignorId, b.ConsigneeId, b.MaterialId,
+        b.VehicleId, b.DriverId);
 
     public static VehicleDto ToDto(Vehicle v, MasterLiveLocation? live = null) => new(
         v.Id, v.Number, v.Type, v.Model, v.Capacity, v.Owner, v.Status,
@@ -66,13 +67,15 @@ public static class EntityMappers
         c.Outstanding, c.CreditLimit, c.TotalTrips, c.LedgerBalance,
         c.PortalEnabled, c.PortalPhone ?? c.Phone, c.PortalPinHash != null,
         c.BranchId, c.Branch?.Name, c.Branch?.Code,
-        c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt);
+        c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt,
+        c.Pan, c.TdsApplicable, c.DefaultTdsSectionId);
 
     public static VendorDto ToDto(Vendor v) => new(
         v.Id, v.Name, v.Contact, v.Phone, v.Email, v.Gst, v.Address,
         v.Outstanding, v.Category, v.TotalBills,
         v.BranchId, v.Branch?.Name,
-        v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt);
+        v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt,
+        v.Pan, v.TdsApplicable, v.DefaultTdsSectionId);
 
     public static ConsignorDto ToDto(Consignor c) => new(
         c.Id, c.Name, c.CompanyName, c.Contact, c.Phone, c.Email, c.Gst, c.Pan,
@@ -108,7 +111,8 @@ public static class EntityMappers
         e.Amount, e.PaymentMode, e.Status,
         e.BranchId, e.Branch?.Name,
         e.CreatedBy, e.CreatedAt, e.UpdatedBy, e.UpdatedAt,
-        attachments);
+        attachments,
+        e.VehicleId, e.VendorId);
 
     public static LrDto ToDto(LorryReceipt l, Guid? branchId = null, string? branchName = null) => new(
         l.LrNumber,
@@ -123,7 +127,8 @@ public static class EntityMappers
         l.BusinessType, l.CustomerId, l.CustomerName,
         l.ConsignorId, l.ConsigneeId,
         branchId ?? l.BranchId, branchName ?? l.Branch?.Name,
-        l.CreatedBy, l.CreatedAt, l.UpdatedBy, l.UpdatedAt);
+        l.CreatedBy, l.CreatedAt, l.UpdatedBy, l.UpdatedAt,
+        l.VehicleId, l.DriverId);
 }
 
 public static class IdGenerator

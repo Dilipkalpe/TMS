@@ -48,6 +48,8 @@ export default function CustomerDetails() {
     { label: 'Phone', value: customer.phone },
     { label: 'Email', value: customer.email },
     { label: 'GST', value: customer.gst },
+    { label: 'PAN', value: customer.pan },
+    { label: 'TDS Applicable', value: customer.tdsApplicable ? 'Yes' : 'No' },
     { label: 'Address', value: customer.address },
     { label: 'Credit Limit', value: formatCurrency(customer.creditLimit) },
     { label: 'Outstanding', value: formatCurrency(customer.outstanding) },
@@ -65,6 +67,8 @@ export default function CustomerDetails() {
             { label: 'Phone', value: customer.phone },
             { label: 'Email', value: customer.email },
             { label: 'GST', value: customer.gst },
+            { label: 'PAN', value: customer.pan },
+            { label: 'TDS Applicable', value: customer.tdsApplicable ? 'Yes' : 'No' },
             { label: 'Address', value: customer.address },
             { label: 'Credit Limit', value: formatCurrency(customer.creditLimit) },
           ].map((f) => (

@@ -7,6 +7,7 @@ import Input, { Select, Textarea } from '../ui/Input'
 import { useToast } from '../../context/ToastContext'
 import { Save, ArrowLeft, Loader2 } from 'lucide-react'
 import { clearControlsAfterSave } from '../../utils/formResetAfterSave'
+import { UOM_OPTIONS } from '../../constants/uomOptions'
 
 const STATUS_OPTIONS = ['Active', 'Inactive']
 const PACKAGE_TYPES = ['Box', 'Carton', 'Coil', 'Bag', 'Pallet', 'Other']
@@ -77,7 +78,7 @@ export default function ItemMasterForm({
             value={form.defaultPackageType}
             onChange={(e) => update('defaultPackageType', e.target.value)}
           />
-          <Input label="Unit" value={form.unit} onChange={(e) => update('unit', e.target.value)} />
+          <Select label="Unit" options={UOM_OPTIONS} value={form.unit} onChange={(e) => update('unit', e.target.value)} />
           <Select label="Status" options={STATUS_OPTIONS} value={form.status} onChange={(e) => update('status', e.target.value)} />
           <div className="sm:col-span-2 lg:col-span-3">
             <Textarea label="Remarks" value={form.remarks} onChange={(e) => update('remarks', e.target.value)} />

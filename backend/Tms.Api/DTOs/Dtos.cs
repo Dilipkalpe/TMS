@@ -29,14 +29,16 @@ public record BookingDto(
     decimal Advance, decimal Balance, string? Remarks, string? LrNumber = null,
     Guid? BranchId = null, string? BranchName = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
-    string? ConsignorId = null, string? ConsigneeId = null, string? MaterialId = null);
+    string? ConsignorId = null, string? ConsigneeId = null, string? MaterialId = null,
+    string? VehicleId = null, string? DriverId = null);
 
 public record CreateBookingRequest(
     string Date, string? Customer, string? Consignor, string? Consignee,
     string From, string To, string? Material, string? Quantity,
     string? Vehicle, string? Driver, decimal Freight, string Status, string Payment,
     decimal Advance, string? Remarks, string? LrNumber = null,
-    string? ConsignorId = null, string? ConsigneeId = null, string? MaterialId = null);
+    string? ConsignorId = null, string? ConsigneeId = null, string? MaterialId = null,
+    string? VehicleId = null, string? DriverId = null);
 
 public record VehicleDto(
     string Id, string Number, string? Type, string? Model, string? Capacity, string? Owner,
@@ -81,13 +83,15 @@ public record CustomerDto(
     string? Address, decimal Outstanding, decimal CreditLimit, int TotalTrips, decimal LedgerBalance,
     bool PortalEnabled = false, string? PortalPhone = null, bool HasPin = false,
     Guid? BranchId = null, string? BranchName = null, string? BranchCode = null,
-    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
+    string? Pan = null, bool TdsApplicable = false, Guid? DefaultTdsSectionId = null);
 
 public record VendorDto(
     string Id, string Name, string? Contact, string? Phone, string? Email, string? Gst,
     string? Address, decimal Outstanding, string? Category, int TotalBills,
     Guid? BranchId = null, string? BranchName = null,
-    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
+    string? Pan = null, bool TdsApplicable = false, Guid? DefaultTdsSectionId = null);
 
 public record ConsignorDto(
     string Id, string Name, string? CompanyName, string? Contact, string? Phone, string? Email,
@@ -122,7 +126,8 @@ public record ExpenseDto(
     string? Vendor, decimal Amount, string? PaymentMode, string Status,
     Guid? BranchId = null, string? BranchName = null,
     string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
-    IReadOnlyList<ExpenseAttachmentDto>? Attachments = null);
+    IReadOnlyList<ExpenseAttachmentDto>? Attachments = null,
+    string? VehicleId = null, string? VendorId = null);
 
 public record LrDto(
     string LrNumber, string LrDate, string? Consignor, string? Consignee,
@@ -133,7 +138,8 @@ public record LrDto(
     string BusinessType, string? CustomerId, string? CustomerName,
     string? ConsignorId = null, string? ConsigneeId = null,
     Guid? BranchId = null, string? BranchName = null,
-    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null);
+    string? CreatedBy = null, DateTime? CreatedAt = null, string? UpdatedBy = null, DateTime? UpdatedAt = null,
+    string? VehicleId = null, string? DriverId = null);
 
 public record DashboardStatsDto(
     int TotalVehicles, int TotalDrivers, int TotalCustomers, int TotalTrips,

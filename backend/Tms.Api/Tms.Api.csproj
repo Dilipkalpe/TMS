@@ -78,6 +78,8 @@
     <None Include="..\..\database\lr\status_history.sql" Link="database\lr\status_history.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\commercial\schema.sql" Link="database\commercial\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\expenses\attachments.sql" Link="database\expenses\attachments.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\tds\schema.sql" Link="database\tds\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\accounting\gl_schema.sql" Link="database\accounting\gl_schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\document_numbering\schema.sql" Link="database\document_numbering\schema.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\stored_procedures.sql" Link="database\reports\stored_procedures.sql" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\database\reports\sp_dashboard_stats.sql" Link="database\reports\sp_dashboard_stats.sql" CopyToOutputDirectory="PreserveNewest" />

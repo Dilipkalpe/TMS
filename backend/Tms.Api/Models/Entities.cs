@@ -39,6 +39,7 @@ public class Customer : IBranchScoped, IAuditable
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? Gst { get; set; }
+    public string? Pan { get; set; }
     public string? Address { get; set; }
     public decimal Outstanding { get; set; }
     public decimal CreditLimit { get; set; }
@@ -47,6 +48,8 @@ public class Customer : IBranchScoped, IAuditable
     public bool PortalEnabled { get; set; }
     public string? PortalPinHash { get; set; }
     public string? PortalPhone { get; set; }
+    public bool TdsApplicable { get; set; }
+    public Guid? DefaultTdsSectionId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
@@ -64,10 +67,13 @@ public class Vendor : IBranchScoped, IAuditable
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? Gst { get; set; }
+    public string? Pan { get; set; }
     public string? Address { get; set; }
     public decimal Outstanding { get; set; }
     public string? Category { get; set; }
     public int TotalBills { get; set; }
+    public bool TdsApplicable { get; set; }
+    public Guid? DefaultTdsSectionId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
@@ -365,7 +371,13 @@ public class LedgerAccount : ITenantScoped
     public string Name { get; set; } = "";
     public string AccountType { get; set; } = "";
     public string? GroupName { get; set; }
+    public Guid? GroupId { get; set; }
     public decimal Balance { get; set; }
+    public decimal OpeningBalance { get; set; }
+    public bool IsControl { get; set; }
+    public string? PartyType { get; set; }
+    public string? PartyId { get; set; }
+    public Guid? BranchId { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
 }
@@ -374,14 +386,29 @@ public class Voucher : ITenantScoped
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public Guid? FinancialYearId { get; set; }
+    public Guid? PeriodId { get; set; }
     public string VoucherNo { get; set; } = "";
     public DateOnly VoucherDate { get; set; }
+    public DateOnly? TransactionDate { get; set; }
+    public DateOnly? PostingDate { get; set; }
     public string VoucherType { get; set; } = "";
+    public string Status { get; set; } = VoucherStatuses.Posted;
     public string? PartyName { get; set; }
     public string? Mode { get; set; }
     public string? Narration { get; set; }
+    public string? ReferenceNo { get; set; }
+    public Guid? CostCentreId { get; set; }
+    public string? SourceType { get; set; }
+    public string? SourceId { get; set; }
     public decimal TotalAmount { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? ApprovedBy { get; set; }
+    public Guid? ReversedByVoucherId { get; set; }
+    public Guid? ReversalOfVoucherId { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
     public ICollection<VoucherLine> Lines { get; set; } = [];
 }
 
@@ -396,6 +423,10 @@ public class VoucherLine : ITenantScoped
     public decimal Debit { get; set; }
     public decimal Credit { get; set; }
     public string? LineNarration { get; set; }
+    public Guid? CostCentreId { get; set; }
+    public string? PartyType { get; set; }
+    public string? PartyId { get; set; }
+    public int LineNo { get; set; }
 }
 
 public class AccountingReportJob : ITenantScoped

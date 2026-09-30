@@ -8,15 +8,16 @@ import { OpsFooter, OpsGrid, OpsPageHeader, OpsSection } from '../../components/
 import { OpsExpenseSettlement } from '../../components/ops/OpsPhase2Parts'
 import { Wallet, Plus, ArrowLeft, Upload } from 'lucide-react'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { lrProcessApi } from '../../services/api'
+import { expensesApi, lrProcessApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
-
-const EXPENSE_TYPES = ['Diesel', 'Toll', 'Hamali', 'Repair', 'Food', 'Other']
+import { PAYMENT_MODES, DEFAULT_PAYMENT_MODE } from '../../constants/paymentModes'
+import { DEFAULT_EXPENSE_CATEGORIES, loadExpenseCategories } from '../../constants/expenseCategories'
 
 function TripExpensesForm({ lrNumber, lr, process, saving, runSave, reload, onBack }) {
   const navigate = useNavigate()
   const { toast } = useToast()
   const fileRef = useRef(null)
+  const [categories, setCategories] = useState(DEFAULT_EXPENSE_CATEGORIES)
   const [expenses, setExpenses] = useState(process?.expenses || [])
   const [settlement, setSettlement] = useState({
     advanceTaken: '',
@@ -25,17 +26,24 @@ function TripExpensesForm({ lrNumber, lr, process, saving, runSave, reload, onBa
     reimbursed: '',
     settlementDate: '',
     paidTo: lr.driver || '',
-    paymentMode: 'Cash',
+    paymentMode: DEFAULT_PAYMENT_MODE,
   })
   const [draft, setDraft] = useState({
-    category: 'Diesel',
+    category: DEFAULT_EXPENSE_CATEGORIES[0],
     amount: '',
     description: '',
     expenseDate: new Date().toISOString().slice(0, 10),
     billNo: '',
-    paymentMode: 'Cash',
+    paymentMode: DEFAULT_PAYMENT_MODE,
   })
   const [pendingBill, setPendingBill] = useState(null)
+
+  useEffect(() => {
+    loadExpenseCategories(expensesApi).then((list) => {
+      setCategories(list)
+      setDraft((d) => ({ ...d, category: d.category || list[0] }))
+    })
+  }, [])
 
   useEffect(() => {
     setExpenses(process?.expenses || [])
@@ -62,7 +70,14 @@ function TripExpensesForm({ lrNumber, lr, process, saving, runSave, reload, onBa
         await lrProcessApi.uploadExpenseAttachment(lrNumber, created.id, pendingBill)
       }
     })
-    setDraft({ category: 'Diesel', amount: '', description: '', expenseDate: new Date().toISOString().slice(0, 10), billNo: '', paymentMode: 'Cash' })
+    setDraft({
+      category: categories[0] || DEFAULT_EXPENSE_CATEGORIES[0],
+      amount: '',
+      description: '',
+      expenseDate: new Date().toISOString().slice(0, 10),
+      billNo: '',
+      paymentMode: DEFAULT_PAYMENT_MODE,
+    })
     setPendingBill(null)
   }
 
@@ -114,10 +129,11 @@ function TripExpensesForm({ lrNumber, lr, process, saving, runSave, reload, onBa
 
         <OpsSection title="Add Expense" action={<Button size="sm" icon={Plus} onClick={addExpense} disabled={saving}>Add Expense</Button>}>
           <OpsGrid cols={6}>
-            <Select label="Expense Type" options={EXPENSE_TYPES} value={draft.category} onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))} />
+            <Select label="Expense Type" options={categories} value={draft.category} onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))} />
             <Input label="Date" type="date" value={draft.expenseDate} onChange={(e) => setDraft((d) => ({ ...d, expenseDate: e.target.value }))} />
             <Input label="Amount (₹)" type="number" value={draft.amount} onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))} />
             <Input label="Bill No." value={draft.billNo} onChange={(e) => setDraft((d) => ({ ...d, billNo: e.target.value }))} />
+            <Select label="Payment Mode" options={PAYMENT_MODES} value={draft.paymentMode} onChange={(e) => setDraft((d) => ({ ...d, paymentMode: e.target.value }))} />
             <Input label="Description" value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} />
             <div>
               <p className="mb-0.5 text-[10px] font-medium text-slate-600">Bill Upload</p>
@@ -184,7 +200,14 @@ function TripExpensesForm({ lrNumber, lr, process, saving, runSave, reload, onBa
           onSave={addExpense}
           onSavePrint={addExpense}
           onClear={() => {
-            setDraft({ category: 'Diesel', amount: '', description: '', expenseDate: new Date().toISOString().slice(0, 10), billNo: '', paymentMode: 'Cash' })
+            setDraft({
+              category: categories[0] || DEFAULT_EXPENSE_CATEGORIES[0],
+              amount: '',
+              description: '',
+              expenseDate: new Date().toISOString().slice(0, 10),
+              billNo: '',
+              paymentMode: DEFAULT_PAYMENT_MODE,
+            })
             setPendingBill(null)
           }}
         />

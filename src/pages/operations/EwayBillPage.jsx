@@ -5,6 +5,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Input, { Select } from '../../components/ui/Input'
+import VehicleMasterSelect from '../../components/masters/VehicleMasterSelect'
 import { ewayBillsApi, lrApi, unwrapList } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { lrDetailPath } from '../../utils/docPath'
@@ -406,7 +407,12 @@ export default function EwayBillPage() {
             />
             <Input label="E-Way Date" type="date" value={form.ewayBillDate} onChange={(e) => setForm({ ...form, ewayBillDate: e.target.value })} />
             <Input label="Valid Upto" type="date" value={form.validUpto} onChange={(e) => setForm({ ...form, validUpto: e.target.value })} />
-            <Input label="Vehicle No." value={form.vehicleNo} onChange={(e) => setForm({ ...form, vehicleNo: e.target.value })} />
+            <VehicleMasterSelect
+              label="Vehicle No."
+              displayValue={form.vehicleNo}
+              placeholder="Search vehicle…"
+              onSelect={(row) => setForm((f) => ({ ...f, vehicleNo: row?.number ?? '' }))}
+            />
             <Input label="Document Value ₹" type="number" value={form.documentValue} onChange={(e) => setForm({ ...form, documentValue: e.target.value })} />
             <Input label="From" value={form.fromPlace} onChange={(e) => setForm({ ...form, fromPlace: e.target.value })} />
             <Input label="To" value={form.toPlace} onChange={(e) => setForm({ ...form, toPlace: e.target.value })} />

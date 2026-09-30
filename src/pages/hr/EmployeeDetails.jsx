@@ -6,6 +6,7 @@ import Badge, { statusVariant } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input, { Select } from '../../components/ui/Input'
 import { formatCurrency } from '../../components/ui/ReportFilters'
+import DriverMasterSelect from '../../components/masters/DriverMasterSelect'
 import { hrApi, vehiclesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
@@ -23,7 +24,7 @@ export default function EmployeeDetails() {
   const isNew = !id || id === 'new'
   const [form, setForm] = useState({
     employeeCode: '', name: '', employeeType: 'Staff', employmentType: 'Permanent',
-    departmentId: '', designationId: '', driverId: '',
+    departmentId: '', designationId: '', driverId: '', driverName: '',
     email: '', phone: '', dateOfJoining: '', dateOfBirth: '', contractEndDate: '',
     gender: '', address: '', bankAccount: '', bankIfsc: '', pan: '',
     basicSalary: 0, dailyWage: 0, hra: 0, da: 0, conveyance: 0, otherAllowance: 0,
@@ -74,6 +75,7 @@ export default function EmployeeDetails() {
         departmentId: emp.departmentId ?? '',
         designationId: emp.designationId ?? '',
         driverId: emp.driverId ?? '',
+        driverName: emp.driverName ?? emp.driver?.name ?? '',
         email: emp.email ?? '',
         phone: emp.phone ?? '',
         dateOfJoining: emp.dateOfJoining ?? '',
@@ -184,7 +186,7 @@ export default function EmployeeDetails() {
       if (isNew) {
         setForm({
           employeeCode: '', name: '', employeeType: 'Staff', employmentType: 'Permanent',
-          departmentId: '', designationId: '', driverId: '',
+          departmentId: '', designationId: '', driverId: '', driverName: '',
           email: '', phone: '', dateOfJoining: '', dateOfBirth: '', contractEndDate: '',
           gender: '', address: '', bankAccount: '', bankIfsc: '', pan: '',
           basicSalary: 0, dailyWage: 0, hra: 0, da: 0, conveyance: 0, otherAllowance: 0,
@@ -239,7 +241,16 @@ export default function EmployeeDetails() {
             )}
             <Select label="Department" options={[{ value: '', label: '(None)' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} value={form.departmentId} onChange={(e) => set('departmentId', e.target.value)} />
             <Select label="Designation" options={[{ value: '', label: '(None)' }, ...designations.map((d) => ({ value: d.id, label: d.name }))]} value={form.designationId} onChange={(e) => set('designationId', e.target.value)} />
-            <Input label="Driver ID (if driver)" value={form.driverId} onChange={(e) => set('driverId', e.target.value)} />
+            <DriverMasterSelect
+              label="Linked Driver"
+              displayValue={form.driverName}
+              placeholder="Search driver…"
+              onSelect={(row) => setForm((p) => ({
+                ...p,
+                driverId: row?.id ?? '',
+                driverName: row?.name ?? '',
+              }))}
+            />
             <Input label="Email" value={form.email} onChange={(e) => set('email', e.target.value)} />
             <Input label="Phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
             <Input label="Date of Joining" type="date" value={form.dateOfJoining} onChange={(e) => set('dateOfJoining', e.target.value)} />

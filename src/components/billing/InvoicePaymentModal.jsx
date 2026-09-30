@@ -6,8 +6,7 @@ import { formatCurrency } from '../ui/ReportFilters'
 import { freightInvoicesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { IndianRupee, Loader2 } from 'lucide-react'
-
-const PAYMENT_MODES = ['Cash', 'UPI', 'NEFT', 'Cheque', 'RTGS', 'Card']
+import { PAYMENT_MODES, DEFAULT_PAYMENT_MODE } from '../../constants/paymentModes'
 
 /**
  * Collect payment against a freight invoice (Billing List / Invoice details).
@@ -20,7 +19,7 @@ export default function InvoicePaymentModal({ open, onClose, invoice, onPaid }) 
   const [form, setForm] = useState({
     amount: '',
     paymentDate: new Date().toISOString().slice(0, 10),
-    paymentMode: 'Cash',
+    paymentMode: DEFAULT_PAYMENT_MODE,
     referenceNo: '',
     remarks: '',
   })
@@ -30,7 +29,7 @@ export default function InvoicePaymentModal({ open, onClose, invoice, onPaid }) 
     setForm({
       amount: String(balance || ''),
       paymentDate: new Date().toISOString().slice(0, 10),
-      paymentMode: 'Cash',
+      paymentMode: DEFAULT_PAYMENT_MODE,
       referenceNo: '',
       remarks: '',
     })

@@ -514,6 +514,18 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
         Add("/accounting/balance-sheet", "Balance Sheet", "Accounts hub");
         Add("/accounting/outstanding", "Outstanding", "Accounts hub");
         Add("/accounting/gst", "GST Reports", "Accounts hub");
+        Add("/accounting/tds/settings", "TDS Settings", "Accounts hub");
+        Add("/accounting/tds/sections", "TDS Sections", "Accounts hub");
+        Add("/accounting/tds/rates", "TDS Rates", "Accounts hub");
+        Add("/accounting/tds/exemptions", "TDS Exemptions", "Accounts hub");
+        Add("/accounting/tds/vendor-payment", "Vendor Payment", "Accounts hub");
+        Add("/accounting/tds/transactions", "TDS Transactions", "Accounts hub");
+        Add("/accounting/tds/reports", "TDS Reports", "Accounts hub");
+        Add("/accounting/gl/journal", "GL Journal", "Accounts hub");
+        Add("/accounting/gl/vendor-bills", "Vendor Bills", "Accounts hub");
+        Add("/accounting/gl/credit-debit-notes", "Credit / Debit Notes", "Accounts hub");
+        Add("/accounting/gl/bank-recon", "Bank Reconciliation", "Accounts hub");
+        Add("/accounting/gl/controls", "GL Controls", "Accounts hub");
 
         // Reports hub
         Add("/reports/trips", "LR / Trip Register", "Reports hub");

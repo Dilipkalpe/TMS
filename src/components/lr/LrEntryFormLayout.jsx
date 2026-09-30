@@ -3,6 +3,8 @@ import Input, { Select, Textarea } from '../ui/Input'
 import VehicleMasterSelect from '../masters/VehicleMasterSelect'
 import DriverMasterSelect from '../masters/DriverMasterSelect'
 import PartyMasterSelect from '../masters/PartyMasterSelect'
+import ItemMasterSelect from '../masters/ItemMasterSelect'
+import BranchSelect from '../ui/BranchSelect'
 import { consignorsApi, consigneesApi } from '../../services/api'
 import { applyConsignorToLrForm, applyConsigneeToLrForm } from '../../utils/partyMasterLr'
 import { formatCurrency } from '../ui/ReportFilters'
@@ -70,7 +72,9 @@ export const emptyLrEntryForm = () => ({
   from: '',
   to: '',
   vehicle: '',
+  vehicleId: '',
   driver: '',
+  driverId: '',
   material: '',
   quantity: '',
   items: [emptyLrItem()],
@@ -213,7 +217,7 @@ export default function LrEntryFormLayout({
           <div className="grid grid-cols-2 gap-x-2 gap-y-1 sm:grid-cols-3 lg:grid-cols-6">
             <Input label="LR No." value={form.lrNumber || 'Auto'} readOnly />
             <Input label="LR Date *" type="date" value={form.lrDate} onChange={(e) => update('lrDate', e.target.value)} />
-            <Input label="Branch" value={form.branchName} placeholder="Branch" onChange={(e) => update('branchName', e.target.value)} />
+            <BranchSelect label="Branch" value={form.branchName} placeholder="Select branch…" onChange={(v) => update('branchName', v)} />
             <Select
               label="Type"
               options={LR_BUSINESS_TYPES.map((t) => ({ value: t, label: LR_BUSINESS_TYPE_LABELS[t] || t }))}
@@ -233,15 +237,36 @@ export default function LrEntryFormLayout({
               label="Vehicle"
               displayValue={form.vehicle}
               placeholder="Search vehicle number…"
-              onSelect={(row) => update('vehicle', row.number ?? '')}
+              onSelect={(row) => setForm((prev) => ({
+                ...prev,
+                vehicleId: row?.id ?? '',
+                vehicle: row?.number ?? '',
+              }))}
             />
             <DriverMasterSelect
               label="Driver"
               displayValue={form.driver}
               placeholder="Search driver name…"
-              onSelect={(row) => update('driver', row.name ?? '')}
+              onSelect={(row) => setForm((prev) => ({
+                ...prev,
+                driverId: row?.id ?? '',
+                driver: row?.name ?? '',
+              }))}
             />
-            <Input label="Material" value={form.material} onChange={(e) => update('material', e.target.value)} />
+            <ItemMasterSelect
+              label="Material"
+              displayValue={form.material}
+              placeholder="Search item…"
+              onSelect={(row) => setForm((prev) => ({
+                ...prev,
+                material: row?.name ?? '',
+                items: prev.items?.length
+                  ? prev.items.map((it, idx) => (idx === 0
+                    ? { ...it, itemId: row?.id ?? '', description: row?.name ?? it.description, hsn: row?.hsn ?? it.hsn }
+                    : it))
+                  : prev.items,
+              }))}
+            />
             <Input label="Qty/Wt" value={form.quantity} onChange={(e) => update('quantity', e.target.value)} placeholder="pkgs/kg" />
             <Input label="E-Way Bill No." value={form.ewayBillNo} onChange={(e) => update('ewayBillNo', e.target.value)} />
             <Select label="Freight Type" options={PAYMENT_TYPES} value={form.paymentType} onChange={(e) => update('paymentType', e.target.value)} />
@@ -378,7 +403,9 @@ export function mapLrDtoToEntryForm(lr) {
     from: lr?.from ?? '',
     to: lr?.to ?? '',
     vehicle: lr?.vehicle ?? '',
+    vehicleId: lr?.vehicleId ?? '',
     driver: lr?.driver ?? '',
+    driverId: lr?.driverId ?? '',
     material: lr?.material ?? '',
     quantity: lr?.quantity ?? '',
     items: itemsFromMeta || [fallbackItem],

@@ -19,7 +19,8 @@ public class LrProcessController(
     ITenantContext tenants,
     IBranchContext branches,
     DocumentNumberService documentNumbers,
-    IWebHostEnvironment env) : ControllerBase
+    IWebHostEnvironment env,
+    Tms.Api.Services.Accounting.GlOpsPostingService glPosting) : ControllerBase
 {
     static readonly HashSet<string> AllowedUploadExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
     const long MaxUploadBytes = 5 * 1024 * 1024;
@@ -1127,6 +1128,8 @@ public class LrProcessController(
         expense.RejectionRemarks = null;
         await db.SaveChangesAsync();
         await LrProcessService.SyncExpenseStatusAsync(db, lr);
+        try { await glPosting.TryPostLrExpenseAsync(expense, CurrentUser()); }
+        catch { /* GL posting must not block ops */ }
         return Ok(MapExpense(expense));
     }
 

@@ -11,6 +11,8 @@ import LoadingSlipSummary from '../../components/ops/LoadingSlipSummary'
 import LrEntryActionButtons from '../../components/lr/LrEntryActionButtons'
 import VehicleMasterSelect from '../../components/masters/VehicleMasterSelect'
 import DriverMasterSelect from '../../components/masters/DriverMasterSelect'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
+import EmployeeLookupSelect from '../../components/ui/EmployeeLookupSelect'
 import {
   LOADING_CHECKLIST, OpsAttachments, OpsChecklist, OpsSignaturePad, useOpsExtended,
 } from '../../components/ops/OpsPhase2Parts'
@@ -18,7 +20,7 @@ import {
   ClipboardList, Truck, MapPin, User, Plus,
   Route, ChevronDown, ChevronRight,
 } from 'lucide-react'
-import { lrApi, lrProcessApi } from '../../services/api'
+import { hrApi, lrApi, lrProcessApi, vendorsApi, unwrapList } from '../../services/api'
 import {
   emptyLoadingSlipForm, mapLoadingSheetItems, mapLrToLoadingRow, toLocalInput,
 } from '../../utils/loadingSlipHelpers'
@@ -121,14 +123,17 @@ function LoadingSlipForm({
         driver: lr.driver || '',
         driverMobile: ext.meta?.driverMobile || ext.driverMobile || '',
         transporter: ext.meta?.transporter || ext.transporter || '',
+        transporterId: ext.meta?.transporterId || null,
         tripNo: ext.meta?.tripNo || sheet?.tripNo || '',
         routeFrom: lr.from || '',
         routeTo: lr.to || '',
         routeVia: ext.meta?.routeVia || ext.routeVia || '',
         expectedDelivery: ext.meta?.expectedDelivery || ext.expectedDelivery || '',
         loader: sheet?.loaderName || '',
+        loaderId: ext.meta?.loaderId || null,
         loaderMobile: ext.meta?.loaderMobile || ext.loaderMobile || '',
         supervisor: sheet?.supervisorName || '',
+        supervisorId: ext.meta?.supervisorId || null,
         supervisorMobile: ext.meta?.supervisorMobile || ext.supervisorMobile || '',
         sealNo: sheet?.sealNumber || '',
         remarks: sheet?.remarks || '',
@@ -148,8 +153,15 @@ function LoadingSlipForm({
   const [addingLrs, setAddingLrs] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [anchorLrCache, setAnchorLrCache] = useState(lr)
+  const [employees, setEmployees] = useState([])
 
   const u = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  useEffect(() => {
+    hrApi.employees({ pageSize: 200 })
+      .then((res) => setEmployees(unwrapList(res)))
+      .catch(() => setEmployees([]))
+  }, [])
 
   useEffect(() => {
     if (!lr || !process) return
@@ -289,10 +301,13 @@ function LoadingSlipForm({
           driverId: form.driverId,
           driverMobile: form.driverMobile,
           transporter: form.transporter,
+          transporterId: form.transporterId,
           tripNo: form.tripNo,
           routeVia: form.routeVia,
           expectedDelivery: form.expectedDelivery,
+          loaderId: form.loaderId,
           loaderMobile: form.loaderMobile,
+          supervisorId: form.supervisorId,
           supervisorMobile: form.supervisorMobile,
           plannedBy: form.plannedBy,
           branchId: form.branchId,
@@ -472,7 +487,20 @@ function LoadingSlipForm({
                 {fieldErrors.driver && <p className="mt-1 text-xs text-red-500">{fieldErrors.driver}</p>}
               </div>
               <Input label="Driver Mobile" value={form.driverMobile} onChange={(e) => u('driverMobile', e.target.value)} />
-              <Input label="Transporter" className="sm:col-span-2" value={form.transporter} onChange={(e) => u('transporter', e.target.value)} />
+              <div className="sm:col-span-2">
+                <PartyMasterSelect
+                  label="Transporter"
+                  api={vendorsApi}
+                  masterKey="vendors"
+                  valueId={form.transporterId || ''}
+                  displayValue={form.transporter}
+                  placeholder="Search transporter / vendor…"
+                  onSelect={(row) => {
+                    u('transporterId', row?.id || '')
+                    u('transporter', row?.name || row?.companyName || '')
+                  }}
+                />
+              </div>
               <Input label="Loading Location" className="sm:col-span-2" value={form.loadingLocation} onChange={(e) => u('loadingLocation', e.target.value)} />
             </div>
           </SlipSection>
@@ -490,9 +518,31 @@ function LoadingSlipForm({
 
         <SlipSection title="Loader & Supervisor" subtitle="Ground staff on duty" icon={User} className="mb-4">
           <div className="loading-slip-field-grid loading-slip-field-grid--4">
-            <Input label="Loader Name" value={form.loader} onChange={(e) => u('loader', e.target.value)} />
+            <EmployeeLookupSelect
+              label="Loader Name"
+              employees={employees}
+              employeeId={form.loaderId || ''}
+              onEmployeeChange={(id, name) => setForm((f) => ({ ...f, loaderId: id || null, loader: name || '' }))}
+              onEmployeesRefresh={async () => {
+                const list = unwrapList(await hrApi.employees({ pageSize: 200 }))
+                setEmployees(list)
+                return list
+              }}
+              placeholder="Search employee…"
+            />
             <Input label="Loader Mobile" value={form.loaderMobile} onChange={(e) => u('loaderMobile', e.target.value)} />
-            <Input label="Supervisor Name" value={form.supervisor} onChange={(e) => u('supervisor', e.target.value)} />
+            <EmployeeLookupSelect
+              label="Supervisor Name"
+              employees={employees}
+              employeeId={form.supervisorId || ''}
+              onEmployeeChange={(id, name) => setForm((f) => ({ ...f, supervisorId: id || null, supervisor: name || '' }))}
+              onEmployeesRefresh={async () => {
+                const list = unwrapList(await hrApi.employees({ pageSize: 200 }))
+                setEmployees(list)
+                return list
+              }}
+              placeholder="Search employee…"
+            />
             <Input label="Supervisor Mobile" value={form.supervisorMobile} onChange={(e) => u('supervisorMobile', e.target.value)} />
           </div>
         </SlipSection>

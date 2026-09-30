@@ -131,7 +131,10 @@ public static class BookingFinanceService
         var prov = await db.Provisions
             .Where(p => p.CompanyId == companyId && p.ProvisionType == "Vendor" && p.PartyId == vendorId && !p.IsReversed)
             .SumAsync(p => p.Amount, ct);
-        vendor.Outstanding = expenseBal + prov;
+        var paid = await db.VendorPayments
+            .Where(p => p.CompanyId == companyId && p.VendorId == vendorId && p.Status == "POSTED")
+            .SumAsync(p => p.GrossAmount, ct);
+        vendor.Outstanding = Math.Max(0, expenseBal + prov - paid);
         vendor.UpdatedAt = DateTime.UtcNow;
     }
 

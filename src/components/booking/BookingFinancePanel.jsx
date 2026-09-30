@@ -1,20 +1,22 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Card, { CardHeader } from '../ui/Card'
 import Button from '../ui/Button'
 import Input, { Select, Textarea } from '../ui/Input'
+import LocalSearchSelect from '../ui/LocalSearchSelect'
 import ERPDataTable from '../ui/ERPDataTable'
+import PartyMasterSelect from '../masters/PartyMasterSelect'
 import { formatCurrency } from '../ui/ReportFilters'
-import { bookingFinanceApi, freightInvoicesApi } from '../../services/api'
+import { bookingFinanceApi, freightInvoicesApi, vendorsApi, expensesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { Plus, Loader2, Printer, Trash2 } from 'lucide-react'
 import { usePrint } from '../../context/PrintContext'
 import { printModuleDocument } from '../../services/printService'
 import { PRINT_MODULE_CODES } from '../../config/printModules'
 import { useNavigate } from 'react-router-dom'
+import { PAYMENT_MODES, DEFAULT_PAYMENT_MODE } from '../../constants/paymentModes'
+import { DEFAULT_EXPENSE_CATEGORIES, loadExpenseCategories } from '../../constants/expenseCategories'
 
-const PAYMENT_MODES = ['Cash', 'UPI', 'NEFT', 'Cheque', 'RTGS']
 const CHARGE_TYPES = ['Commission', 'Fixed', 'Loading', 'Other']
-const EXPENSE_CATS = ['Fuel', 'Toll', 'Hamali', 'Detention', 'Other']
 
 export default function BookingFinancePanel({ bookingId, booking, onBookingChange }) {
   const navigate = useNavigate()
@@ -23,9 +25,16 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
-  const [brokerForm, setBrokerForm] = useState({ brokerName: '', chargeType: 'Commission', amount: '', remarks: '' })
-  const [expenseForm, setExpenseForm] = useState({ category: 'Fuel', amount: '', vendorName: '', description: '' })
+  const [brokers, setBrokers] = useState([])
+  const [expenseCats, setExpenseCats] = useState(DEFAULT_EXPENSE_CATEGORIES)
+  const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMode: DEFAULT_PAYMENT_MODE, referenceNo: '', remarks: '', freightInvoiceId: '' })
+  const [brokerForm, setBrokerForm] = useState({ brokerId: '', brokerName: '', chargeType: 'Commission', amount: '', remarks: '' })
+  const [expenseForm, setExpenseForm] = useState({ category: 'Fuel', amount: '', vendorId: '', vendorName: '', description: '' })
+
+  const brokerOptions = useMemo(
+    () => brokers.map((b) => ({ value: b.id, label: b.name, raw: b })),
+    [brokers],
+  )
 
   const reload = useCallback(() => {
     if (!bookingId) return
@@ -41,6 +50,11 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
 
   useEffect(() => { reload() }, [reload])
 
+  useEffect(() => {
+    bookingFinanceApi.brokers().then((rows) => setBrokers(Array.isArray(rows) ? rows : [])).catch(() => setBrokers([]))
+    loadExpenseCategories(expensesApi).then(setExpenseCats)
+  }, [])
+
   const submitPayment = async () => {
     const amount = Number(paymentForm.amount)
     if (!amount || amount <= 0) {
@@ -55,7 +69,7 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
         freightInvoiceId: paymentForm.freightInvoiceId || undefined,
       })
       toast({ title: 'Payment recorded', type: 'success' })
-      setPaymentForm({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
+      setPaymentForm({ amount: '', paymentMode: DEFAULT_PAYMENT_MODE, referenceNo: '', remarks: '', freightInvoiceId: '' })
       reload()
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
@@ -71,9 +85,15 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
     }
     setSaving(true)
     try {
-      await bookingFinanceApi.addBrokerCharge(bookingId, { ...brokerForm, amount: Number(brokerForm.amount) })
+      await bookingFinanceApi.addBrokerCharge(bookingId, {
+        brokerId: brokerForm.brokerId || undefined,
+        brokerName: brokerForm.brokerName,
+        chargeType: brokerForm.chargeType,
+        amount: Number(brokerForm.amount),
+        remarks: brokerForm.remarks,
+      })
       toast({ title: 'Broker charge added', type: 'success' })
-      setBrokerForm({ brokerName: '', chargeType: 'Commission', amount: '', remarks: '' })
+      setBrokerForm({ brokerId: '', brokerName: '', chargeType: 'Commission', amount: '', remarks: '' })
       reload()
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
@@ -89,9 +109,15 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
     }
     setSaving(true)
     try {
-      await bookingFinanceApi.addExpense(bookingId, { ...expenseForm, amount: Number(expenseForm.amount) })
+      await bookingFinanceApi.addExpense(bookingId, {
+        category: expenseForm.category,
+        amount: Number(expenseForm.amount),
+        vendorId: expenseForm.vendorId || undefined,
+        vendorName: expenseForm.vendorName || undefined,
+        description: expenseForm.description,
+      })
       toast({ title: 'Expense added', type: 'success' })
-      setExpenseForm({ category: 'Fuel', amount: '', vendorName: '', description: '' })
+      setExpenseForm({ category: 'Fuel', amount: '', vendorId: '', vendorName: '', description: '' })
       reload()
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
@@ -209,7 +235,20 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
         <Card>
           <CardHeader title="Broker Charges" />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Broker Name" value={brokerForm.brokerName} onChange={(e) => setBrokerForm((f) => ({ ...f, brokerName: e.target.value }))} />
+            <LocalSearchSelect
+              label="Broker"
+              options={brokerOptions}
+              value={brokerForm.brokerId}
+              placeholder="Search broker…"
+              onChange={(id) => {
+                const row = brokers.find((b) => b.id === id)
+                setBrokerForm((f) => ({
+                  ...f,
+                  brokerId: id || '',
+                  brokerName: row?.name || '',
+                }))
+              }}
+            />
             <Select label="Type" options={CHARGE_TYPES} value={brokerForm.chargeType} onChange={(e) => setBrokerForm((f) => ({ ...f, chargeType: e.target.value }))} />
             <Input label="Amount (₹)" type="number" value={brokerForm.amount} onChange={(e) => setBrokerForm((f) => ({ ...f, amount: e.target.value }))} />
             <Input label="Remarks" value={brokerForm.remarks} onChange={(e) => setBrokerForm((f) => ({ ...f, remarks: e.target.value }))} />
@@ -229,9 +268,21 @@ export default function BookingFinancePanel({ bookingId, booking, onBookingChang
       <Card>
         <CardHeader title="Additional Expenses" subtitle="Add multiple expenses after booking is created" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Select label="Category" options={EXPENSE_CATS} value={expenseForm.category} onChange={(e) => setExpenseForm((f) => ({ ...f, category: e.target.value }))} />
+          <Select label="Category" options={expenseCats} value={expenseForm.category} onChange={(e) => setExpenseForm((f) => ({ ...f, category: e.target.value }))} />
           <Input label="Amount (₹)" type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm((f) => ({ ...f, amount: e.target.value }))} />
-          <Input label="Vendor" value={expenseForm.vendorName} onChange={(e) => setExpenseForm((f) => ({ ...f, vendorName: e.target.value }))} />
+          <PartyMasterSelect
+            label="Vendor"
+            api={vendorsApi}
+            masterKey="vendors"
+            valueId={expenseForm.vendorId}
+            displayValue={expenseForm.vendorName}
+            placeholder="Search vendor…"
+            onSelect={(row) => setExpenseForm((f) => ({
+              ...f,
+              vendorId: row?.id ?? '',
+              vendorName: row?.name ?? row?.companyName ?? '',
+            }))}
+          />
           <Input label="Description" value={expenseForm.description} onChange={(e) => setExpenseForm((f) => ({ ...f, description: e.target.value }))} />
         </div>
         <Button className="mt-3" variant="outline" icon={Plus} disabled={saving} onClick={submitExpense}>Add Expense</Button>

@@ -50,6 +50,10 @@ public class BookingPayment : ITenantScoped
     public string? ReceiptNo { get; set; }
     public DateOnly PaymentDate { get; set; }
     public decimal Amount { get; set; }
+    /// <summary>Gross freight/invoice amount before customer-deducted TDS. Null = same as Amount.</summary>
+    public decimal? GrossAmount { get; set; }
+    public decimal TdsAmount { get; set; }
+    public Guid? TdsSectionId { get; set; }
     public string? PaymentMode { get; set; }
     public string? ReferenceNo { get; set; }
     public string? Remarks { get; set; }

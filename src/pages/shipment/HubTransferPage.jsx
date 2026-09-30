@@ -5,6 +5,9 @@ import ERPPageTitle from '../../components/ui/ERPPageTitle'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import BranchMasterSelect from '../../components/masters/BranchMasterSelect'
+import VehicleMasterSelect from '../../components/masters/VehicleMasterSelect'
+import DriverMasterSelect from '../../components/masters/DriverMasterSelect'
 import Modal from '../../components/ui/Modal'
 import SlideDrawer from '../../components/ui/SlideDrawer'
 import OpsListActionBar from '../../components/ops/OpsListActionBar'
@@ -67,13 +70,14 @@ export default function HubTransferPage() {
   const [busy, setBusy] = useState(false)
 
   const [receiveForm, setReceiveForm] = useState({
-    loadingSheetNo: '', vehicleNo: '', hubBranchId: '', remarks: '',
+    loadingSheetNo: '', vehicleNo: '', hubBranchId: '', hubBranchName: '', remarks: '',
   })
   const [inboundPreview, setInboundPreview] = useState(null)
   const [inboundSelected, setInboundSelected] = useState(() => new Set())
 
   const [reManifestForm, setReManifestForm] = useState({
-    hubBranchId: '', toDestination: '', vehicleId: '', driverId: '', remarks: '',
+    hubBranchId: '', hubBranchName: '', toDestination: '',
+    vehicleId: '', vehicleNo: '', driverId: '', driverName: '', remarks: '',
   })
   const [history, setHistory] = useState(null)
   const [dispatchManifestId, setDispatchManifestId] = useState(null)
@@ -201,7 +205,7 @@ export default function HubTransferPage() {
       toast({ title: 'Success', message: 'Hub receipt saved', type: 'success' })
       setReceiveOpen(false)
       setInboundPreview(null)
-      setReceiveForm({ loadingSheetNo: '', vehicleNo: '', hubBranchId: '', remarks: '' })
+      setReceiveForm({ loadingSheetNo: '', vehicleNo: '', hubBranchId: '', hubBranchName: '', remarks: '' })
       setInboundSelected(new Set())
       refreshList()
     } catch (err) {
@@ -246,21 +250,24 @@ export default function HubTransferPage() {
       const manifest = await hubTransferApi.reManifest({
         lrNumbers: [...selected],
         hubBranchId: reManifestForm.hubBranchId || null,
-        hubName: hub?.name || selectedRows[0]?.currentHub,
+        hubName: hub?.name || reManifestForm.hubBranchName || selectedRows[0]?.currentHub,
         toDestination: reManifestForm.toDestination.trim(),
-        vehicleId: vehicle?.id || null,
-        vehicleNumber: vehicle?.number || null,
+        vehicleId: reManifestForm.vehicleId || vehicle?.id || null,
+        vehicleNumber: reManifestForm.vehicleNo || vehicle?.number || null,
         vehicleType: vehicle?.type || null,
-        driverId: driver?.id || null,
-        driverName: driver?.name || null,
+        driverId: reManifestForm.driverId || driver?.id || null,
+        driverName: reManifestForm.driverName || driver?.name || null,
         driverMobile: driver?.phone || null,
         remarks: reManifestForm.remarks || null,
       })
       toast({ title: 'Success', message: `Re-manifest ${manifest.manifestNo} created`, type: 'success' })
       setReManifestOpen(false)
-      setReManifestForm({ hubBranchId: '', toDestination: '', vehicleId: '', driverId: '', remarks: '' })
+      setReManifestForm({
+        hubBranchId: '', hubBranchName: '', toDestination: '',
+        vehicleId: '', vehicleNo: '', driverId: '', driverName: '', remarks: '',
+      })
       refreshList()
-      if (manifest.id && vehicle) {
+      if (manifest.id && (reManifestForm.vehicleId || vehicle)) {
         setDispatchManifestId(manifest.id)
         setDispatchManifest(manifest)
         setDispatchOpen(true)
@@ -387,9 +394,13 @@ export default function HubTransferPage() {
             </Button>
             <Button size="sm" variant="outline" onClick={() => {
               const hubId = selectedRows[0]?.currentHubBranchId || appliedFilters.hubBranchId || ''
+              const hubName = selectedRows[0]?.currentHub
+                || branches.find((b) => b.id === hubId)?.name
+                || ''
               setReManifestForm((f) => ({
                 ...f,
                 hubBranchId: hubId,
+                hubBranchName: hubName,
                 toDestination: selectedRows.length === 1 ? (selectedRows[0].finalDestination || '') : '',
               }))
               setReManifestOpen(true)
@@ -480,14 +491,24 @@ export default function HubTransferPage() {
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <Input label="Loading Sheet No" value={receiveForm.loadingSheetNo} onChange={(e) => setReceiveForm((f) => ({ ...f, loadingSheetNo: e.target.value }))} />
-          <Input label="Vehicle No" value={receiveForm.vehicleNo} onChange={(e) => setReceiveForm((f) => ({ ...f, vehicleNo: e.target.value }))} />
-          <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-slate-600">Hub (Branch)</span>
-            <select className="w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900" value={receiveForm.hubBranchId} onChange={(e) => setReceiveForm((f) => ({ ...f, hubBranchId: e.target.value }))}>
-              <option value="">Select hub…</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}{b.city ? ` — ${b.city}` : ''}</option>)}
-            </select>
-          </label>
+          <VehicleMasterSelect
+            label="Vehicle No"
+            displayValue={receiveForm.vehicleNo}
+            placeholder="Search vehicle…"
+            onSelect={(row) => setReceiveForm((f) => ({ ...f, vehicleNo: row?.number ?? '' }))}
+          />
+          <div className="sm:col-span-2">
+            <BranchMasterSelect
+              label="Hub (Branch)"
+              displayValue={receiveForm.hubBranchName}
+              placeholder="Search hub branch…"
+              onSelect={(row) => setReceiveForm((f) => ({
+                ...f,
+                hubBranchId: row?.id ?? '',
+                hubBranchName: row?.name ?? '',
+              }))}
+            />
+          </div>
           <Input label="Remarks" value={receiveForm.remarks} onChange={(e) => setReceiveForm((f) => ({ ...f, remarks: e.target.value }))} className="sm:col-span-2" />
         </div>
         <div className="mt-3">
@@ -567,28 +588,37 @@ export default function HubTransferPage() {
       >
         <p className="mb-2 text-sm text-slate-600">{selected.size} LR(s) selected. Original destinations are not changed.</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="mb-1 block text-slate-600">From Hub</span>
-            <select className="w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900" value={reManifestForm.hubBranchId} onChange={(e) => setReManifestForm((f) => ({ ...f, hubBranchId: e.target.value }))}>
-              <option value="">Select…</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </label>
+          <BranchMasterSelect
+            label="From Hub"
+            displayValue={reManifestForm.hubBranchName}
+            placeholder="Search hub branch…"
+            onSelect={(row) => setReManifestForm((f) => ({
+              ...f,
+              hubBranchId: row?.id ?? '',
+              hubBranchName: row?.name ?? '',
+            }))}
+          />
           <Input label="To Destination" value={reManifestForm.toDestination} onChange={(e) => setReManifestForm((f) => ({ ...f, toDestination: e.target.value }))} />
-          <label className="block text-sm">
-            <span className="mb-1 block text-slate-600">Vehicle</span>
-            <select className="w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900" value={reManifestForm.vehicleId} onChange={(e) => setReManifestForm((f) => ({ ...f, vehicleId: e.target.value }))}>
-              <option value="">Select vehicle…</option>
-              {vehicles.map((v) => <option key={v.id} value={v.id}>{v.number}{v.type ? ` (${v.type})` : ''}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-slate-600">Driver</span>
-            <select className="w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900" value={reManifestForm.driverId} onChange={(e) => setReManifestForm((f) => ({ ...f, driverId: e.target.value }))}>
-              <option value="">Select driver…</option>
-              {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}{d.phone ? ` — ${d.phone}` : ''}</option>)}
-            </select>
-          </label>
+          <VehicleMasterSelect
+            label="Vehicle"
+            displayValue={reManifestForm.vehicleNo}
+            placeholder="Search vehicle…"
+            onSelect={(row) => setReManifestForm((f) => ({
+              ...f,
+              vehicleId: row?.id ?? '',
+              vehicleNo: row?.number ?? '',
+            }))}
+          />
+          <DriverMasterSelect
+            label="Driver"
+            displayValue={reManifestForm.driverName}
+            placeholder="Search driver…"
+            onSelect={(row) => setReManifestForm((f) => ({
+              ...f,
+              driverId: row?.id ?? '',
+              driverName: row?.name ?? '',
+            }))}
+          />
           <Input label="Remarks" value={reManifestForm.remarks} onChange={(e) => setReManifestForm((f) => ({ ...f, remarks: e.target.value }))} className="sm:col-span-2" />
         </div>
         <ul className="mt-3 max-h-40 list-inside list-disc overflow-auto text-xs">

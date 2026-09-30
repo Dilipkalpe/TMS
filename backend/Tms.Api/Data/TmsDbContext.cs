@@ -75,6 +75,22 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<Voucher> Vouchers => Set<Voucher>();
     public DbSet<VoucherLine> VoucherLines => Set<VoucherLine>();
     public DbSet<AccountingReportJob> AccountingReportJobs => Set<AccountingReportJob>();
+    public DbSet<AccountGroup> AccountGroups => Set<AccountGroup>();
+    public DbSet<FinancialYear> FinancialYears => Set<FinancialYear>();
+    public DbSet<AccountingPeriod> AccountingPeriods => Set<AccountingPeriod>();
+    public DbSet<CostCentre> CostCentres => Set<CostCentre>();
+    public DbSet<AccountingSettings> AccountingSettings => Set<AccountingSettings>();
+    public DbSet<AccountPostingMap> AccountPostingMaps => Set<AccountPostingMap>();
+    public DbSet<VendorBill> VendorBills => Set<VendorBill>();
+    public DbSet<VendorBillLine> VendorBillLines => Set<VendorBillLine>();
+    public DbSet<VendorBillSettlement> VendorBillSettlements => Set<VendorBillSettlement>();
+    public DbSet<CreditDebitNote> CreditDebitNotes => Set<CreditDebitNote>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
+    public DbSet<BankReconciliationLine> BankReconciliationLines => Set<BankReconciliationLine>();
+    public DbSet<AccountingAuditLog> AccountingAuditLogs => Set<AccountingAuditLog>();
+    public DbSet<AccountingReconciliationFinding> AccountingReconciliationFindings => Set<AccountingReconciliationFinding>();
+    public DbSet<EInvoiceRegister> EInvoiceRegisters => Set<EInvoiceRegister>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<PrintTemplateConfiguration> PrintTemplateConfigurations => Set<PrintTemplateConfiguration>();
     public DbSet<LabelTemplate> LabelTemplates => Set<LabelTemplate>();
@@ -82,6 +98,12 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<BookingBrokerCharge> BookingBrokerCharges => Set<BookingBrokerCharge>();
     public DbSet<BookingExpense> BookingExpenses => Set<BookingExpense>();
     public DbSet<BookingPayment> BookingPayments => Set<BookingPayment>();
+    public DbSet<TdsSection> TdsSections => Set<TdsSection>();
+    public DbSet<TdsRate> TdsRates => Set<TdsRate>();
+    public DbSet<TdsExemption> TdsExemptions => Set<TdsExemption>();
+    public DbSet<TdsSettings> TdsSettings => Set<TdsSettings>();
+    public DbSet<TdsTransaction> TdsTransactions => Set<TdsTransaction>();
+    public DbSet<VendorPayment> VendorPayments => Set<VendorPayment>();
     public DbSet<Provision> Provisions => Set<Provision>();
     public DbSet<TransportBill> TransportBills => Set<TransportBill>();
     public DbSet<FreightRate> FreightRates => Set<FreightRate>();
@@ -168,6 +190,7 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Phone).HasColumnName("phone");
             e.Property(x => x.Email).HasColumnName("email");
             e.Property(x => x.Gst).HasColumnName("gst");
+            e.Property(x => x.Pan).HasColumnName("pan");
             e.Property(x => x.Address).HasColumnName("address");
             e.Property(x => x.Outstanding).HasColumnName("outstanding");
             e.Property(x => x.CreditLimit).HasColumnName("credit_limit");
@@ -176,6 +199,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.PortalEnabled).HasColumnName("portal_enabled");
             e.Property(x => x.PortalPinHash).HasColumnName("portal_pin_hash");
             e.Property(x => x.PortalPhone).HasColumnName("portal_phone");
+            e.Property(x => x.TdsApplicable).HasColumnName("tds_applicable");
+            e.Property(x => x.DefaultTdsSectionId).HasColumnName("default_tds_section_id");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
@@ -193,10 +218,13 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Phone).HasColumnName("phone");
             e.Property(x => x.Email).HasColumnName("email");
             e.Property(x => x.Gst).HasColumnName("gst");
+            e.Property(x => x.Pan).HasColumnName("pan");
             e.Property(x => x.Address).HasColumnName("address");
             e.Property(x => x.Outstanding).HasColumnName("outstanding");
             e.Property(x => x.Category).HasColumnName("category");
             e.Property(x => x.TotalBills).HasColumnName("total_bills");
+            e.Property(x => x.TdsApplicable).HasColumnName("tds_applicable");
+            e.Property(x => x.DefaultTdsSectionId).HasColumnName("default_tds_section_id");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.CreatedBy).HasColumnName("created_by");
@@ -507,7 +535,13 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Name).HasColumnName("name");
             e.Property(x => x.AccountType).HasColumnName("account_type");
             e.Property(x => x.GroupName).HasColumnName("group_name");
+            e.Property(x => x.GroupId).HasColumnName("group_id");
             e.Property(x => x.Balance).HasColumnName("balance");
+            e.Property(x => x.OpeningBalance).HasColumnName("opening_balance");
+            e.Property(x => x.IsControl).HasColumnName("is_control");
+            e.Property(x => x.PartyType).HasColumnName("party_type");
+            e.Property(x => x.PartyId).HasColumnName("party_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
             e.Property(x => x.IsActive).HasColumnName("is_active");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
         });
@@ -517,14 +551,30 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.ToTable("vouchers");
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.FinancialYearId).HasColumnName("financial_year_id");
+            e.Property(x => x.PeriodId).HasColumnName("period_id");
             e.Property(x => x.VoucherNo).HasColumnName("voucher_no");
             e.Property(x => x.VoucherDate).HasColumnName("voucher_date");
+            e.Property(x => x.TransactionDate).HasColumnName("transaction_date");
+            e.Property(x => x.PostingDate).HasColumnName("posting_date");
             e.Property(x => x.VoucherType).HasColumnName("voucher_type");
+            e.Property(x => x.Status).HasColumnName("status");
             e.Property(x => x.PartyName).HasColumnName("party_name");
             e.Property(x => x.Mode).HasColumnName("mode");
             e.Property(x => x.Narration).HasColumnName("narration");
+            e.Property(x => x.ReferenceNo).HasColumnName("reference_no");
+            e.Property(x => x.CostCentreId).HasColumnName("cost_centre_id");
+            e.Property(x => x.SourceType).HasColumnName("source_type");
+            e.Property(x => x.SourceId).HasColumnName("source_id");
             e.Property(x => x.TotalAmount).HasColumnName("total_amount");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.ApprovedBy).HasColumnName("approved_by");
+            e.Property(x => x.ReversedByVoucherId).HasColumnName("reversed_by_voucher_id");
+            e.Property(x => x.ReversalOfVoucherId).HasColumnName("reversal_of_voucher_id");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasMany(x => x.Lines).WithOne(x => x.Voucher!).HasForeignKey(x => x.VoucherId);
         });
 
         modelBuilder.Entity<VoucherLine>(e =>
@@ -538,6 +588,253 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Debit).HasColumnName("debit");
             e.Property(x => x.Credit).HasColumnName("credit");
             e.Property(x => x.LineNarration).HasColumnName("line_narration");
+            e.Property(x => x.CostCentreId).HasColumnName("cost_centre_id");
+            e.Property(x => x.PartyType).HasColumnName("party_type");
+            e.Property(x => x.PartyId).HasColumnName("party_id");
+            e.Property(x => x.LineNo).HasColumnName("line_no");
+        });
+
+        modelBuilder.Entity<AccountGroup>(e =>
+        {
+            e.ToTable("account_groups");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.Code).HasColumnName("code");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.AccountType).HasColumnName("account_type");
+            e.Property(x => x.ParentId).HasColumnName("parent_id");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+        modelBuilder.Entity<FinancialYear>(e =>
+        {
+            e.ToTable("financial_years");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.Code).HasColumnName("code");
+            e.Property(x => x.StartDate).HasColumnName("start_date");
+            e.Property(x => x.EndDate).HasColumnName("end_date");
+            e.Property(x => x.IsClosed).HasColumnName("is_closed");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasMany(x => x.Periods).WithOne(x => x.FinancialYear!).HasForeignKey(x => x.FinancialYearId);
+        });
+        modelBuilder.Entity<AccountingPeriod>(e =>
+        {
+            e.ToTable("accounting_periods");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.FinancialYearId).HasColumnName("financial_year_id");
+            e.Property(x => x.PeriodNo).HasColumnName("period_no");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.StartDate).HasColumnName("start_date");
+            e.Property(x => x.EndDate).HasColumnName("end_date");
+            e.Property(x => x.IsLocked).HasColumnName("is_locked");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+        modelBuilder.Entity<CostCentre>(e =>
+        {
+            e.ToTable("cost_centres");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.Code).HasColumnName("code");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+        modelBuilder.Entity<AccountingSettings>(e =>
+        {
+            e.ToTable("accounting_settings");
+            e.HasKey(x => x.CompanyId);
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.GlReportsEnabled).HasColumnName("gl_reports_enabled");
+            e.Property(x => x.RequireApproval).HasColumnName("require_approval");
+            e.Property(x => x.AutoPostOps).HasColumnName("auto_post_ops");
+            e.Property(x => x.DefaultCashLedgerId).HasColumnName("default_cash_ledger_id");
+            e.Property(x => x.DefaultBankLedgerId).HasColumnName("default_bank_ledger_id");
+            e.Property(x => x.ArControlLedgerId).HasColumnName("ar_control_ledger_id");
+            e.Property(x => x.ApControlLedgerId).HasColumnName("ap_control_ledger_id");
+            e.Property(x => x.FreightIncomeLedgerId).HasColumnName("freight_income_ledger_id");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+        modelBuilder.Entity<AccountPostingMap>(e =>
+        {
+            e.ToTable("account_posting_maps");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.TxnType).HasColumnName("txn_type");
+            e.Property(x => x.DebitLedgerId).HasColumnName("debit_ledger_id");
+            e.Property(x => x.CreditLedgerId).HasColumnName("credit_ledger_id");
+            e.Property(x => x.TaxLedgerId).HasColumnName("tax_ledger_id");
+            e.Property(x => x.TdsLedgerId).HasColumnName("tds_ledger_id");
+            e.Property(x => x.SecondaryLedgerId).HasColumnName("secondary_ledger_id");
+            e.Property(x => x.ExtrasJson).HasColumnName("extras_json");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+        modelBuilder.Entity<VendorBill>(e =>
+        {
+            e.ToTable("vendor_bills");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.BillNo).HasColumnName("bill_no");
+            e.Property(x => x.BillDate).HasColumnName("bill_date");
+            e.Property(x => x.VendorId).HasColumnName("vendor_id");
+            e.Property(x => x.VendorName).HasColumnName("vendor_name");
+            e.Property(x => x.TaxableAmount).HasColumnName("taxable_amount");
+            e.Property(x => x.CgstAmount).HasColumnName("cgst_amount");
+            e.Property(x => x.SgstAmount).HasColumnName("sgst_amount");
+            e.Property(x => x.IgstAmount).HasColumnName("igst_amount");
+            e.Property(x => x.TdsAmount).HasColumnName("tds_amount");
+            e.Property(x => x.TotalAmount).HasColumnName("total_amount");
+            e.Property(x => x.AmountPaid).HasColumnName("amount_paid");
+            e.Property(x => x.Balance).HasColumnName("balance");
+            e.Property(x => x.ExpenseAccountId).HasColumnName("expense_account_id");
+            e.Property(x => x.CostCentreId).HasColumnName("cost_centre_id");
+            e.Property(x => x.ReferenceNo).HasColumnName("reference_no");
+            e.Property(x => x.Narration).HasColumnName("narration");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.AccountingVoucherId).HasColumnName("accounting_voucher_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            e.HasMany(x => x.Lines).WithOne(x => x.VendorBill!).HasForeignKey(x => x.VendorBillId);
+        });
+        modelBuilder.Entity<VendorBillLine>(e =>
+        {
+            e.ToTable("vendor_bill_lines");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.VendorBillId).HasColumnName("vendor_bill_id");
+            e.Property(x => x.LineNo).HasColumnName("line_no");
+            e.Property(x => x.Description).HasColumnName("description");
+            e.Property(x => x.LedgerAccountId).HasColumnName("ledger_account_id");
+            e.Property(x => x.Amount).HasColumnName("amount");
+            e.Property(x => x.TaxAmount).HasColumnName("tax_amount");
+        });
+        modelBuilder.Entity<VendorBillSettlement>(e =>
+        {
+            e.ToTable("vendor_bill_settlements");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.VendorBillId).HasColumnName("vendor_bill_id");
+            e.Property(x => x.VendorPaymentId).HasColumnName("vendor_payment_id");
+            e.Property(x => x.Amount).HasColumnName("amount");
+            e.Property(x => x.SettlementDate).HasColumnName("settlement_date");
+            e.Property(x => x.AccountingVoucherId).HasColumnName("accounting_voucher_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+        modelBuilder.Entity<CreditDebitNote>(e =>
+        {
+            e.ToTable("credit_debit_notes");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.NoteNo).HasColumnName("note_no");
+            e.Property(x => x.NoteDate).HasColumnName("note_date");
+            e.Property(x => x.NoteType).HasColumnName("note_type");
+            e.Property(x => x.PartyType).HasColumnName("party_type");
+            e.Property(x => x.PartyId).HasColumnName("party_id");
+            e.Property(x => x.PartyName).HasColumnName("party_name");
+            e.Property(x => x.InvoiceId).HasColumnName("invoice_id");
+            e.Property(x => x.VendorBillId).HasColumnName("vendor_bill_id");
+            e.Property(x => x.TaxableAmount).HasColumnName("taxable_amount");
+            e.Property(x => x.TaxAmount).HasColumnName("tax_amount");
+            e.Property(x => x.TotalAmount).HasColumnName("total_amount");
+            e.Property(x => x.Narration).HasColumnName("narration");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.AccountingVoucherId).HasColumnName("accounting_voucher_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+        });
+        modelBuilder.Entity<BankAccount>(e =>
+        {
+            e.ToTable("bank_accounts");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.LedgerAccountId).HasColumnName("ledger_account_id");
+            e.Property(x => x.BankName).HasColumnName("bank_name");
+            e.Property(x => x.AccountNo).HasColumnName("account_no");
+            e.Property(x => x.Ifsc).HasColumnName("ifsc");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+        modelBuilder.Entity<BankReconciliation>(e =>
+        {
+            e.ToTable("bank_reconciliations");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BankAccountId).HasColumnName("bank_account_id");
+            e.Property(x => x.StatementDate).HasColumnName("statement_date");
+            e.Property(x => x.StatementBalance).HasColumnName("statement_balance");
+            e.Property(x => x.BookBalance).HasColumnName("book_balance");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+        });
+        modelBuilder.Entity<BankReconciliationLine>(e =>
+        {
+            e.ToTable("bank_reconciliation_lines");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BankReconciliationId).HasColumnName("bank_reconciliation_id");
+            e.Property(x => x.VoucherLineId).HasColumnName("voucher_line_id");
+            e.Property(x => x.StatementRef).HasColumnName("statement_ref");
+            e.Property(x => x.Amount).HasColumnName("amount");
+            e.Property(x => x.IsMatched).HasColumnName("is_matched");
+            e.Property(x => x.MatchedAt).HasColumnName("matched_at");
+        });
+        modelBuilder.Entity<AccountingAuditLog>(e =>
+        {
+            e.ToTable("accounting_audit_log");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.EntityType).HasColumnName("entity_type");
+            e.Property(x => x.EntityId).HasColumnName("entity_id");
+            e.Property(x => x.Action).HasColumnName("action");
+            e.Property(x => x.Details).HasColumnName("details");
+            e.Property(x => x.UserName).HasColumnName("user_name");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+        modelBuilder.Entity<AccountingReconciliationFinding>(e =>
+        {
+            e.ToTable("accounting_reconciliation_findings");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.FindingType).HasColumnName("finding_type");
+            e.Property(x => x.SourceType).HasColumnName("source_type");
+            e.Property(x => x.SourceId).HasColumnName("source_id");
+            e.Property(x => x.VoucherId).HasColumnName("voucher_id");
+            e.Property(x => x.AmountOps).HasColumnName("amount_ops");
+            e.Property(x => x.AmountGl).HasColumnName("amount_gl");
+            e.Property(x => x.Message).HasColumnName("message");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+        modelBuilder.Entity<EInvoiceRegister>(e =>
+        {
+            e.ToTable("e_invoice_register");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.FreightInvoiceId).HasColumnName("freight_invoice_id");
+            e.Property(x => x.InvoiceNo).HasColumnName("invoice_no");
+            e.Property(x => x.InvoiceDate).HasColumnName("invoice_date");
+            e.Property(x => x.CustomerName).HasColumnName("customer_name");
+            e.Property(x => x.Gstin).HasColumnName("gstin");
+            e.Property(x => x.TaxableAmount).HasColumnName("taxable_amount");
+            e.Property(x => x.TaxAmount).HasColumnName("tax_amount");
+            e.Property(x => x.TotalAmount).HasColumnName("total_amount");
+            e.Property(x => x.Irn).HasColumnName("irn");
+            e.Property(x => x.AckNo).HasColumnName("ack_no");
+            e.Property(x => x.AckDate).HasColumnName("ack_date");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
         });
 
         modelBuilder.Entity<AccountingReportJob>(e =>
@@ -1631,10 +1928,147 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.ReceiptNo).HasColumnName("receipt_no").HasMaxLength(64);
             e.Property(x => x.PaymentDate).HasColumnName("payment_date");
             e.Property(x => x.Amount).HasColumnName("amount");
+            e.Property(x => x.GrossAmount).HasColumnName("gross_amount");
+            e.Property(x => x.TdsAmount).HasColumnName("tds_amount");
+            e.Property(x => x.TdsSectionId).HasColumnName("tds_section_id");
             e.Property(x => x.PaymentMode).HasColumnName("payment_mode");
             e.Property(x => x.ReferenceNo).HasColumnName("reference_no");
             e.Property(x => x.Remarks).HasColumnName("remarks");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<TdsSection>(e =>
+        {
+            e.ToTable("tds_sections");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.SectionCode).HasColumnName("section_code");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.NatureOfPayment).HasColumnName("nature_of_payment");
+            e.Property(x => x.PartyType).HasColumnName("party_type");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+        });
+
+        modelBuilder.Entity<TdsRate>(e =>
+        {
+            e.ToTable("tds_rates");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.SectionId).HasColumnName("section_id");
+            e.Property(x => x.RatePercent).HasColumnName("rate_percent");
+            e.Property(x => x.RateWithoutPanPercent).HasColumnName("rate_without_pan_percent");
+            e.Property(x => x.ThresholdAmount).HasColumnName("threshold_amount");
+            e.Property(x => x.ThresholdType).HasColumnName("threshold_type");
+            e.Property(x => x.EffectiveFrom).HasColumnName("effective_from");
+            e.Property(x => x.EffectiveTo).HasColumnName("effective_to");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            e.HasOne(x => x.Section).WithMany().HasForeignKey(x => x.SectionId);
+        });
+
+        modelBuilder.Entity<TdsExemption>(e =>
+        {
+            e.ToTable("tds_exemptions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.PartyType).HasColumnName("party_type");
+            e.Property(x => x.PartyId).HasColumnName("party_id");
+            e.Property(x => x.SectionId).HasColumnName("section_id");
+            e.Property(x => x.CertificateNo).HasColumnName("certificate_no");
+            e.Property(x => x.LowerRatePercent).HasColumnName("lower_rate_percent");
+            e.Property(x => x.ValidFrom).HasColumnName("valid_from");
+            e.Property(x => x.ValidTo).HasColumnName("valid_to");
+            e.Property(x => x.Remarks).HasColumnName("remarks");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+        });
+
+        modelBuilder.Entity<TdsSettings>(e =>
+        {
+            e.ToTable("tds_settings");
+            e.HasKey(x => x.CompanyId);
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.Enabled).HasColumnName("enabled");
+            e.Property(x => x.TdsPayableLedgerName).HasColumnName("tds_payable_ledger_name");
+            e.Property(x => x.TdsReceivableLedgerName).HasColumnName("tds_receivable_ledger_name");
+            e.Property(x => x.RoundOff).HasColumnName("round_off");
+            e.Property(x => x.AutoPostVoucher).HasColumnName("auto_post_voucher");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+        });
+
+        modelBuilder.Entity<TdsTransaction>(e =>
+        {
+            e.ToTable("tds_transactions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.Direction).HasColumnName("direction");
+            e.Property(x => x.SectionId).HasColumnName("section_id");
+            e.Property(x => x.RatePercent).HasColumnName("rate_percent");
+            e.Property(x => x.BaseAmount).HasColumnName("base_amount");
+            e.Property(x => x.TdsAmount).HasColumnName("tds_amount");
+            e.Property(x => x.PartyType).HasColumnName("party_type");
+            e.Property(x => x.PartyId).HasColumnName("party_id");
+            e.Property(x => x.PartyName).HasColumnName("party_name");
+            e.Property(x => x.PartyPan).HasColumnName("party_pan");
+            e.Property(x => x.SourceType).HasColumnName("source_type");
+            e.Property(x => x.SourceId).HasColumnName("source_id");
+            e.Property(x => x.SourceRef).HasColumnName("source_ref");
+            e.Property(x => x.PaymentMode).HasColumnName("payment_mode");
+            e.Property(x => x.TransactionDate).HasColumnName("transaction_date");
+            e.Property(x => x.FinancialYear).HasColumnName("financial_year");
+            e.Property(x => x.VoucherId).HasColumnName("voucher_id");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.ReversedByTxnId).HasColumnName("reversed_by_txn_id");
+            e.Property(x => x.ReversalOfTxnId).HasColumnName("reversal_of_txn_id");
+            e.Property(x => x.Narration).HasColumnName("narration");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+        });
+
+        modelBuilder.Entity<VendorPayment>(e =>
+        {
+            e.ToTable("vendor_payments");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CompanyId).HasColumnName("company_id");
+            e.Property(x => x.BranchId).HasColumnName("branch_id");
+            e.Property(x => x.PaymentNo).HasColumnName("payment_no");
+            e.Property(x => x.PaymentDate).HasColumnName("payment_date");
+            e.Property(x => x.VendorId).HasColumnName("vendor_id");
+            e.Property(x => x.GrossAmount).HasColumnName("gross_amount");
+            e.Property(x => x.TdsAmount).HasColumnName("tds_amount");
+            e.Property(x => x.NetAmount).HasColumnName("net_amount");
+            e.Property(x => x.TdsSectionId).HasColumnName("tds_section_id");
+            e.Property(x => x.TdsRatePercent).HasColumnName("tds_rate_percent");
+            e.Property(x => x.TdsTransactionId).HasColumnName("tds_transaction_id");
+            e.Property(x => x.PaymentMode).HasColumnName("payment_mode");
+            e.Property(x => x.ReferenceNo).HasColumnName("reference_no");
+            e.Property(x => x.Narration).HasColumnName("narration");
+            e.Property(x => x.ExpenseId).HasColumnName("expense_id");
+            e.Property(x => x.BookingExpenseId).HasColumnName("booking_expense_id");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
         });
 
         modelBuilder.Entity<Provision>(e =>

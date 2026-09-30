@@ -5,6 +5,10 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import VehicleLookupSelect from '../../components/ui/VehicleLookupSelect'
+import VehicleMasterSelect from '../../components/masters/VehicleMasterSelect'
+import DriverMasterSelect from '../../components/masters/DriverMasterSelect'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
+import ItemMasterSelect from '../../components/masters/ItemMasterSelect'
 import { Select } from '../../components/ui/Input'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import {
@@ -434,7 +438,9 @@ export function CustomerPortalPage() {
   const [invoices, setInvoices] = useState([])
   const [track, setTrack] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ origin: '', destination: '', customerName: '', freightAmount: '', material: '' })
+  const [form, setForm] = useState({
+    origin: '', destination: '', customerId: '', customerName: '', freightAmount: '', material: '', materialId: '',
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -457,12 +463,15 @@ export function CustomerPortalPage() {
       await customerPortalApi.createBooking({
         origin: form.origin,
         destination: form.destination,
+        customerId: form.customerId || undefined,
         customerName: form.customerName,
         freightAmount: Number(form.freightAmount || 0),
         material: form.material || undefined,
       })
       toast({ title: 'Customer booking created', type: 'success' })
-      setForm({ origin: '', destination: '', customerName: '', freightAmount: '', material: '' })
+      setForm({
+        origin: '', destination: '', customerId: '', customerName: '', freightAmount: '', material: '', materialId: '',
+      })
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -516,11 +525,33 @@ export function CustomerPortalPage() {
       {tab === 'create' && (
         <Card className="mx-auto max-w-lg p-6">
           <form onSubmit={createBooking} className="space-y-3">
-            <input required placeholder="Customer name" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} className={inputClass} />
+            <PartyMasterSelect
+              label="Customer"
+              api={customersApi}
+              masterKey="customers"
+              valueId={form.customerId}
+              displayValue={form.customerName}
+              placeholder="Search customer…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                customerId: row?.id ?? '',
+                customerName: row?.name ?? row?.companyName ?? '',
+              }))}
+            />
             <input required placeholder="Origin" value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })} className={inputClass} />
             <input required placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} className={inputClass} />
             <input required type="number" placeholder="Freight amount" value={form.freightAmount} onChange={(e) => setForm({ ...form, freightAmount: e.target.value })} className={inputClass} />
-            <input placeholder="Material" value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} className={inputClass} />
+            <ItemMasterSelect
+              label="Material"
+              valueId={form.materialId}
+              displayValue={form.material}
+              placeholder="Search material…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                materialId: row?.id ?? '',
+                material: row?.name ?? '',
+              }))}
+            />
             <Button type="submit" className="w-full">Create booking</Button>
           </form>
         </Card>
@@ -557,22 +588,16 @@ export function TripsPage() {
   const { toast } = useToast()
   const [tab, setTab] = useState('list')
   const [rows, setRows] = useState([])
-  const [vehicles, setVehicles] = useState([])
-  const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ origin: '', destination: '', vehicleId: '', driverId: '', plannedStart: '', plannedEnd: '' })
+  const [form, setForm] = useState({
+    origin: '', destination: '', vehicleId: '', vehicleNo: '', driverId: '', driverName: '', plannedStart: '', plannedEnd: '',
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [t, v, d] = await Promise.all([
-        tripsApi.list(),
-        vehiclesApi.list({ pageSize: 200 }),
-        driversApi.list({ pageSize: 200 }),
-      ])
+      const t = await tripsApi.list()
       setRows(t ?? [])
-      setVehicles(v.items ?? v ?? [])
-      setDrivers(d.items ?? d ?? [])
     } catch (e) {
       toast({ title: 'Load failed', message: e.message, type: 'error' })
     } finally {
@@ -594,7 +619,9 @@ export function TripsPage() {
         plannedEnd: form.plannedEnd || undefined,
       })
       toast({ title: 'Trip created', type: 'success' })
-      setForm({ origin: '', destination: '', vehicleId: '', driverId: '', plannedStart: '', plannedEnd: '' })
+      setForm({
+        origin: '', destination: '', vehicleId: '', vehicleNo: '', driverId: '', driverName: '', plannedStart: '', plannedEnd: '',
+      })
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -644,8 +671,26 @@ export function TripsPage() {
           <form onSubmit={create} className="space-y-3">
             <input required placeholder="Origin" value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })} className={inputClass} />
             <input required placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} className={inputClass} />
-            <Select label="Vehicle" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} options={[{ value: '', label: 'Optional' }, ...vehicles.map((v) => ({ value: v.id, label: v.number || v.registrationNo }))]} />
-            <Select label="Driver" value={form.driverId} onChange={(e) => setForm({ ...form, driverId: e.target.value })} options={[{ value: '', label: 'Optional' }, ...drivers.map((d) => ({ value: d.id, label: d.name }))]} />
+            <VehicleMasterSelect
+              label="Vehicle"
+              displayValue={form.vehicleNo}
+              placeholder="Search vehicle…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                vehicleId: row?.id ?? '',
+                vehicleNo: row?.number ?? row?.registrationNo ?? '',
+              }))}
+            />
+            <DriverMasterSelect
+              label="Driver"
+              displayValue={form.driverName}
+              placeholder="Search driver…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                driverId: row?.id ?? '',
+                driverName: row?.name ?? '',
+              }))}
+            />
             <input type="datetime-local" value={form.plannedStart} onChange={(e) => setForm({ ...form, plannedStart: e.target.value })} className={inputClass} />
             <input type="datetime-local" value={form.plannedEnd} onChange={(e) => setForm({ ...form, plannedEnd: e.target.value })} className={inputClass} />
             <Button type="submit" className="w-full">Create trip</Button>
@@ -730,21 +775,18 @@ export function FinanceModulePage() {
   const [summary, setSummary] = useState(null)
   const [invoices, setInvoices] = useState([])
   const [expenses, setExpenses] = useState([])
-  const [customers, setCustomers] = useState([])
-  const [form, setForm] = useState({ customerId: '', amount: '', taxAmount: '0', description: 'Freight charges' })
+  const [form, setForm] = useState({ customerId: '', customerName: '', amount: '', taxAmount: '0', description: 'Freight charges' })
 
   const load = useCallback(async () => {
     try {
-      const [s, inv, exp, cust] = await Promise.all([
+      const [s, inv, exp] = await Promise.all([
         financeApi.summary(),
         financeApi.invoices(),
         financeApi.expenses(),
-        customersApi.list({ pageSize: 200 }),
       ])
       setSummary(s)
       setInvoices(inv?.items ?? inv ?? [])
       setExpenses(exp ?? [])
-      setCustomers(cust.items ?? cust ?? [])
     } catch (e) {
       toast({ title: 'Load failed', message: e.message, type: 'error' })
     }
@@ -762,7 +804,7 @@ export function FinanceModulePage() {
         lines: [{ description: form.description || 'Freight', quantity: 1, unitPrice: Number(form.amount || 0) }],
       })
       toast({ title: 'Invoice created', type: 'success' })
-      setForm({ customerId: '', amount: '', taxAmount: '0', description: 'Freight charges' })
+      setForm({ customerId: '', customerName: '', amount: '', taxAmount: '0', description: 'Freight charges' })
       load()
     } catch (e) {
       toast({ title: 'Create failed', message: e.message, type: 'error' })
@@ -802,7 +844,19 @@ export function FinanceModulePage() {
       {tab === 'create' && (
         <Card className="mx-auto max-w-lg p-6">
           <form onSubmit={createInvoice} className="space-y-3">
-            <Select label="Customer" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} options={[{ value: '', label: 'Select customer' }, ...customers.map((c) => ({ value: c.id, label: c.name }))]} />
+            <PartyMasterSelect
+              label="Customer"
+              api={customersApi}
+              masterKey="customers"
+              valueId={form.customerId}
+              displayValue={form.customerName}
+              placeholder="Search customer…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                customerId: row?.id ?? '',
+                customerName: row?.name ?? row?.companyName ?? '',
+              }))}
+            />
             <input required type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputClass} />
             <input type="number" placeholder="Tax" value={form.taxAmount} onChange={(e) => setForm({ ...form, taxAmount: e.target.value })} className={inputClass} />
             <input placeholder="Line description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} />
@@ -819,14 +873,14 @@ export function DocumentsPage() {
   const [tab, setTab] = useState('all')
   const [docs, setDocs] = useState([])
   const [expiring, setExpiring] = useState(null)
-  const [vehicles, setVehicles] = useState([])
-  const [form, setForm] = useState({ entityType: 'Vehicle', entityId: '', docType: 'Insurance', title: '', fileUrl: '', expiresAt: '' })
+  const [form, setForm] = useState({
+    entityType: 'Vehicle', entityId: '', entityLabel: '', docType: 'Insurance', title: '', fileUrl: '', expiresAt: '',
+  })
 
   const load = useCallback(async () => {
-    const [allRes, expRes, vRes] = await Promise.allSettled([
+    const [allRes, expRes] = await Promise.allSettled([
       documentsApi.list(),
       documentsApi.expiring(30),
-      vehiclesApi.list({ pageSize: 200 }),
     ])
     if (allRes.status === 'fulfilled') setDocs(allRes.value ?? [])
     else {
@@ -835,7 +889,6 @@ export function DocumentsPage() {
     }
     if (expRes.status === 'fulfilled') setExpiring(expRes.value)
     else toast({ title: 'Expiring docs failed', message: expRes.reason?.message || 'Unable to load expiring docs', type: 'error' })
-    if (vRes.status === 'fulfilled') setVehicles(vRes.value?.items ?? vRes.value ?? [])
   }, [toast])
 
   useEffect(() => { load() }, [load])
@@ -852,7 +905,7 @@ export function DocumentsPage() {
         expiresAt: form.expiresAt || undefined,
       })
       toast({ title: 'Document saved', type: 'success' })
-      setForm({ entityType: 'Vehicle', entityId: '', docType: 'Insurance', title: '', fileUrl: '', expiresAt: '' })
+      setForm({ entityType: 'Vehicle', entityId: '', entityLabel: '', docType: 'Insurance', title: '', fileUrl: '', expiresAt: '' })
       load()
     } catch (e) {
       toast({ title: 'Save failed', message: e.message, type: 'error' })
@@ -891,9 +944,29 @@ export function DocumentsPage() {
       {tab === 'add' && (
         <Card className="mx-auto max-w-lg p-6">
           <form onSubmit={save} className="space-y-3">
-            <Select label="Entity type" value={form.entityType} onChange={(e) => setForm({ ...form, entityType: e.target.value })} options={[{ value: 'Vehicle', label: 'Vehicle' }, { value: 'Driver', label: 'Driver' }, { value: 'Company', label: 'Company' }]} />
+            <Select label="Entity type" value={form.entityType} onChange={(e) => setForm({ ...form, entityType: e.target.value, entityId: '', entityLabel: '' })} options={[{ value: 'Vehicle', label: 'Vehicle' }, { value: 'Driver', label: 'Driver' }, { value: 'Company', label: 'Company' }]} />
             {form.entityType === 'Vehicle' ? (
-              <Select label="Vehicle" value={form.entityId} onChange={(e) => setForm({ ...form, entityId: e.target.value })} options={[{ value: '', label: 'Select vehicle' }, ...vehicles.map((v) => ({ value: v.id, label: v.number || v.registrationNo }))]} />
+              <VehicleMasterSelect
+                label="Vehicle"
+                displayValue={form.entityLabel}
+                placeholder="Search vehicle…"
+                onSelect={(row) => setForm((f) => ({
+                  ...f,
+                  entityId: row?.id ?? '',
+                  entityLabel: row?.number ?? row?.registrationNo ?? '',
+                }))}
+              />
+            ) : form.entityType === 'Driver' ? (
+              <DriverMasterSelect
+                label="Driver"
+                displayValue={form.entityLabel}
+                placeholder="Search driver…"
+                onSelect={(row) => setForm((f) => ({
+                  ...f,
+                  entityId: row?.id ?? '',
+                  entityLabel: row?.name ?? '',
+                }))}
+              />
             ) : (
               <input required placeholder="Entity ID" value={form.entityId} onChange={(e) => setForm({ ...form, entityId: e.target.value })} className={inputClass} />
             )}
@@ -1241,15 +1314,13 @@ export function IotPage() {
   const { toast } = useToast()
   const [tab, setTab] = useState('devices')
   const [rows, setRows] = useState([])
-  const [vehicles, setVehicles] = useState([])
-  const [form, setForm] = useState({ deviceType: 'GPS', deviceSerial: '', vehicleId: '' })
+  const [form, setForm] = useState({ deviceType: 'GPS', deviceSerial: '', vehicleId: '', vehicleNo: '' })
   const [reading, setReading] = useState({ deviceId: '', metric: 'temperature', value: '', unit: 'C' })
 
   const load = useCallback(async () => {
     try {
-      const [d, v] = await Promise.all([iotApi.devices(), vehiclesApi.list({ pageSize: 200 })])
+      const d = await iotApi.devices()
       setRows(d ?? [])
-      setVehicles(v.items ?? v ?? [])
     } catch (e) {
       toast({ title: 'Load failed', message: e.message, type: 'error' })
     }
@@ -1266,7 +1337,7 @@ export function IotPage() {
         vehicleId: form.vehicleId || undefined,
       })
       toast({ title: 'Device registered', type: 'success' })
-      setForm({ deviceType: 'GPS', deviceSerial: '', vehicleId: '' })
+      setForm({ deviceType: 'GPS', deviceSerial: '', vehicleId: '', vehicleNo: '' })
       load()
     } catch (e) {
       toast({ title: 'Register failed', message: e.message, type: 'error' })
@@ -1314,7 +1385,16 @@ export function IotPage() {
           <form onSubmit={register} className="space-y-3">
             <Select label="Type" value={form.deviceType} onChange={(e) => setForm({ ...form, deviceType: e.target.value })} options={[{ value: 'GPS', label: 'GPS' }, { value: 'TEMP', label: 'Temperature' }, { value: 'FUEL', label: 'Fuel sensor' }, { value: 'DOOR', label: 'Door' }]} />
             <input required placeholder="Device serial" value={form.deviceSerial} onChange={(e) => setForm({ ...form, deviceSerial: e.target.value })} className={inputClass} />
-            <Select label="Vehicle (optional)" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} options={[{ value: '', label: 'Unassigned' }, ...vehicles.map((v) => ({ value: v.id, label: v.number || v.registrationNo }))]} />
+            <VehicleMasterSelect
+              label="Vehicle (optional)"
+              displayValue={form.vehicleNo}
+              placeholder="Search vehicle…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                vehicleId: row?.id ?? '',
+                vehicleNo: row?.number ?? row?.registrationNo ?? '',
+              }))}
+            />
             <Button type="submit" className="w-full">Register device</Button>
           </form>
         </Card>

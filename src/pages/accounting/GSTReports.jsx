@@ -1,8 +1,9 @@
+import { Link } from 'react-router-dom'
 import ERPContentPage from '../../components/ui/ERPContentPage'
 import StatusSummaryCards from '../../components/ui/StatusSummaryCards'
 import Card, { CardHeader } from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
 import { formatCurrency } from '../../components/ui/ReportFilters'
-import { TablePrintButton } from '../../components/print/ReportPrintButton'
 import { useApiObject } from '../../hooks/useApiResource'
 import { accountingApi } from '../../services/api'
 
@@ -30,11 +31,20 @@ export default function GSTReports() {
   return (
     <ERPContentPage module="Accounting" title="GST Reports">
       <div className="space-y-4">
+        <Card>
+          <CardHeader title="GSTR / e-Invoice / Form 26Q" subtitle="Filing registers from the double-entry GL" />
+          <p className="mb-3 text-sm text-slate-500">
+            Use the compliance workspace for GSTR-1, GSTR-3B worksheets, Form 26Q CSV, and the local e-Invoice IRN register.
+          </p>
+          <Link to="/accounting/gl/compliance">
+            <Button>Open GST / TDS Compliance</Button>
+          </Link>
+        </Card>
         {error && <p className="text-sm text-red-500">{error}</p>}
         {!hasData ? (
           <Card>
-            <CardHeader title="No GST data" subtitle="GST reports appear when lorry receipts include GST amounts." />
-            <p className="text-sm text-slate-500">All values are zero until GST is recorded on LR entries.</p>
+            <CardHeader title="Legacy LR GST summary" subtitle="Appears when lorry receipts include GST amounts." />
+            <p className="text-sm text-slate-500">Prefer freight invoices + GL compliance for GSTR worksheets.</p>
           </Card>
         ) : (
           <>

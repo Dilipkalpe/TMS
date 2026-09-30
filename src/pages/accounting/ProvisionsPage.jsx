@@ -5,8 +5,8 @@ import Button from '../../components/ui/Button'
 import Input, { Select, Textarea } from '../../components/ui/Input'
 import ERPDataTable from '../../components/ui/ERPDataTable'
 import TablePagination from '../../components/ui/TablePagination'
-import LookupSelect from '../../components/ui/LookupSelect'
-import { bookingFinanceApi } from '../../services/api'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
+import { bookingFinanceApi, customersApi, vendorsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiResource'
 import { formatCurrency } from '../../components/ui/ReportFilters'
@@ -66,9 +66,33 @@ export default function ProvisionsPage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Select label="Type" options={['Vendor', 'Party']} value={form.provisionType} onChange={(e) => setForm((f) => ({ ...f, provisionType: e.target.value, partyName: '', partyId: '' }))} />
           {form.provisionType === 'Vendor' ? (
-            <LookupSelect label="Vendor" type="vendors" value={form.partyName} onChange={(v) => setForm((f) => ({ ...f, partyName: v }))} placeholder="Search vendor…" />
+            <PartyMasterSelect
+              label="Vendor"
+              api={vendorsApi}
+              masterKey="vendors"
+              valueId={form.partyId}
+              displayValue={form.partyName}
+              placeholder="Search vendor…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                partyId: row?.id ?? '',
+                partyName: row?.name ?? row?.companyName ?? '',
+              }))}
+            />
           ) : (
-            <LookupSelect label="Customer / Party" type="customers" value={form.partyName} onChange={(v) => setForm((f) => ({ ...f, partyName: v }))} placeholder="Search customer…" />
+            <PartyMasterSelect
+              label="Customer / Party"
+              api={customersApi}
+              masterKey="customers"
+              valueId={form.partyId}
+              displayValue={form.partyName}
+              placeholder="Search customer…"
+              onSelect={(row) => setForm((f) => ({
+                ...f,
+                partyId: row?.id ?? '',
+                partyName: row?.name ?? row?.companyName ?? '',
+              }))}
+            />
           )}
           <Input label="Amount (₹)" type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
           <Input label="Reference" value={form.referenceNo} onChange={(e) => setForm((f) => ({ ...f, referenceNo: e.target.value }))} />

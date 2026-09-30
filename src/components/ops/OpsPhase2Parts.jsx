@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '../ui/Button'
-import Input from '../ui/Input'
+import Input, { Select } from '../ui/Input'
+import EmployeeLookupSelect from '../ui/EmployeeLookupSelect'
 import { Trash2, Upload } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
+import { hrApi, unwrapList } from '../../services/api'
+import { PAYMENT_MODES, DEFAULT_PAYMENT_MODE } from '../../constants/paymentModes'
 
 export function OpsChecklist({ items = [], values = {}, onChange }) {
   return (
@@ -258,6 +261,14 @@ export function OpsInvoiceItemsTable({ items, onChange, lr }) {
 
 export function OpsExpenseSettlement({ form, onChange }) {
   const u = (k, v) => onChange?.({ ...form, [k]: v })
+  const [employees, setEmployees] = useState([])
+
+  useEffect(() => {
+    hrApi.employees({ pageSize: 200 })
+      .then((res) => setEmployees(unwrapList(res)))
+      .catch(() => setEmployees([]))
+  }, [])
+
   return (
     <div className="grid gap-1 lg:grid-cols-2">
       <div className="lr-entry-section lr-entry-compact">
@@ -273,8 +284,26 @@ export function OpsExpenseSettlement({ form, onChange }) {
         <div className="grid grid-cols-2 gap-1">
           <Input label="Reimbursed (₹)" type="number" value={form.reimbursed} onChange={(e) => u('reimbursed', e.target.value)} />
           <Input label="Settlement Date" type="date" value={form.settlementDate} onChange={(e) => u('settlementDate', e.target.value)} />
-          <Input label="Paid To" value={form.paidTo} onChange={(e) => u('paidTo', e.target.value)} />
-          <Input label="Payment Mode" value={form.paymentMode} onChange={(e) => u('paymentMode', e.target.value)} />
+          <EmployeeLookupSelect
+            label="Paid To"
+            employees={employees}
+            employeeId={form.paidToId
+              || employees.find((e) => e.name?.toLowerCase() === String(form.paidTo || '').toLowerCase())?.id
+              || ''}
+            onEmployeeChange={(id, name) => onChange?.({ ...form, paidToId: id || '', paidTo: name || '' })}
+            onEmployeesRefresh={async () => {
+              const list = unwrapList(await hrApi.employees({ pageSize: 200 }))
+              setEmployees(list)
+              return list
+            }}
+            placeholder="Search employee…"
+          />
+          <Select
+            label="Payment Mode"
+            options={PAYMENT_MODES}
+            value={form.paymentMode || DEFAULT_PAYMENT_MODE}
+            onChange={(e) => u('paymentMode', e.target.value)}
+          />
         </div>
       </div>
     </div>

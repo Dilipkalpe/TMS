@@ -468,7 +468,13 @@ public class QuotationsController(TmsDbContext db, ITenantContext tenants, IBran
 [Authorize]
 [ApiController]
 [Route("api/freight-invoices")]
-public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, IBranchContext branches, DocumentNumberService documentNumbers) : ControllerBase
+public class FreightInvoicesController(
+    TmsDbContext db,
+    ITenantContext tenants,
+    IBranchContext branches,
+    DocumentNumberService documentNumbers,
+    Tms.Api.Services.Accounting.GlOpsPostingService glPosting,
+    ILogger<FreightInvoicesController> logger) : ControllerBase
 {
     static object Map(FreightInvoice inv) => new
     {
@@ -662,6 +668,12 @@ public class FreightInvoicesController(TmsDbContext db, ITenantContext tenants, 
         }
 
         await db.SaveChangesAsync();
+        try { await glPosting.TryPostCustomerInvoiceAsync(inv, User.Identity?.Name); }
+        catch (Exception ex)
+        {
+            // Ops invoice must succeed; surface posting failure for Ops↔GL reconciliation.
+            logger.LogWarning(ex, "GL auto-post failed for freight invoice {InvoiceId} ({InvoiceNo})", inv.Id, inv.InvoiceNo);
+        }
         return CreatedAtAction(nameof(Get), new { id = inv.Id }, Map(inv));
     }
 

@@ -14,8 +14,7 @@ import { useApiObject } from '../../hooks/useApiResource'
 import { accountingApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { defaultReportFilters, toReportQuery } from '../../utils/reportQuery'
-
-const PAYMENT_MODES = ['Cash', 'UPI', 'NEFT', 'Cheque', 'RTGS', 'Card']
+import { PAYMENT_MODES, DEFAULT_PAYMENT_MODE } from '../../constants/paymentModes'
 
 function OutstandingLinesModal({ open, onClose, title, lines }) {
   const rows = Array.isArray(lines) ? lines : []
@@ -57,9 +56,12 @@ function CustomerPaymentModal({ open, onClose, customer, onPaid }) {
   const [form, setForm] = useState({
     amount: '',
     paymentDate: new Date().toISOString().slice(0, 10),
-    paymentMode: 'Cash',
+    paymentMode: DEFAULT_PAYMENT_MODE,
     referenceNo: '',
     remarks: '',
+    tdsAmount: '',
+    grossAmount: '',
+    tdsSectionId: '',
   })
 
   const selected = useMemo(() => {
@@ -74,9 +76,12 @@ function CustomerPaymentModal({ open, onClose, customer, onPaid }) {
     setForm({
       amount: first ? String(first.amount ?? '') : '',
       paymentDate: new Date().toISOString().slice(0, 10),
-      paymentMode: 'Cash',
+      paymentMode: DEFAULT_PAYMENT_MODE,
       referenceNo: '',
       remarks: '',
+      tdsAmount: '',
+      grossAmount: '',
+      tdsSectionId: '',
     })
   }, [open, customer?.partyId, customer?.name])
 
@@ -104,6 +109,8 @@ function CustomerPaymentModal({ open, onClose, customer, onPaid }) {
     }
     setSaving(true)
     try {
+      const tdsAmount = Math.max(0, Number(form.tdsAmount) || 0)
+      const grossAmount = Number(form.grossAmount) || (amount + tdsAmount)
       const res = await accountingApi.recordCustomerPayment({
         sourceType: selected.sourceType,
         sourceId: selected.sourceId,
@@ -113,10 +120,13 @@ function CustomerPaymentModal({ open, onClose, customer, onPaid }) {
         referenceNo: form.referenceNo || undefined,
         remarks: form.remarks || undefined,
         customerId: customer?.partyId || undefined,
+        tdsAmount: tdsAmount || undefined,
+        grossAmount: tdsAmount > 0 ? grossAmount : undefined,
+        tdsSectionId: form.tdsSectionId || undefined,
       })
       toast({
         title: 'Payment recorded',
-        message: `Receipt ${res.receiptNo || ''} · Remaining ${formatCurrency(res.outstanding ?? 0)}`,
+        message: `Receipt ${res.receiptNo || ''} · Remaining ${formatCurrency(res.outstanding ?? 0)}${tdsAmount > 0 ? ` · TDS ${formatCurrency(tdsAmount)}` : ''}`,
         type: 'success',
       })
       onPaid?.(res)
@@ -175,10 +185,12 @@ function CustomerPaymentModal({ open, onClose, customer, onPaid }) {
               onChange={(e) => setLineKey(e.target.value)}
             />
           </div>
-          <Input label="Payment Amount (₹) *" type="number" value={form.amount} onChange={(e) => u('amount', e.target.value)} />
+          <Input label="Cash Received (₹) *" type="number" value={form.amount} onChange={(e) => u('amount', e.target.value)} />
           <Input label="Payment Date" type="date" value={form.paymentDate} onChange={(e) => u('paymentDate', e.target.value)} />
           <Select label="Payment Mode" options={PAYMENT_MODES} value={form.paymentMode} onChange={(e) => u('paymentMode', e.target.value)} />
           <Input label="Reference No." value={form.referenceNo} onChange={(e) => u('referenceNo', e.target.value)} placeholder="UTR / Cheque no." />
+          <Input label="TDS Deducted by Customer (₹)" type="number" value={form.tdsAmount} onChange={(e) => u('tdsAmount', e.target.value)} placeholder="0" />
+          <Input label="Gross (cash + TDS)" type="number" value={form.grossAmount} onChange={(e) => u('grossAmount', e.target.value)} placeholder="Auto = cash + TDS" />
           <div className="sm:col-span-2">
             <Input label="Remarks" value={form.remarks} onChange={(e) => u('remarks', e.target.value)} />
           </div>

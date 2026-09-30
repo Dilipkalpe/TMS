@@ -30,7 +30,7 @@ public class CustomerPortalController(TmsDbContext db, ITenantContext tenants, I
                 bookedAt = b.BookingDate,
             }).ToListAsync());
 
-    public record PortalBooking(string Origin, string Destination, string CustomerName, decimal FreightAmount, string? Material);
+    public record PortalBooking(string Origin, string Destination, string CustomerName, decimal FreightAmount, string? Material, string? CustomerId = null);
 
     [HttpPost("bookings")]
     public async Task<IActionResult> CreateBooking([FromBody] PortalBooking body)
@@ -40,6 +40,7 @@ public class CustomerPortalController(TmsDbContext db, ITenantContext tenants, I
         {
             Id = id,
             BookingDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            CustomerId = string.IsNullOrWhiteSpace(body.CustomerId) ? null : body.CustomerId.Trim(),
             CustomerName = body.CustomerName,
             FromCity = body.Origin,
             ToCity = body.Destination,

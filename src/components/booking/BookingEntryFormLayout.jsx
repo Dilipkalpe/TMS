@@ -26,7 +26,9 @@ export const emptyBookingEntryForm = () => ({
   material: '',
   quantity: '',
   vehicle: '',
+  vehicleId: '',
   driver: '',
+  driverId: '',
   freight: '',
   advance: '',
   payment: 'Unpaid',
@@ -48,7 +50,9 @@ export function buildBookingApiPayload(form) {
     materialId: form.materialId || null,
     quantity: form.quantity || null,
     vehicle: form.vehicle || null,
+    vehicleId: form.vehicleId || null,
     driver: form.driver || null,
+    driverId: form.driverId || null,
     freight: Number(form.freight) || 0,
     advance: Number(form.advance) || 0,
     status: form.status || 'Pending',
@@ -99,6 +103,7 @@ export default function BookingEntryFormLayout({
       />
       <BookingTransportSection
         form={form}
+        setForm={setForm}
         update={update}
         errors={fieldErrors}
         fieldMap={fieldMap}

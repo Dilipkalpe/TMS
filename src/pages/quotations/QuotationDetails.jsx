@@ -6,8 +6,9 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Input, { Select, Textarea } from '../../components/ui/Input'
+import PartyMasterSelect from '../../components/masters/PartyMasterSelect'
 import { ArrowLeft, Check, FilePlus, Loader2, Save, Send, Trash2, X } from 'lucide-react'
-import { freightRatesApi, quotationsApi } from '../../services/api'
+import { customersApi, freightRatesApi, quotationsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 
@@ -145,10 +146,20 @@ export default function QuotationDetails() {
     >
       <div className="mb-3"><Badge>{quote.status}</Badge></div>
       <Card className="grid gap-3 p-4 sm:grid-cols-2">
-        <Input label="Customer Name" value={form.customerName} disabled={!editable}
-          onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} />
-        <Input label="Customer Id" value={form.customerId} disabled={!editable}
-          onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))} />
+        <PartyMasterSelect
+          label="Customer"
+          api={customersApi}
+          masterKey="customers"
+          valueId={form.customerId}
+          displayValue={form.customerName}
+          disabled={!editable}
+          placeholder="Search customer…"
+          onSelect={(row) => setForm((f) => ({
+            ...f,
+            customerId: row?.id ?? '',
+            customerName: row?.name ?? row?.companyName ?? '',
+          }))}
+        />
         <Input label="From" value={form.fromCity} disabled={!editable}
           onChange={(e) => setForm((f) => ({ ...f, fromCity: e.target.value }))} />
         <Input label="To" value={form.toCity} disabled={!editable}

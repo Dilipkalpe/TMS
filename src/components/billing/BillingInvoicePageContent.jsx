@@ -9,6 +9,7 @@ import SlideDrawer from '../ui/SlideDrawer'
 import Button from '../ui/Button'
 import Badge from '../ui/Badge'
 import PartyMasterSelect from '../masters/PartyMasterSelect'
+import BranchSelect from '../ui/BranchSelect'
 import OpsWorkflowFlowBanner from '../ops/OpsWorkflowFlowBanner'
 import BillingSectionCard from './entry/BillingSectionCard'
 import BillingCustomerCreditSummary from './entry/BillingCustomerCreditSummary'
@@ -17,7 +18,7 @@ import BillingLineItemsSection from './entry/BillingLineItemsSection'
 import BillingInvoiceActionBar from './BillingInvoiceActionBar'
 import BillingExistingInvoiceAlert from './BillingExistingInvoiceAlert'
 import { statusBadgeVariant } from '../../utils/opsWorkflowUtils'
-import { customersApi, freightRatesApi, lrOperationsApi, lrProcessApi } from '../../services/api'
+import { customersApi, freightRatesApi, glApi, lrOperationsApi, lrProcessApi } from '../../services/api'
 import { formatCurrency } from '../ui/ReportFilters'
 import { amountToWords } from '../../utils/amountWords'
 import {
@@ -110,6 +111,7 @@ export default function BillingInvoicePageContent({
   const [customerId, setCustomerId] = useState('')
   const [customer, setCustomer] = useState(null)
   const [credit, setCredit] = useState(null)
+  const [bankAccounts, setBankAccounts] = useState([])
   const [queueRows, setQueueRows] = useState([])
   const [queueLoading, setQueueLoading] = useState(false)
   const [selectedLrs, setSelectedLrs] = useState(() => new Set(primaryLrNumber ? [primaryLrNumber] : []))
@@ -120,6 +122,12 @@ export default function BillingInvoicePageContent({
   const [draftFilters, setDraftFilters] = useState({ dateFrom: '', dateTo: '', branch: '', customer: '' })
   const [fieldErrors, setFieldErrors] = useState({})
   const draftLoadedRef = useRef(false)
+
+  useEffect(() => {
+    glApi.bankAccounts()
+      .then((rows) => setBankAccounts(Array.isArray(rows) ? rows : []))
+      .catch(() => setBankAccounts([]))
+  }, [])
 
   const u = (k, v) => setForm((f) => {
     const next = { ...f, [k]: v }
@@ -490,7 +498,13 @@ export default function BillingInvoicePageContent({
           <div className="billing-v2-grid billing-v2-grid--3">
             <Input label="Invoice No." value={existingInvoice?.invoiceNo || existingInvoice?.InvoiceNo || 'AUTO'} readOnly />
             <Input label="Invoice Date *" type="date" value={form.invoiceDate} onChange={(e) => u('invoiceDate', e.target.value)} error={fieldErrors.invoiceDate} disabled={invoiceLocked} />
-            <Input label="Branch *" value={form.branchName} onChange={(e) => u('branchName', e.target.value)} error={fieldErrors.branchName} disabled={invoiceLocked} />
+            <BranchSelect
+              label="Branch *"
+              value={form.branchName}
+              onChange={(v) => u('branchName', v)}
+              error={fieldErrors.branchName}
+              disabled={invoiceLocked}
+            />
             <Select label="Invoice Type *" options={SUPPORTED_BILL_TYPES} value={form.invoiceType} onChange={(e) => u('invoiceType', e.target.value)} disabled={invoiceLocked} />
             <Input label="Invoice Series" value={form.invoiceSeries} placeholder="PUN-FRT" onChange={(e) => u('invoiceSeries', e.target.value)} disabled={invoiceLocked} />
             <Input label="Financial Year" value={financialYear(form.invoiceDate)} readOnly />
@@ -655,7 +669,27 @@ export default function BillingInvoicePageContent({
         >
           <div className="billing-v2-grid billing-v2-grid--3">
             <Select label="Payment Mode" options={PAYMENT_MODES} value={form.paymentMode} onChange={(e) => u('paymentMode', e.target.value)} disabled={invoiceLocked} />
-            <Input label="Bank Account" value={form.bankAccount} onChange={(e) => u('bankAccount', e.target.value)} placeholder="Enter or select from company master" disabled={invoiceLocked} />
+            <Select
+              label="Bank Account"
+              value={form.bankAccount}
+              disabled={invoiceLocked}
+              onChange={(e) => {
+                const id = e.target.value
+                const ba = bankAccounts.find((b) => b.id === id)
+                u('bankAccount', ba ? `${ba.bankName || ''} ${ba.accountNo || ''}`.trim() : id)
+                if (ba?.ifsc) u('ifsc', ba.ifsc)
+              }}
+              options={[
+                { value: '', label: 'Select bank account…' },
+                ...bankAccounts.map((b) => ({
+                  value: b.id,
+                  label: `${b.bankName || 'Bank'}${b.accountNo ? ` · ${b.accountNo}` : ''}`,
+                })),
+                ...(form.bankAccount && !bankAccounts.some((b) => `${b.bankName || ''} ${b.accountNo || ''}`.trim() === form.bankAccount)
+                  ? [{ value: form.bankAccount, label: form.bankAccount }]
+                  : []),
+              ]}
+            />
             <Input label="Account Name" value={form.accountName} onChange={(e) => u('accountName', e.target.value)} disabled={invoiceLocked} />
             <Input label="IFSC Code" value={form.ifsc} onChange={(e) => u('ifsc', e.target.value)} disabled={invoiceLocked} />
             <Input label="Bank Branch" value={form.bankBranch} onChange={(e) => u('bankBranch', e.target.value)} disabled={invoiceLocked} />

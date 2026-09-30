@@ -114,7 +114,11 @@ export default function LrEntryRouteSection({ form, setForm, update, errors = {}
               label={false}
               displayValue={form.vehicle}
               placeholder="Search vehicle number…"
-              onSelect={(row) => update('vehicle', row.number ?? '')}
+              onSelect={(row) => setForm((prev) => ({
+                ...prev,
+                vehicleId: row?.id ?? '',
+                vehicle: row?.number ?? '',
+              }))}
             />
           </div>
         ) : null}
@@ -127,7 +131,11 @@ export default function LrEntryRouteSection({ form, setForm, update, errors = {}
               label={false}
               displayValue={form.driver}
               placeholder="Search driver name…"
-              onSelect={(row) => update('driver', row.name ?? '')}
+              onSelect={(row) => setForm((prev) => ({
+                ...prev,
+                driverId: row?.id ?? '',
+                driver: row?.name ?? '',
+              }))}
             />
           </div>
         ) : null}

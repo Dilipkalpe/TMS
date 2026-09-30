@@ -10,8 +10,7 @@ import { bookingPath } from '../../utils/docPath'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../components/ui/ReportFilters'
 import { Save, Loader2 } from 'lucide-react'
-
-const PAYMENT_MODES = ['Cash', 'UPI', 'NEFT', 'Cheque', 'RTGS']
+import { PAYMENT_MODES, DEFAULT_PAYMENT_MODE } from '../../constants/paymentModes'
 
 export default function BookingPaymentAdjustment() {
   const navigate = useNavigate()
@@ -21,7 +20,10 @@ export default function BookingPaymentAdjustment() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
+  const [form, setForm] = useState({
+    amount: '', paymentMode: DEFAULT_PAYMENT_MODE, referenceNo: '', remarks: '', freightInvoiceId: '',
+    tdsAmount: '', grossAmount: '', tdsSectionId: '',
+  })
 
   const loadBooking = async (id) => {
     if (!id?.trim()) return
@@ -54,14 +56,24 @@ export default function BookingPaymentAdjustment() {
     }
     setSaving(true)
     try {
+      const tdsAmount = Math.max(0, Number(form.tdsAmount) || 0)
+      const grossAmount = Number(form.grossAmount) || (amount + tdsAmount)
       const res = await bookingFinanceApi.recordPayment(booking.id, {
-        ...form,
         amount,
+        paymentMode: form.paymentMode,
+        referenceNo: form.referenceNo || undefined,
+        remarks: form.remarks || undefined,
         freightInvoiceId: form.freightInvoiceId || undefined,
+        tdsAmount: tdsAmount || undefined,
+        grossAmount: tdsAmount > 0 ? grossAmount : undefined,
+        tdsSectionId: form.tdsSectionId || undefined,
       })
       toast({ title: 'Payment recorded', message: `Outstanding: ${formatCurrency(res.outstanding)}`, type: 'success' })
       setBooking((b) => ({ ...b, balance: res.outstanding, payment: res.paymentStatus }))
-      setForm({ amount: '', paymentMode: 'Cash', referenceNo: '', remarks: '', freightInvoiceId: '' })
+      setForm({
+        amount: '', paymentMode: DEFAULT_PAYMENT_MODE, referenceNo: '', remarks: '', freightInvoiceId: '',
+        tdsAmount: '', grossAmount: '', tdsSectionId: '',
+      })
       await loadBooking(booking.id)
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
@@ -95,10 +107,12 @@ export default function BookingPaymentAdjustment() {
             <div><p className="text-xs text-slate-500">Status</p><p className="font-semibold">{booking.payment}</p></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Input label="Payment Amount (₹)" type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+            <Input label="Cash Received (₹)" type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
             <Select label="Mode" options={PAYMENT_MODES} value={form.paymentMode} onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value }))} />
             <Input label="Reference" value={form.referenceNo} onChange={(e) => setForm((f) => ({ ...f, referenceNo: e.target.value }))} />
             <Input label="Remarks" value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} />
+            <Input label="TDS Deducted by Customer (₹)" type="number" value={form.tdsAmount} onChange={(e) => setForm((f) => ({ ...f, tdsAmount: e.target.value }))} placeholder="0" />
+            <Input label="Gross (cash + TDS)" type="number" value={form.grossAmount} onChange={(e) => setForm((f) => ({ ...f, grossAmount: e.target.value }))} placeholder="Auto" />
             {invoices.length > 0 && (
               <Select
                 label="Allocate to Invoice"

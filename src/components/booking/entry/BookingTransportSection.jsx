@@ -8,6 +8,7 @@ import { fieldLabel, fieldRequired, fieldVisible } from '../../../utils/fieldCon
 export default function BookingTransportSection({
   form,
   update,
+  setForm,
   errors = {},
   fieldMap = {},
   disabled = false,
@@ -64,7 +65,14 @@ export default function BookingTransportSection({
               displayValue={form.vehicle}
               placeholder="Search vehicle number…"
               disabled={disabled}
-              onSelect={(row) => update('vehicle', row.number ?? '')}
+              onSelect={(row) => {
+                if (setForm) {
+                  setForm((prev) => ({ ...prev, vehicleId: row?.id ?? '', vehicle: row?.number ?? '' }))
+                } else {
+                  update('vehicle', row?.number ?? '')
+                  update('vehicleId', row?.id ?? '')
+                }
+              }}
             />
             {errors.vehicle ? <p className="mt-1 text-xs text-red-500">{errors.vehicle}</p> : null}
           </div>
@@ -76,7 +84,14 @@ export default function BookingTransportSection({
               displayValue={form.driver}
               placeholder="Search driver name…"
               disabled={disabled}
-              onSelect={(row) => update('driver', row.name ?? '')}
+              onSelect={(row) => {
+                if (setForm) {
+                  setForm((prev) => ({ ...prev, driverId: row?.id ?? '', driver: row?.name ?? '' }))
+                } else {
+                  update('driver', row?.name ?? '')
+                  update('driverId', row?.id ?? '')
+                }
+              }}
             />
             {errors.driver ? <p className="mt-1 text-xs text-red-500">{errors.driver}</p> : null}
           </div>

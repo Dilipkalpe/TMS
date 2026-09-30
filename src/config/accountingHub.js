@@ -25,6 +25,19 @@ export const accountingCards = withHubTheme([
   { title: 'Balance Sheet', path: '/accounting/balance-sheet', icon: 'Scale', description: 'Assets, liabilities and capital' },
   { title: 'Outstanding', path: '/accounting/outstanding', icon: 'AlertCircle', description: 'Receivable and payable outstanding' },
   { title: 'GST Reports', path: '/accounting/gst', icon: 'FileSpreadsheet', description: 'GST input, output and summary' },
+  { title: 'TDS Settings', path: '/accounting/tds/settings', icon: 'Settings', description: 'Enable TDS and ledger mapping' },
+  { title: 'TDS Sections', path: '/accounting/tds/sections', icon: 'List', description: 'Section codes (194C, 194J, …)' },
+  { title: 'TDS Rates', path: '/accounting/tds/rates', icon: 'Percent', description: 'Rates, thresholds and without-PAN rates' },
+  { title: 'TDS Exemptions', path: '/accounting/tds/exemptions', icon: 'Shield', description: 'Lower rate / exemption certificates' },
+  { title: 'Vendor Payment', path: '/accounting/tds/vendor-payment', icon: 'Wallet', description: 'Pay vendors with TDS payable deduction' },
+  { title: 'TDS Transactions', path: '/accounting/tds/transactions', icon: 'History', description: 'Posted TDS history and reversals' },
+  { title: 'TDS Reports', path: '/accounting/tds/reports', icon: 'FileBarChart', description: 'Payable, receivable and vendor-wise TDS' },
+  { title: 'GL Journal', path: '/accounting/gl/journal', icon: 'BookMarked', description: 'Double-entry journal vouchers with reverse' },
+  { title: 'Vendor Bills', path: '/accounting/gl/vendor-bills', icon: 'FileInput', description: 'Vendor bill → payable → settlement' },
+  { title: 'Credit / Debit Notes', path: '/accounting/gl/credit-debit-notes', icon: 'FileMinus', description: 'Customer/vendor credit and debit notes' },
+  { title: 'Bank Reconciliation', path: '/accounting/gl/bank-recon', icon: 'Landmark', description: 'Bank accounts and statement reconciliation' },
+  { title: 'GL Controls', path: '/accounting/gl/controls', icon: 'ShieldCheck', description: 'FY lock, posting maps, migration, audit' },
+  { title: 'GST / TDS Compliance', path: '/accounting/gl/compliance', icon: 'FileSpreadsheet', description: 'GSTR-1, GSTR-3B, Form 26Q export, e-Invoice register' },
 ])
 
 const byPath = Object.fromEntries(accountingCards.map((c) => [c.path, c]))
@@ -63,4 +76,21 @@ export const accountingHubSections = [
     '/accounting/provisions',
     '/accounting/gst',
   ), { chip: 'Report' }),
+  hubSection('TDS', 'Tax deducted at source — masters, payments and reports', pick(
+    '/accounting/tds/settings',
+    '/accounting/tds/sections',
+    '/accounting/tds/rates',
+    '/accounting/tds/exemptions',
+    '/accounting/tds/vendor-payment',
+    '/accounting/tds/transactions',
+    '/accounting/tds/reports',
+  ), { chip: 'TDS' }),
+  hubSection('Double-entry GL', 'Posting engine, AP bills, banking and controls', pick(
+    '/accounting/gl/journal',
+    '/accounting/gl/vendor-bills',
+    '/accounting/gl/credit-debit-notes',
+    '/accounting/gl/bank-recon',
+    '/accounting/gl/controls',
+    '/accounting/gl/compliance',
+  ), { chip: 'GL' }),
 ]
