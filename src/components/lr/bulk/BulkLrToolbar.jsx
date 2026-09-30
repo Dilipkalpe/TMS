@@ -15,6 +15,7 @@ export default function BulkLrToolbar({
   pendingCount = 0,
   onSaveAll,
   onClear,
+  onClearItems,
   onImportClick,
   onTemplatesClick,
 }) {
@@ -23,17 +24,23 @@ export default function BulkLrToolbar({
       <div className="bulk-lr-toolbar-top">
         <div className="min-w-0">
           <h1 className="bulk-lr-title">Ultra Fast LR Entry</h1>
-          <p className="bulk-lr-subtitle">Create multiple LRs in seconds.</p>
+          <p className="bulk-lr-subtitle">Same client + location → many LR numbers in one go.</p>
         </div>
         <div className="bulk-lr-toolbar-actions">
           <button type="button" className="bulk-lr-btn bulk-lr-btn-primary" onClick={onSaveAll} disabled={saving}>
             <Save className="h-4 w-4" />
-            {saving ? 'Saving…' : 'Save All'}
+            {saving ? 'Saving…' : 'Save All LRs'}
             <span className="bulk-lr-kbd">F2</span>
           </button>
-          <button type="button" className="bulk-lr-btn" onClick={onClear} disabled={saving}>
+          {onClearItems ? (
+            <button type="button" className="bulk-lr-btn" onClick={onClearItems} disabled={saving} title="Clear item rows only">
+              <RotateCcw className="h-4 w-4" />
+              Clear Items
+            </button>
+          ) : null}
+          <button type="button" className="bulk-lr-btn" onClick={onClear} disabled={saving} title="Clear client, location, and items">
             <RotateCcw className="h-4 w-4" />
-            Clear
+            Clear All
             <span className="bulk-lr-kbd">F6</span>
           </button>
           <button type="button" className="bulk-lr-btn" onClick={onImportClick} disabled={saving}>

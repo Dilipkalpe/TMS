@@ -32,7 +32,7 @@ export default function BulkLrRowsGrid({
       <div className="bulk-lr-section-head bulk-lr-grid-head">
         <div>
           <h2>LR Items</h2>
-          <p>Each filled row creates one LR</p>
+          <p>Each filled row = one new LR (same client &amp; From/To from above)</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="bulk-lr-btn" onClick={onAddRow}>
@@ -82,8 +82,8 @@ export default function BulkLrRowsGrid({
                         displayValue={row.description}
                         placeholder="Search item…"
                         onSelect={(item) => onPatchRow(idx, {
-                          itemId: item.id,
-                          description: item.name,
+                          itemId: item?.id || '',
+                          description: item?.name || '',
                         })}
                       />
                     ) : (

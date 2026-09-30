@@ -3200,3 +3200,40 @@ body.printing #print-root {
     max-height: 50vh;
   }
 }
+
+.bulk-lr-party-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary, #1e5a8a) 35%, #cbd5e1);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--color-primary, #1e5a8a) 10%, #fff);
+  font-size: 0.82rem;
+  color: rgb(30 41 59);
+}
+
+.dark .bulk-lr-party-banner {
+  background: color-mix(in srgb, var(--color-primary, #1e5a8a) 28%, #0f172a);
+  border-color: rgb(71 85 105);
+  color: rgb(226 232 240);
+}
+
+.bulk-lr-party-label {
+  margin-right: 0.4rem;
+  font-weight: 600;
+  color: rgb(100 116 139);
+}
+
+.bulk-lr-party-sep {
+  margin: 0 0.4rem;
+  color: rgb(148 163 184);
+}
+
+.bulk-lr-save-progress {
+  font-weight: 700;
+  color: var(--color-primary, #1e5a8a);
+}

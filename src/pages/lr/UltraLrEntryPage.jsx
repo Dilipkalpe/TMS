@@ -10,6 +10,7 @@ import {
   buildBulkLrPayload,
   createEmptyBulkRows,
   deleteBulkTemplate,
+  describeBulkPartyRoute,
   emptyBulkCommon,
   emptyBulkRow,
   isBulkRowFilled,
@@ -41,6 +42,12 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function keepPartyBanner(common, count) {
+  const who = common?.consignor || 'client'
+  const route = [common?.from, common?.to].filter(Boolean).join(' → ')
+  return `${count} LR(s) created for ${who}${route ? ` (${route})` : ''}`
+}
+
 export default function UltraLrEntryPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -59,12 +66,14 @@ export default function UltraLrEntryPage() {
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const [templates, setTemplates] = useState(() => loadBulkTemplates())
   const [lastSaved, setLastSaved] = useState([])
+  const [saveProgress, setSaveProgress] = useState(null)
 
   const summary = useMemo(
     () => summarizeBulkRows(rows, common.autoCalculate !== false),
     [rows, common.autoCalculate],
   )
   const pendingCount = summary.totalLrs
+  const partyRoute = useMemo(() => describeBulkPartyRoute(common), [common])
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10)
@@ -120,7 +129,8 @@ export default function UltraLrEntryPage() {
     setRows((prev) => {
       const src = prev[idx]
       if (!src) return prev
-      const clone = { ...src, id: emptyBulkRow().id }
+      // New LR row for same client/location — keep goods/rate, clear invoice ref
+      const clone = { ...src, id: emptyBulkRow().id, invoiceNo: '' }
       const next = [...prev]
       next.splice(idx + 1, 0, clone)
       return next
@@ -134,6 +144,22 @@ export default function UltraLrEntryPage() {
     })
   }, [])
 
+  // Keep spare blank rows so operators can keep typing for the same client/route
+  useEffect(() => {
+    setRows((prev) => {
+      let emptyTail = 0
+      for (let i = prev.length - 1; i >= 0; i -= 1) {
+        if (isBulkRowFilled(prev[i])) break
+        emptyTail += 1
+      }
+      if (emptyTail >= 2) return prev
+      return [
+        ...prev,
+        ...Array.from({ length: 2 - emptyTail }, () => emptyBulkRow()),
+      ]
+    })
+  }, [summary.totalLrs, rows.length])
+
   const { containerRef: gridRef } = useGridKeyboard({
     rows,
     setRows,
@@ -142,15 +168,23 @@ export default function UltraLrEntryPage() {
     enabled: true,
   })
 
+  const handleClearItems = useCallback(() => {
+    setRows(createEmptyBulkRows())
+    setRemarks('')
+    setDocuments([])
+    setCommonErrors({})
+    toast({ title: 'Items cleared', message: 'Client and location kept for next LRs.', type: 'info' })
+  }, [toast])
+
   const handleClear = useCallback(() => {
     setRows(createEmptyBulkRows())
     setRemarks('')
     setDocuments([])
     setCommonErrors({})
     setLastSaved([])
-    if (!common.rememberLast) setCommon(emptyBulkCommon())
-    toast({ title: 'Cleared', message: 'Grid and remarks cleared.', type: 'info' })
-  }, [common.rememberLast, toast])
+    setCommon(emptyBulkCommon())
+    toast({ title: 'Cleared', message: 'Client, location, and items cleared.', type: 'info' })
+  }, [toast])
 
   const handleImportFile = useCallback(async (file) => {
     if (!file) return
@@ -198,19 +232,22 @@ export default function UltraLrEntryPage() {
     }
 
     setSaving(true)
+    setSaveProgress({ done: 0, total: filledIndexes.length })
     const successes = []
     const failures = []
 
     try {
-      for (const { row, idx } of filledIndexes) {
+      for (let i = 0; i < filledIndexes.length; i += 1) {
+        const { row, idx } = filledIndexes[i]
+        setSaveProgress({ done: i, total: filledIndexes.length })
         try {
           const payload = buildBulkLrPayload(common, row, remarks)
           const created = await lrApi.create(payload)
-          successes.push({ sr: idx + 1, lrNumber: created.lrNumber, idx })
+          successes.push({ sr: idx + 1, lrNumber: created.lrNumber || created.LrNumber, idx })
 
           if (andPrint || printAfterSave) {
             try {
-              const lr = await lrApi.get(created.lrNumber)
+              const lr = await lrApi.get(created.lrNumber || created.LrNumber)
               await printModuleDocument({
                 moduleCode: PRINT_MODULE_CODES.LR_LIST,
                 company,
@@ -225,16 +262,19 @@ export default function UltraLrEntryPage() {
           failures.push({ sr: idx + 1, message: err.message || 'Save failed' })
         }
       }
+      setSaveProgress({ done: filledIndexes.length, total: filledIndexes.length })
 
-      setLastSaved(successes.map((s) => s.lrNumber))
+      setLastSaved(successes.map((s) => s.lrNumber).filter(Boolean))
       if (successes.length) {
         persistRememberedCommon(common)
         setTodayCount((n) => n + successes.length)
         const successIdx = new Set(successes.map((s) => s.idx))
         const remaining = rows.filter((_, i) => !successIdx.has(i))
         const stillFilled = remaining.filter(isBulkRowFilled)
+        const keepParty = common.keepPartyAndRoute !== false
         if (!stillFilled.length) {
-          if (!common.rememberLast) setCommon(emptyBulkCommon())
+          // Multi-LR mode: keep same client + location ready for the next batch
+          if (!keepParty) setCommon(emptyBulkCommon())
           setRemarks('')
           setDocuments([])
           setCommonErrors({})
@@ -246,25 +286,26 @@ export default function UltraLrEntryPage() {
 
       if (failures.length === 0) {
         toast({
-          title: 'Saved',
-          message: `${successes.length} LR(s) created: ${successes.map((s) => s.lrNumber).join(', ')}`,
+          title: keepPartyBanner(common, successes.length),
+          message: `${successes.map((s) => s.lrNumber).join(', ')}`,
           type: 'success',
         })
       } else if (successes.length) {
         toast({
           title: 'Partial save',
-          message: `${successes.length} saved, ${failures.length} failed (row ${failures.map((f) => f.sr).join(', ')}).`,
+          message: `${successes.length} saved (${successes.map((s) => s.lrNumber).join(', ')}). Failed row ${failures.map((f) => `${f.sr}: ${f.message}`).join('; ')}`,
           type: 'warning',
         })
       } else {
         toast({
           title: 'Save failed',
-          message: failures[0]?.message || 'Could not create LRs.',
+          message: failures.map((f) => `Row ${f.sr}: ${f.message}`).join(' · ') || 'Could not create LRs.',
           type: 'error',
         })
       }
     } finally {
       setSaving(false)
+      setSaveProgress(null)
     }
   }, [common, rows, remarks, printAfterSave, company, print, toast])
 
@@ -315,12 +356,27 @@ export default function UltraLrEntryPage() {
             pendingCount={pendingCount}
             onSaveAll={() => handleSaveAll(false)}
             onClear={handleClear}
+            onClearItems={handleClearItems}
             onImportClick={() => fileInputRef.current?.click()}
             onTemplatesClick={() => setTemplatesOpen(true)}
           />
+          <div className="bulk-lr-party-banner">
+            <div>
+              <span className="bulk-lr-party-label">Multi-LR for</span>
+              <strong>{partyRoute.party}</strong>
+              <span className="bulk-lr-party-sep">·</span>
+              <strong>{partyRoute.route}</strong>
+            </div>
+            {saveProgress ? (
+              <span className="bulk-lr-save-progress">
+                Saving {saveProgress.done + (saveProgress.done < saveProgress.total ? 1 : 0)}/{saveProgress.total}…
+              </span>
+            ) : null}
+          </div>
           {lastSaved.length > 0 && (
             <p className="bulk-lr-last-saved">
               Last saved: <strong>{lastSaved.join(', ')}</strong>
+              {' — '}client &amp; location kept for more LRs
             </p>
           )}
         </div>

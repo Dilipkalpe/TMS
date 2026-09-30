@@ -16,8 +16,8 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
     <section className="bulk-lr-common" id="bulk-lr-common" data-bulk-party-search>
       <div className="bulk-lr-section-head">
         <div>
-          <h2>Common Details</h2>
-          <p>Applied to every LR row below</p>
+          <h2>Common Details — same client &amp; location</h2>
+          <p>Set once, then add many LR rows below. Each row creates a separate LR number.</p>
         </div>
       </div>
 
@@ -39,6 +39,7 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
                     consignor: mapped.consignor,
                     consignorPhone: mapped.consignorPhone,
                     consignorGst: mapped.consignorGst,
+                    consignorAddress: mapped.consignorAddress,
                     ...(mapped.from ? { from: mapped.from } : {}),
                   })
                 }}
@@ -60,6 +61,7 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
                     consignee: mapped.consignee,
                     consigneePhone: mapped.consigneePhone,
                     consigneeGst: mapped.consigneeGst,
+                    consigneeAddress: mapped.consigneeAddress,
                     ...(mapped.to ? { to: mapped.to } : {}),
                   })
                 }}
@@ -191,10 +193,18 @@ export default function BulkLrCommonHeader({ common, errors = {}, onChange, onPa
           <label className="bulk-lr-check">
             <input
               type="checkbox"
+              checked={common.keepPartyAndRoute !== false}
+              onChange={(e) => onChange('keepPartyAndRoute', e.target.checked)}
+            />
+            Keep client &amp; location after save
+          </label>
+          <label className="bulk-lr-check">
+            <input
+              type="checkbox"
               checked={!!common.rememberLast}
               onChange={(e) => onChange('rememberLast', e.target.checked)}
             />
-            Remember Last Values
+            Remember on next visit
           </label>
         </aside>
       </div>

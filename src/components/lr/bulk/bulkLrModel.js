@@ -24,21 +24,28 @@ export function emptyBulkCommon() {
     consignor: '',
     consignorPhone: '',
     consignorGst: '',
+    consignorAddress: '',
     consigneeId: '',
     consignee: '',
     consigneePhone: '',
     consigneeGst: '',
+    consigneeAddress: '',
     from: '',
     to: '',
     paymentType: 'To Pay',
     vehicle: '',
+    vehicleId: '',
     driver: '',
+    driverId: '',
     lrDate: new Date().toISOString().slice(0, 10),
     ewayBillNo: '',
     businessType: 'PTL',
     autoCalculate: true,
     autoWeightTotal: true,
+    /** Persist party/route in localStorage across page reloads. */
     rememberLast: true,
+    /** After Save All, keep client + location and only clear item rows (multi-LR mode). */
+    keepPartyAndRoute: true,
   }
 }
 
@@ -131,16 +138,19 @@ export function buildBulkLrForm(common, row, remarks = '') {
 
   return {
     ...form,
+    lrNumber: '', // always allocate a fresh LR number per row
     lrDate: common.lrDate || form.lrDate,
     businessType: common.businessType || form.businessType,
     consignorId: common.consignorId || '',
     consignor: common.consignor || '',
     consignorPhone: common.consignorPhone || '',
     consignorGst: common.consignorGst || '',
+    consignorAddress: common.consignorAddress || '',
     consigneeId: common.consigneeId || '',
     consignee: common.consignee || '',
     consigneePhone: common.consigneePhone || '',
     consigneeGst: common.consigneeGst || '',
+    consigneeAddress: common.consigneeAddress || '',
     billingParty: common.consignor || '',
     billingPartyId: common.consignorId || '',
     customerName: common.consignor || '',
@@ -148,11 +158,13 @@ export function buildBulkLrForm(common, row, remarks = '') {
     to: common.to || '',
     pickupCity: common.from || '',
     vehicle: common.vehicle || '',
+    vehicleId: common.vehicleId || '',
     driver: common.driver || '',
+    driverId: common.driverId || '',
     paymentType: common.paymentType || 'To Pay',
     ewayBillNo: row.ewayBillNo || common.ewayBillNo || '',
     material: row.description || '',
-    quantity: qty || weight ? `${qty} pkgs / ${weight} kg` : '',
+    quantity: (qty > 0 || weight > 0) ? `${qty} pkgs / ${weight} kg` : '',
     items: [item],
     freight,
     advance: 0,
@@ -181,11 +193,19 @@ export function validateBulkCommon(common) {
 
 export function validateBulkRow(row, index) {
   if (!isBulkRowFilled(row)) return null
-  if (!String(row.description || '').trim() && !String(row.invoiceNo || '').trim()) {
-    return `Row ${index + 1}: Item / Invoice is required.`
+  const hasIdentity = Boolean(
+    String(row.description || '').trim()
+    || String(row.invoiceNo || '').trim()
+    || Number(row.freight) > 0,
+  )
+  const hasQtyOrWt = Number(row.packages) > 0
+    || Number(row.actualWeight) > 0
+    || Number(row.chargedWeight) > 0
+  if (!hasIdentity && !hasQtyOrWt) {
+    return `Row ${index + 1}: Enter item/invoice or packages/weight.`
   }
-  if (!(Number(row.packages) > 0) && !(Number(row.actualWeight) > 0) && !(Number(row.chargedWeight) > 0)) {
-    return `Row ${index + 1}: Packages or weight is required.`
+  if (!hasQtyOrWt && !(Number(row.freight) > 0)) {
+    return `Row ${index + 1}: Packages, weight, or freight is required.`
   }
   return null
 }
@@ -322,12 +342,20 @@ export function persistRememberedCommon(common) {
     return
   }
   const {
-    autoCalculate, autoWeightTotal, rememberLast, lrDate, ewayBillNo, ...rest
+    autoCalculate, autoWeightTotal, rememberLast, keepPartyAndRoute, lrDate, ewayBillNo, ...rest
   } = common
   localStorage.setItem(BULK_LR_REMEMBER_KEY, JSON.stringify({
     ...rest,
     autoCalculate,
     autoWeightTotal,
     rememberLast: true,
+    keepPartyAndRoute: keepPartyAndRoute !== false,
   }))
+}
+
+/** Party + route summary for multi-LR banner. */
+export function describeBulkPartyRoute(common) {
+  const party = [common?.consignor, common?.consignee].filter(Boolean).join(' → ') || 'Select consignor & consignee'
+  const route = [common?.from, common?.to].filter(Boolean).join(' → ') || 'Set From / To'
+  return { party, route }
 }
