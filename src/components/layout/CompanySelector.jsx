@@ -14,11 +14,25 @@ export default function CompanySelector({ variant = 'erp' }) {
   const erpPill = variant === 'erp'
 
   useEffect(() => {
-    platformApi.companies({ pageSize: 100 })
-      .then((res) => setCompanies(unwrapPaginated(res)))
+    platformApi.companies({ pageSize: 100, active: 'true' })
+      .then((res) => {
+        const rows = unwrapPaginated(res).filter((c) => c.isActive !== false)
+        setCompanies(rows)
+      })
       .catch(() => setCompanies([]))
       .finally(() => setLoading(false))
   }, [])
+
+  // If stored selection is inactive/missing, switch to first active company
+  useEffect(() => {
+    if (loading || companies.length === 0) return
+    const stillValid = companies.some((c) => String(c.id) === String(effectiveCompanyId))
+    if (stillValid) return
+    const nextId = companies[0]?.id
+    if (!nextId) return
+    setSelectedCompanyId(nextId)
+    window.location.reload()
+  }, [loading, companies, effectiveCompanyId, setSelectedCompanyId])
 
   const onChange = (e) => {
     const id = e.target.value
@@ -40,7 +54,11 @@ export default function CompanySelector({ variant = 'erp' }) {
       <Building2 className="h-4 w-4 shrink-0 text-primary" />
       <div className="relative min-w-0">
         <select
-          value={effectiveCompanyId ?? ''}
+          value={
+            companies.some((c) => String(c.id) === String(effectiveCompanyId))
+              ? (effectiveCompanyId ?? '')
+              : ''
+          }
           onChange={onChange}
           className={`appearance-none truncate rounded-lg border border-slate-200 bg-white py-2 pl-2 pr-7 text-xs font-medium text-slate-700 outline-none focus:border-primary dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 ${
             erpPill ? 'max-w-[10rem] text-sm sm:max-w-[12rem] lg:max-w-[14rem]' : 'max-w-[180px] lg:max-w-[220px]'
