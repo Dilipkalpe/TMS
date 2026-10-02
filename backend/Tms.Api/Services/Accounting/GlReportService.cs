@@ -112,13 +112,24 @@ public class GlReportService(TmsDbContext db, ITenantContext tenants, Accounting
         {
             var bal = await engine.GetLedgerBalanceAsync(led.Id, asOfDate, ct);
             if (Math.Abs(bal) < 0.005m) continue;
-            var item = new { code = led.Code, name = led.Name, balance = bal };
+            // GetLedgerBalanceAsync returns debit-credit. Present BS credit-side amounts as positive.
             if (led.AccountType.Equals("Asset", StringComparison.OrdinalIgnoreCase))
-            { assets.Add(item); totalAssets += bal; }
+            {
+                assets.Add(new { code = led.Code, name = led.Name, balance = bal });
+                totalAssets += bal;
+            }
             else if (led.AccountType.Equals("Liability", StringComparison.OrdinalIgnoreCase))
-            { liabilities.Add(item); totalLiab += Math.Abs(bal); }
+            {
+                var creditBal = -bal;
+                liabilities.Add(new { code = led.Code, name = led.Name, balance = creditBal });
+                totalLiab += creditBal;
+            }
             else if (led.AccountType.Equals("Capital", StringComparison.OrdinalIgnoreCase))
-            { capital.Add(item); totalCap += bal; }
+            {
+                var creditBal = -bal;
+                capital.Add(new { code = led.Code, name = led.Name, balance = creditBal });
+                totalCap += creditBal;
+            }
         }
         var fyStart = asOfDate.Month >= 4 ? new DateOnly(asOfDate.Year, 4, 1) : new DateOnly(asOfDate.Year - 1, 4, 1);
         var pl = (dynamic)await ProfitAndLossAsync(fyStart, asOfDate, ct);
@@ -134,6 +145,8 @@ public class GlReportService(TmsDbContext db, ITenantContext tenants, Accounting
             liabilities,
             capital,
             totalAssets,
+            totalLiabilities = totalLiab,
+            totalCapital = totalCap,
             totalLiabilitiesCapital = totalLiab + totalCap,
         };
     }
