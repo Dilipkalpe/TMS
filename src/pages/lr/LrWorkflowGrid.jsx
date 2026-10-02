@@ -14,6 +14,7 @@ import {
 } from '../../constants/lrStatusNavigation'
 import { useAuth } from '../../context/AuthContext'
 import { ArrowRight } from 'lucide-react'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 const WORKFLOW_ACTION_ICONS = {
   view: Icons.Eye,
@@ -90,7 +91,7 @@ export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
     }))
   }, [user?.role, runRowAction])
 
-  const columns = useMemo(() => [
+  const columns = useMemo(() => withBranchColumn([
     {
       key: 'action',
       label: 'Next Action',
@@ -125,7 +126,7 @@ export default function LrWorkflowGrid({ stage, stageActionLabel, onChanged }) {
         )
       },
     },
-  ], [stageAction, runPrimaryAction])
+  ], { afterKey: 'lrNumber' }), [stageAction, runPrimaryAction])
 
   const extraRow = stage === 'expense-pending' ? (
     <Link to="/lr/expense-approval">

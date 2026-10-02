@@ -14,5 +14,6 @@ export const addRecordRoutes = {
   vendors: '/vendors/new',
   expenses: '/expenses/new',
   voucher: '/accounting/voucher-entry',
+  vouchers: '/accounting/vouchers',
   ledger: '/accounting/ledger-master/new',
 }

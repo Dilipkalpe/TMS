@@ -8,6 +8,7 @@ import { accountingApi, glApi } from '../../../services/api'
 import { useToast } from '../../../context/ToastContext'
 import { formatCurrency } from '../../../components/ui/ReportFilters'
 import { Plus, Save, Loader2, Undo2 } from 'lucide-react'
+import { withBranchColumn } from '../../../utils/branchColumns'
 
 export default function GlJournalPage() {
   const { toast } = useToast()
@@ -32,7 +33,7 @@ export default function GlJournalPage() {
         glApi.vouchers({}),
       ])
       setLedgers(lm?.items || lm || [])
-      setVouchers(vs || [])
+      setVouchers(vs?.items || vs || [])
     } catch (err) {
       toast({ title: 'Load failed', message: err.message, type: 'error' })
     }
@@ -74,7 +75,7 @@ export default function GlJournalPage() {
     }
   }
 
-  const columns = [
+  const columns = withBranchColumn([
     { key: 'date', label: 'Date' },
     { key: 'voucherNo', label: 'Voucher' },
     { key: 'voucherType', label: 'Type' },
@@ -102,7 +103,7 @@ export default function GlJournalPage() {
         }}>Post</Button>
       ) : null,
     },
-  ]
+  ], { afterKey: 'date' })
 
   const ledgerOpts = ledgers.map((l) => ({ value: l.id || '', label: `${l.code} — ${l.name}` })).filter((o) => o.value)
 

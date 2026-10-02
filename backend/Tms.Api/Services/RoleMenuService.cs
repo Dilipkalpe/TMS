@@ -78,6 +78,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
                 "/accounting/bank-book",
                 "/accounting/day-book",
                 "/accounting/voucher-entry",
+                "/accounting/vouchers",
                 "/accounting/chart-of-accounts",
                 "/accounting/ledger-master",
                 "/accounting/freight-invoices",
@@ -492,6 +493,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
         // Accounting hub
         Add("/accounting/chart-of-accounts", "Chart of Accounts", "Accounts hub");
         Add("/accounting/ledger-master", "Ledger Master", "Accounts hub");
+        Add("/accounting/vouchers", "Voucher List", "Accounts hub");
         Add("/accounting/voucher-entry", "Voucher Entry", "Accounts hub");
         Add("/accounting/ledger-report", "Ledger Report", "Accounts hub");
         Add("/accounting/customer-ledger", "Customer Ledger", "Accounts hub");
@@ -584,6 +586,7 @@ public class RoleMenuService(TmsDbContext db, UserRoleTypeService roleTypes)
         Add("/settings/field-configuration", "Field configuration", "Settings hub");
         Add("/settings/notifications", "SMS & WhatsApp", "Settings hub");
         Add("/settings/data-cleanup", "Data cleanup", "Settings hub");
+        Add("/settings/about", "About / System", "Settings hub");
 
         return items;
     }

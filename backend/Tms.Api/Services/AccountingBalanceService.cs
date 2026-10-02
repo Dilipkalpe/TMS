@@ -48,47 +48,51 @@ public static class AccountingBalanceService
 
     public static async Task<List<object>> BuildCashBookAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var lines = new List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular)>();
+        var lines = new List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular, string? BranchName)>();
+        var branchMap = await db.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.Name, ct);
 
         foreach (var p in await tenants.Filter(db.BookingPayments.AsQueryable()).Where(x => x.PaymentMode == "Cash").ToListAsync(ct))
-            lines.Add((p.PaymentDate, p.Amount, 0, $"Booking payment · {p.BookingId}"));
+            lines.Add((p.PaymentDate, p.Amount, 0, $"Booking payment · {p.BookingId}", null));
 
         foreach (var v in await tenants.Filter(db.Vouchers.AsQueryable()).Where(x => x.Mode == "Cash").OrderBy(x => x.VoucherDate).ToListAsync(ct))
         {
+            var bn = v.BranchId.HasValue && branchMap.TryGetValue(v.BranchId.Value, out var n) ? n : null;
             if (v.VoucherType == "Receipt")
-                lines.Add((v.VoucherDate, v.TotalAmount, 0, v.Narration ?? v.PartyName ?? v.VoucherType));
+                lines.Add((v.VoucherDate, v.TotalAmount, 0, v.Narration ?? v.PartyName ?? v.VoucherType, bn));
             else if (v.VoucherType == "Payment")
-                lines.Add((v.VoucherDate, 0, v.TotalAmount, v.Narration ?? v.PartyName ?? v.VoucherType));
+                lines.Add((v.VoucherDate, 0, v.TotalAmount, v.Narration ?? v.PartyName ?? v.VoucherType, bn));
         }
 
-        foreach (var e in await TenantScope.Expenses(db, tenants, branches).Where(x => x.PaymentMode == "Cash").ToListAsync(ct))
-            lines.Add((e.ExpenseDate, 0, e.Amount, e.Description ?? e.Category));
+        foreach (var e in await TenantScope.Expenses(db, tenants, branches).Include(x => x.Branch).Where(x => x.PaymentMode == "Cash").ToListAsync(ct))
+            lines.Add((e.ExpenseDate, 0, e.Amount, e.Description ?? e.Category, e.Branch?.Name));
 
         return RunningBalance(lines);
     }
 
     public static async Task<List<object>> BuildBankBookAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var lines = new List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular)>();
+        var lines = new List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular, string? BranchName)>();
+        var branchMap = await db.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.Name, ct);
 
         foreach (var p in await tenants.Filter(db.BookingPayments.AsQueryable()).Where(x => BankPaymentModes.Contains(x.PaymentMode)).ToListAsync(ct))
-            lines.Add((p.PaymentDate, p.Amount, 0, $"Booking payment · {p.BookingId} · {p.PaymentMode}"));
+            lines.Add((p.PaymentDate, p.Amount, 0, $"Booking payment · {p.BookingId} · {p.PaymentMode}", null));
 
         foreach (var v in await tenants.Filter(db.Vouchers.AsQueryable()).Where(x => x.Mode != null && BankPaymentModes.Contains(x.Mode)).OrderBy(x => x.VoucherDate).ToListAsync(ct))
         {
+            var bn = v.BranchId.HasValue && branchMap.TryGetValue(v.BranchId.Value, out var n) ? n : null;
             if (v.VoucherType == "Receipt")
-                lines.Add((v.VoucherDate, v.TotalAmount, 0, v.Narration ?? v.PartyName ?? v.VoucherType));
+                lines.Add((v.VoucherDate, v.TotalAmount, 0, v.Narration ?? v.PartyName ?? v.VoucherType, bn));
             else if (v.VoucherType == "Payment")
-                lines.Add((v.VoucherDate, 0, v.TotalAmount, v.Narration ?? v.PartyName ?? v.VoucherType));
+                lines.Add((v.VoucherDate, 0, v.TotalAmount, v.Narration ?? v.PartyName ?? v.VoucherType, bn));
         }
 
-        foreach (var e in await TenantScope.Expenses(db, tenants, branches).Where(x => x.PaymentMode != null && BankPaymentModes.Contains(x.PaymentMode)).ToListAsync(ct))
-            lines.Add((e.ExpenseDate, 0, e.Amount, e.Description ?? e.Category));
+        foreach (var e in await TenantScope.Expenses(db, tenants, branches).Include(x => x.Branch).Where(x => x.PaymentMode != null && BankPaymentModes.Contains(x.PaymentMode)).ToListAsync(ct))
+            lines.Add((e.ExpenseDate, 0, e.Amount, e.Description ?? e.Category, e.Branch?.Name));
 
         return RunningBalance(lines, depositKey: true);
     }
 
-    static List<object> RunningBalance(List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular)> lines, bool depositKey = false)
+    static List<object> RunningBalance(List<(DateOnly Date, decimal Receipt, decimal Payment, string Particular, string? BranchName)> lines, bool depositKey = false)
     {
         decimal balance = 0;
         return lines
@@ -97,8 +101,8 @@ public static class AccountingBalanceService
             {
                 balance += l.Receipt - l.Payment;
                 if (depositKey)
-                    return (object)new { date = l.Date.ToString("yyyy-MM-dd"), deposit = l.Receipt, withdrawal = l.Payment, balance, particular = l.Particular };
-                return new { date = l.Date.ToString("yyyy-MM-dd"), receipt = l.Receipt, payment = l.Payment, balance, particular = l.Particular };
+                    return (object)new { date = l.Date.ToString("yyyy-MM-dd"), deposit = l.Receipt, withdrawal = l.Payment, balance, particular = l.Particular, branchName = l.BranchName };
+                return new { date = l.Date.ToString("yyyy-MM-dd"), receipt = l.Receipt, payment = l.Payment, balance, particular = l.Particular, branchName = l.BranchName };
             })
             .ToList();
     }

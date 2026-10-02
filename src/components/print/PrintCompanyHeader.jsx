@@ -1,8 +1,9 @@
 import PrintLogo from './PrintLogo'
+import { brandPoweredBy } from '../../config/brand'
 import { formatPrintDateTime } from '../../utils/printUtils'
 
 export default function PrintCompanyHeader({ company, documentTitle, documentSubtitle, meta = [] }) {
-  const name = company?.companyName || 'TMS Pro Transport'
+  const name = company?.companyName || 'Company'
   const address = company?.address
   const gstin = company?.gstin
   const pan = company?.pan
@@ -49,9 +50,12 @@ export default function PrintCompanyHeader({ company, documentTitle, documentSub
 export function PrintFooter({ company }) {
   return (
     <footer className="print-footer">
-      Printed on {formatPrintDateTime(new Date())}
-      {company?.companyName ? ` · ${company.companyName}` : ''}
-      {' · '}This is a computer-generated document.
+      <div>
+        Printed on {formatPrintDateTime(new Date())}
+        {company?.companyName ? ` · ${company.companyName}` : ''}
+        {' · '}This is a computer-generated document.
+      </div>
+      <div className="print-powered-by mt-0.5">{brandPoweredBy()}</div>
     </footer>
   )
 }

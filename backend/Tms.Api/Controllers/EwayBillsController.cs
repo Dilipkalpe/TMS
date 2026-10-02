@@ -31,7 +31,9 @@ public class EwayBillsController(
         string? PortalRef,
         string? Notes,
         DateTime CreatedAt,
-        DateTime UpdatedAt);
+        DateTime UpdatedAt,
+        Guid? BranchId = null,
+        string? BranchName = null);
 
     public record SaveEwayBillBody(
         string LrNumber,
@@ -45,7 +47,7 @@ public class EwayBillsController(
         string? Status,
         string? Notes);
 
-    static EwayBillDto ToDto(EwayBill e, DateOnly today) => new(
+    static EwayBillDto ToDto(EwayBill e, DateOnly today, string? branchName = null) => new(
         e.Id,
         e.LrNumber,
         e.EwayBillNo,
@@ -60,7 +62,9 @@ public class EwayBillsController(
         e.PortalRef,
         e.Notes,
         e.CreatedAt,
-        e.UpdatedAt);
+        e.UpdatedAt,
+        e.BranchId,
+        branchName);
 
     IQueryable<EwayBill> Scoped() => TenantScope.EwayBills(db, tenants, branches);
 
@@ -88,7 +92,16 @@ public class EwayBillsController(
         }
 
         var rows = await q.OrderByDescending(e => e.UpdatedAt).Take(take).ToListAsync();
-        var dtos = rows.Select(e => ToDto(e, today)).ToList();
+        var branchIds = rows.Where(e => e.BranchId.HasValue).Select(e => e.BranchId!.Value).Distinct().ToList();
+        var branchNames = branchIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await db.Branches.AsNoTracking()
+                .Where(b => branchIds.Contains(b.Id))
+                .ToDictionaryAsync(b => b.Id, b => b.Name);
+        var dtos = rows.Select(e => ToDto(
+            e,
+            today,
+            e.BranchId.HasValue && branchNames.TryGetValue(e.BranchId.Value, out var bn) ? bn : null)).ToList();
 
         if (!string.IsNullOrWhiteSpace(status))
             dtos = dtos.Where(d => d.Status.Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();

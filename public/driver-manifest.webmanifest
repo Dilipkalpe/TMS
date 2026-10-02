@@ -1,19 +1,19 @@
 {
-  "name": "TMS Driver Portal",
-  "short_name": "TMS Driver",
+  "name": "CodeeStack TMS Driver Portal",
+  "short_name": "CodeeStack Driver",
   "description": "Mobile web driver portal for trip status and browser GPS tracking",
   "start_url": "/driver",
   "scope": "/driver",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#10b981",
+  "theme_color": "#0b1f3a",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/codeestack-logo.png",
       "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

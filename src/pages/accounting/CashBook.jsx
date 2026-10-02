@@ -7,6 +7,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { serverListProps } from '../../utils/serverListProps'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 export default function CashBook() {
   const navigate = useNavigate()
@@ -14,13 +15,13 @@ export default function CashBook() {
     ({ page, pageSize, search }) => accountingApi.cashBook(buildListParams({ page, pageSize, search })),
     [],
   )
-  const columns = [
+  const columns = withBranchColumn([
     { key: 'date', label: 'Date' },
     { key: 'particular', label: 'Particular' },
     { key: 'receipt', label: 'Receipt', render: (r) => (r.receipt ? formatCurrency(r.receipt) : '-') },
     { key: 'payment', label: 'Payment', render: (r) => (r.payment ? formatCurrency(r.payment) : '-') },
     { key: 'balance', label: 'Balance', render: (r) => formatCurrency(r.balance) },
-  ]
+  ], { afterKey: 'date' })
 
   return (
     <ERPListPage

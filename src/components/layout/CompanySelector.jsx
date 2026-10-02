@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Building2 } from 'lucide-react'
+import { Building2, ChevronDown } from 'lucide-react'
 import { useCompany } from '../../context/CompanyContext'
 import { platformApi, unwrapPaginated } from '../../services/api'
 
-export default function CompanySelector({ variant = 'header' }) {
+/**
+ * Active Company (tenant) selector — platform admin only in practice.
+ * variant "erp" matches BranchSelector height/look for header side-by-side layout.
+ */
+export default function CompanySelector({ variant = 'erp' }) {
   const { effectiveCompanyId, setSelectedCompanyId } = useCompany()
   const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(true)
-  const isSidebar = variant === 'sidebar'
+  const erpPill = variant === 'erp'
 
   useEffect(() => {
     platformApi.companies({ pageSize: 100 })
@@ -16,27 +20,33 @@ export default function CompanySelector({ variant = 'header' }) {
       .finally(() => setLoading(false))
   }, [])
 
+  const onChange = (e) => {
+    const id = e.target.value
+    if (!id) return
+    setSelectedCompanyId(id)
+    window.location.reload()
+  }
+
   if (loading) {
-    return isSidebar ? (
-      <p className="text-[10px] text-slate-400">Loading company…</p>
-    ) : (
-      <span className="hidden text-xs text-slate-500 sm:inline">Loading…</span>
+    return (
+      <span className={`inline-flex items-center text-xs text-slate-500 ${erpPill ? 'py-2' : ''}`}>
+        Loading…
+      </span>
     )
   }
 
-  if (isSidebar) {
-    return (
-      <div className="mt-0.5 w-full min-w-0">
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <Building2 className="h-4 w-4 shrink-0 text-primary" />
+      <div className="relative min-w-0">
         <select
           value={effectiveCompanyId ?? ''}
-          onChange={(e) => {
-            const id = e.target.value
-            if (!id) return
-            setSelectedCompanyId(id)
-            window.location.reload()
-          }}
-          className="w-full truncate rounded-md border border-slate-600 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-slate-100 outline-none focus:border-primary"
-          title="Active tenant company"
+          onChange={onChange}
+          className={`appearance-none truncate rounded-lg border border-slate-200 bg-white py-2 pl-2 pr-7 text-xs font-medium text-slate-700 outline-none focus:border-primary dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 ${
+            erpPill ? 'max-w-[10rem] text-sm sm:max-w-[12rem] lg:max-w-[14rem]' : 'max-w-[180px] lg:max-w-[220px]'
+          }`}
+          title="Active company"
+          aria-label="Active company"
         >
           <option value="" disabled>Select company…</option>
           {companies.map((c) => (
@@ -45,31 +55,10 @@ export default function CompanySelector({ variant = 'header' }) {
             </option>
           ))}
         </select>
+        {erpPill && (
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        )}
       </div>
-    )
-  }
-
-  return (
-    <div className="hidden items-center gap-2 sm:flex">
-      <Building2 className="h-4 w-4 shrink-0 text-primary" />
-      <select
-        value={effectiveCompanyId ?? ''}
-        onChange={(e) => {
-          const id = e.target.value
-          if (!id) return
-          setSelectedCompanyId(id)
-          window.location.reload()
-        }}
-        className="max-w-[180px] truncate rounded-lg border border-primary/20 bg-white/90 px-2 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-primary dark:border-primary/30 dark:bg-slate-800 dark:text-slate-100 lg:max-w-[220px]"
-        title="Active tenant company"
-      >
-        <option value="" disabled>Select company…</option>
-        {companies.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.code} — {c.name}
-          </option>
-        ))}
-      </select>
     </div>
   )
 }

@@ -21,11 +21,11 @@ import {
   ItemList, ItemDetails, NewItem,
   ExpensesHub, ExpenseList, NewExpense, EditExpense,
   SettingsHub, Settings, DataCleanupPage, MastersHub, ShipmentManagementHub, HubTransferPage, DeliveryManagementHub,
-  BranchesPage, PortalUsersPage, UsersPage, RoleMenusPage, DocumentNumberingPage, FieldConfigurationPage, NotificationSettings, PrintTemplateSettingsPage, LabelTemplatesSettingsPage,
+  BranchesPage, PortalUsersPage, UsersPage, RoleMenusPage, DocumentNumberingPage, FieldConfigurationPage, NotificationSettings, PrintTemplateSettingsPage, LabelTemplatesSettingsPage, AboutSystemPage,
   PortalLogin, PortalLayout, PortalDashboard, PortalTrackPage,
   PortalInvoices, PortalInvoiceView, PortalPublicTrack,
   DriverLogin, DriverTripPage, DriverPortalUsersPage,
-  AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry,
+  AccountingHub, ChartOfAccounts, LedgerMaster, NewLedger, VoucherEntry, VoucherList, VoucherDetail,
   LedgerReport, CustomerLedgerReport, VendorLedgerReport, DriverLedgerReport,
   VehicleLedgerReport, CashBook, BankBook, DayBook, JournalRegister,
   ReceiptRegister, PaymentRegister, PurchaseRegister, SalesRegister,
@@ -221,6 +221,8 @@ export default function App() {
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/ledger-master" element={<LedgerMaster />} />
         <Route path="accounting/ledger-master/new" element={<NewLedger />} />
+        <Route path="accounting/vouchers" element={<VoucherList />} />
+        <Route path="accounting/vouchers/:id" element={<VoucherDetail />} />
         <Route path="accounting/voucher-entry" element={<VoucherEntry />} />
         <Route path="accounting/ledger-report" element={<LedgerReport />} />
         <Route path="accounting/customer-ledger" element={<CustomerLedgerReport />} />
@@ -288,6 +290,7 @@ export default function App() {
         <Route path="settings/notifications" element={<NotificationSettings />} />
         <Route path="settings/print-templates" element={<PrintTemplateSettingsPage />} />
         <Route path="settings/label-templates" element={<LabelTemplatesSettingsPage />} />
+        <Route path="settings/about" element={<AboutSystemPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -6,6 +6,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { consigneesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 export default function ConsigneeList() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export default function ConsigneeList() {
     [],
   )
 
-  const columns = withAuditColumns([
+  const columns = withAuditColumns(withBranchColumn([
     { key: 'name', label: 'Consignee' },
     { key: 'companyName', label: 'Company', render: (r) => r.companyName || '—' },
     { key: 'city', label: 'City', render: (r) => r.city || '—' },
@@ -24,7 +25,7 @@ export default function ConsigneeList() {
     { key: 'gst', label: 'GST' },
     { key: 'defaultToLocation', label: 'Default To', render: (r) => r.defaultToLocation || '—' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ])
+  ], { afterKey: 'name' }))
 
   return (
     <ERPListPage

@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'))
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -9,6 +12,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     base,
+    define: {
+      __APP_VERSION__: JSON.stringify(pkg.version || '1.0.0'),
+    },
     plugins: [react(), tailwindcss()],
     build: {
       target: 'es2020',
@@ -40,7 +46,13 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
+        // JSON API
         '/api': {
+          target: 'http://localhost:5000',
+          changeOrigin: true,
+        },
+        // Company logos & other wwwroot uploads (logoUrl is /uploads/...)
+        '/uploads': {
           target: 'http://localhost:5000',
           changeOrigin: true,
         },

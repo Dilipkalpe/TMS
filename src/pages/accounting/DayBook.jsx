@@ -7,6 +7,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { serverListProps } from '../../utils/serverListProps'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 export default function DayBook() {
   const navigate = useNavigate()
@@ -14,14 +15,14 @@ export default function DayBook() {
     ({ page, pageSize, search }) => accountingApi.dayBook(buildListParams({ page, pageSize, search })),
     [],
   )
-  const columns = [
+  const columns = withBranchColumn([
     { key: 'date', label: 'Date' },
     { key: 'voucherNo', label: 'Voucher No.' },
     { key: 'type', label: 'Type' },
     { key: 'ledger', label: 'Ledger' },
     { key: 'debit', label: 'Debit', render: (r) => (r.debit ? formatCurrency(r.debit) : '-') },
     { key: 'credit', label: 'Credit', render: (r) => (r.credit ? formatCurrency(r.credit) : '-') },
-  ]
+  ], { afterKey: 'date' })
 
   return (
     <ERPListPage

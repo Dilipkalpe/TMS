@@ -577,28 +577,80 @@ public static class AccountingReportService
     public static DateOnly? ParseDate(string? value) =>
         DateOnly.TryParse(value, out var d) ? d : null;
 
-    public static async Task<object> BuildJournalRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default) =>
-        (await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Journal").ToListAsync(ct))
-            .Select(v => new { date = v.VoucherDate.ToString("yyyy-MM-dd"), voucherNo = v.VoucherNo, debitLedger = "GST Input", creditLedger = "GST Output", amount = v.TotalAmount, narration = v.Narration })
-            .ToList();
+    static async Task<Dictionary<Guid, string>> BranchNameMapAsync(TmsDbContext db, IEnumerable<Guid?> branchIds, CancellationToken ct)
+    {
+        var ids = branchIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
+        return await db.Branches.AsNoTracking()
+            .Where(b => ids.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.Name, ct);
+    }
 
-    public static async Task<object> BuildReceiptRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default) =>
-        (await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Receipt").ToListAsync(ct))
-            .Select(v => new { date = v.VoucherDate.ToString("yyyy-MM-dd"), voucherNo = v.VoucherNo, party = v.PartyName, mode = v.Mode, amount = v.TotalAmount, narration = v.Narration })
-            .ToList();
+    public static async Task<object> BuildJournalRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
+    {
+        var vouchers = await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Journal").ToListAsync(ct);
+        var branchMap = await BranchNameMapAsync(db, vouchers.Select(v => v.BranchId), ct);
+        return vouchers.Select(v => new
+        {
+            date = v.VoucherDate.ToString("yyyy-MM-dd"),
+            voucherNo = v.VoucherNo,
+            debitLedger = "GST Input",
+            creditLedger = "GST Output",
+            amount = v.TotalAmount,
+            narration = v.Narration,
+            branchName = v.BranchId.HasValue && branchMap.TryGetValue(v.BranchId.Value, out var n) ? n : null,
+        }).ToList();
+    }
 
-    public static async Task<object> BuildPaymentRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default) =>
-        (await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Payment").ToListAsync(ct))
-            .Select(v => new { date = v.VoucherDate.ToString("yyyy-MM-dd"), voucherNo = v.VoucherNo, party = v.PartyName, mode = v.Mode, amount = v.TotalAmount, narration = v.Narration })
-            .ToList();
+    public static async Task<object> BuildReceiptRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
+    {
+        var vouchers = await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Receipt").ToListAsync(ct);
+        var branchMap = await BranchNameMapAsync(db, vouchers.Select(v => v.BranchId), ct);
+        return vouchers.Select(v => new
+        {
+            date = v.VoucherDate.ToString("yyyy-MM-dd"),
+            voucherNo = v.VoucherNo,
+            party = v.PartyName,
+            mode = v.Mode,
+            amount = v.TotalAmount,
+            narration = v.Narration,
+            branchName = v.BranchId.HasValue && branchMap.TryGetValue(v.BranchId.Value, out var n) ? n : null,
+        }).ToList();
+    }
+
+    public static async Task<object> BuildPaymentRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
+    {
+        var vouchers = await tenants.Filter(db.Vouchers.AsNoTracking()).Where(v => v.VoucherType == "Payment").ToListAsync(ct);
+        var branchMap = await BranchNameMapAsync(db, vouchers.Select(v => v.BranchId), ct);
+        return vouchers.Select(v => new
+        {
+            date = v.VoucherDate.ToString("yyyy-MM-dd"),
+            voucherNo = v.VoucherNo,
+            party = v.PartyName,
+            mode = v.Mode,
+            amount = v.TotalAmount,
+            narration = v.Narration,
+            branchName = v.BranchId.HasValue && branchMap.TryGetValue(v.BranchId.Value, out var n) ? n : null,
+        }).ToList();
+    }
 
     public static async Task<object> BuildPurchaseRegisterAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var exps = await TenantScope.Expenses(db, tenants, branches).AsNoTracking().Where(e => e.VendorName != null).OrderByDescending(e => e.ExpenseDate).ToListAsync(ct);
+        var exps = await TenantScope.Expenses(db, tenants, branches).AsNoTracking().Include(e => e.Branch)
+            .Where(e => e.VendorName != null).OrderByDescending(e => e.ExpenseDate).ToListAsync(ct);
         return exps.Select(e =>
         {
             var gst = Math.Round(e.Amount * 0.18m, 0);
-            return new { date = e.ExpenseDate.ToString("yyyy-MM-dd"), billNo = e.Id, vendor = e.VendorName, amount = e.Amount, gst, total = e.Amount + gst };
+            return new
+            {
+                date = e.ExpenseDate.ToString("yyyy-MM-dd"),
+                billNo = e.Id,
+                vendor = e.VendorName,
+                amount = e.Amount,
+                gst,
+                total = e.Amount + gst,
+                branchName = e.Branch?.Name,
+            };
         }).ToList();
     }
 
@@ -606,7 +658,7 @@ public static class AccountingReportService
     {
         try
         {
-            var invoices = await TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking()
+            var invoices = await TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking().Include(i => i.Branch)
                 .Where(i => i.Status != "Cancelled")
                 .OrderByDescending(i => i.InvoiceDate)
                 .Take(500)
@@ -626,6 +678,7 @@ public static class AccountingReportService
                     balance = i.Balance,
                     status = i.Status,
                     source = "freight_invoice",
+                    branchName = i.Branch?.Name,
                 }).ToList();
             }
         }
@@ -634,7 +687,8 @@ public static class AccountingReportService
             // freight_invoices may not exist yet on older deployments — fall through to LR register.
         }
 
-        return (await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking().OrderByDescending(l => l.LrDate).ToListAsync(ct))
+        return (await TenantScope.LorryReceipts(db, tenants, branches).AsNoTracking().Include(l => l.Branch)
+                .OrderByDescending(l => l.LrDate).ToListAsync(ct))
             .Select(l => new
             {
                 date = l.LrDate.ToString("yyyy-MM-dd"),
@@ -645,6 +699,7 @@ public static class AccountingReportService
                 gst = l.Gst,
                 total = l.Freight + l.Gst,
                 source = "lr",
+                branchName = l.Branch?.Name,
             })
             .ToList();
     }

@@ -66,6 +66,10 @@ public class AccountingController(
         q = q.OrderBy(l => l.Code);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+        var branchIds = items.Where(l => l.BranchId.HasValue).Select(l => l.BranchId!.Value).Distinct().ToList();
+        var branchMap = branchIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await db.Branches.AsNoTracking().Where(b => branchIds.Contains(b.Id)).ToDictionaryAsync(b => b.Id, b => b.Name);
         var useGl = await glReports.UseGlReportsAsync();
         var live = useGl ? null : await AccountingReportService.BuildLiveAccountBalancesAsync(db, tenants, branches);
         var rows = new List<object>();
@@ -76,7 +80,17 @@ public class AccountingController(
                 bal = await glEngine.GetLedgerBalanceAsync(l.Id);
             else
                 bal = AccountingReportService.ResolveLiveBalance(live!, l.Code, l.Name);
-            rows.Add(new { code = l.Code, name = l.Name, type = l.AccountType, balance = Math.Abs(bal), id = l.Id, openingBalance = l.OpeningBalance });
+            rows.Add(new
+            {
+                code = l.Code,
+                name = l.Name,
+                type = l.AccountType,
+                balance = Math.Abs(bal),
+                id = l.Id,
+                openingBalance = l.OpeningBalance,
+                branchId = l.BranchId,
+                branchName = l.BranchId.HasValue && branchMap.TryGetValue(l.BranchId.Value, out var bn) ? bn : null,
+            });
         }
         return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }
@@ -116,21 +130,8 @@ public class AccountingController(
         var prefix = type[..3].ToUpper();
         var voucherNo = body.GetValueOrDefault("voucherNo")?.ToString() ?? $"{prefix}-2026-{count:D4}";
         var amount = decimal.TryParse(body.GetValueOrDefault("amount")?.ToString(), out var a) ? a : 0;
-
-        var v = new Voucher
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = companyId,
-            VoucherNo = voucherNo,
-            VoucherDate = DateOnly.TryParse(body.GetValueOrDefault("date")?.ToString(), out var d) ? d : DateOnly.FromDateTime(DateTime.UtcNow),
-            VoucherType = type,
-            PartyName = body.GetValueOrDefault("partyName")?.ToString(),
-            Mode = body.GetValueOrDefault("mode")?.ToString(),
-            Narration = body.GetValueOrDefault("narration")?.ToString(),
-            TotalAmount = amount,
-            CreatedAt = DateTime.UtcNow
-        };
-        db.Vouchers.Add(v);
+        if (amount <= 0)
+            return BadRequest(new ApiError("Amount must be greater than zero. Total Debit must equal Total Credit."));
 
         string? BodyStr(string key) =>
             body.TryGetValue(key, out var raw) ? raw?.ToString() : null;
@@ -158,35 +159,65 @@ public class AccountingController(
         }
 
         var debit = await ResolveLedgerAsync("debitLedgerId", "debitLedger");
-        if (debit.Name != null || debit.Id != null)
-        {
-            db.VoucherLines.Add(new VoucherLine
-            {
-                Id = Guid.NewGuid(),
-                CompanyId = companyId,
-                VoucherId = v.Id,
-                LedgerAccountId = debit.Id,
-                LedgerName = debit.Name,
-                Debit = amount, Credit = 0,
-                LineNarration = v.Narration
-            });
-        }
         var credit = await ResolveLedgerAsync("creditLedgerId", "creditLedger");
-        if (credit.Name != null || credit.Id != null)
+        if (debit.Id == null && string.IsNullOrWhiteSpace(debit.Name))
+            return BadRequest(new ApiError("Debit ledger is required."));
+        if (credit.Id == null && string.IsNullOrWhiteSpace(credit.Name))
+            return BadRequest(new ApiError("Credit ledger is required."));
+        if (debit.Id != null && credit.Id != null && debit.Id == credit.Id)
+            return BadRequest(new ApiError("Debit and credit ledgers must be different."));
+
+        // Balanced by construction: one debit line and one credit line for the same amount
+        var totalDebit = amount;
+        var totalCredit = amount;
+        if (totalDebit != totalCredit)
+            return BadRequest(new ApiError($"Unbalanced voucher: Debit {totalDebit:0.##} != Credit {totalCredit:0.##}."));
+
+        var v = new Voucher
         {
-            db.VoucherLines.Add(new VoucherLine
-            {
-                Id = Guid.NewGuid(),
-                CompanyId = companyId,
-                VoucherId = v.Id,
-                LedgerAccountId = credit.Id,
-                LedgerName = credit.Name,
-                Debit = 0, Credit = amount,
-                LineNarration = v.Narration
-            });
-        }
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            BranchId = branches.AssignBranchId,
+            VoucherNo = voucherNo,
+            VoucherDate = DateOnly.TryParse(body.GetValueOrDefault("date")?.ToString(), out var d) ? d : DateOnly.FromDateTime(DateTime.UtcNow),
+            VoucherType = type,
+            PartyName = body.GetValueOrDefault("partyName")?.ToString(),
+            Mode = body.GetValueOrDefault("mode")?.ToString(),
+            Narration = body.GetValueOrDefault("narration")?.ToString(),
+            ReferenceNo = body.GetValueOrDefault("referenceNo")?.ToString(),
+            TotalAmount = amount,
+            Status = VoucherStatuses.Posted,
+            CreatedBy = User.Identity?.Name,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.Vouchers.Add(v);
+
+        db.VoucherLines.Add(new VoucherLine
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            VoucherId = v.Id,
+            LedgerAccountId = debit.Id,
+            LedgerName = debit.Name,
+            Debit = amount,
+            Credit = 0,
+            LineNarration = v.Narration,
+            LineNo = 1,
+        });
+        db.VoucherLines.Add(new VoucherLine
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            VoucherId = v.Id,
+            LedgerAccountId = credit.Id,
+            LedgerName = credit.Name,
+            Debit = 0,
+            Credit = amount,
+            LineNarration = v.Narration,
+            LineNo = 2,
+        });
         await db.SaveChangesAsync();
-        return Ok(new { voucherNo = v.VoucherNo, message = "Voucher saved." });
+        return Ok(new { id = v.Id, voucherNo = v.VoucherNo, status = v.Status, message = "Voucher saved." });
     }
 
     [HttpGet("cash-book")]
@@ -216,26 +247,32 @@ public class AccountingController(
         [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
         [FromQuery] bool includeTotal = true)
     {
-        var q = tenants.Filter(db.Vouchers.AsNoTracking()).AsQueryable();
+        var q =
+            from v in tenants.Filter(db.Vouchers.AsNoTracking())
+            join b in db.Branches.AsNoTracking() on v.BranchId equals b.Id into bj
+            from b in bj.DefaultIfEmpty()
+            select new { Voucher = v, BranchName = b != null ? b.Name : null };
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLowerInvariant();
-            q = q.Where(v =>
-                v.VoucherNo.ToLower().Contains(s) ||
-                (v.PartyName != null && v.PartyName.ToLower().Contains(s)) ||
-                (v.Narration != null && v.Narration.ToLower().Contains(s)));
+            q = q.Where(x =>
+                x.Voucher.VoucherNo.ToLower().Contains(s) ||
+                (x.Voucher.PartyName != null && x.Voucher.PartyName.ToLower().Contains(s)) ||
+                (x.Voucher.Narration != null && x.Voucher.Narration.ToLower().Contains(s)) ||
+                (x.BranchName != null && x.BranchName.ToLower().Contains(s)));
         }
-        q = q.OrderByDescending(v => v.VoucherDate).ThenByDescending(v => v.CreatedAt);
+        q = q.OrderByDescending(x => x.Voucher.VoucherDate).ThenByDescending(x => x.Voucher.CreatedAt);
         var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
         var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
-        var rows = items.Select(v => (object)new
+        var rows = items.Select(x => (object)new
         {
-            date = v.VoucherDate.ToString("yyyy-MM-dd"),
-            voucherNo = v.VoucherNo,
-            type = v.VoucherType,
-            ledger = v.PartyName ?? "",
-            debit = v.VoucherType == "Payment" ? v.TotalAmount : 0m,
-            credit = v.VoucherType == "Receipt" ? v.TotalAmount : (v.VoucherType == "Payment" ? 0m : v.TotalAmount),
+            date = x.Voucher.VoucherDate.ToString("yyyy-MM-dd"),
+            voucherNo = x.Voucher.VoucherNo,
+            type = x.Voucher.VoucherType,
+            ledger = x.Voucher.PartyName ?? "",
+            debit = x.Voucher.VoucherType == "Payment" ? x.Voucher.TotalAmount : 0m,
+            credit = x.Voucher.VoucherType == "Receipt" ? x.Voucher.TotalAmount : (x.Voucher.VoucherType == "Payment" ? 0m : x.Voucher.TotalAmount),
+            branchName = x.BranchName,
         }).ToList();
         return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }

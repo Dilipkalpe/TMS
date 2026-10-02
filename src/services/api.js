@@ -539,8 +539,10 @@ export const glApi = {
   postingMaps: () => apiRequest('/gl/posting-maps'),
   updatePostingMap: (txnType, data) => apiRequest(`/gl/posting-maps/${encodeURIComponent(txnType)}`, { method: 'PUT', body: data }),
   createJournal: (data) => apiRequest('/gl/journals', { method: 'POST', body: data }),
-  vouchers: (params = {}) => apiRequest(`/gl/vouchers?${new URLSearchParams(params)}`),
+  vouchers: (params = {}) => apiRequest(`/gl/vouchers?${queryString(params)}`),
   voucher: (id) => apiRequest(`/gl/vouchers/${id}`),
+  updateVoucher: (id, data) => apiRequest(`/gl/vouchers/${id}`, { method: 'PUT', body: data }),
+  deleteVoucher: (id, data = {}) => apiRequest(`/gl/vouchers/${id}`, { method: 'DELETE', body: data }),
   postDraft: (id) => apiRequest(`/gl/vouchers/${id}/post`, { method: 'POST', body: {} }),
   reverseVoucher: (id, remarks) => apiRequest(`/gl/vouchers/${id}/reverse`, { method: 'POST', body: { remarks } }),
   trialBalance: (asOf) => apiRequest(`/gl/reports/trial-balance${asOf ? `?asOf=${asOf}` : ''}`),
@@ -596,6 +598,10 @@ export const accountingApi = {
   createLedger: (data) => apiRequest('/accounting/ledger-master', { method: 'POST', body: data }),
   voucherTypes: () => apiRequest('/accounting/voucher-types'),
   createVoucher: (data) => apiRequest('/accounting/vouchers', { method: 'POST', body: data }),
+  listVouchers: (params = {}) => apiRequest(`/gl/vouchers?${queryString(params)}`),
+  getVoucher: (id) => apiRequest(`/gl/vouchers/${id}`),
+  updateVoucher: (id, data) => apiRequest(`/gl/vouchers/${id}`, { method: 'PUT', body: data }),
+  deleteVoucher: (id, data = {}) => apiRequest(`/gl/vouchers/${id}`, { method: 'DELETE', body: data }),
   cashBook: (params = {}) => apiRequest(`/accounting/cash-book?${new URLSearchParams(params)}`),
   bankBook: (params = {}) => apiRequest(`/accounting/bank-book?${new URLSearchParams(params)}`),
   dayBook: (params = {}) => apiRequest(`/accounting/day-book?${new URLSearchParams(params)}`),
@@ -647,6 +653,15 @@ export const settingsApi = {
       throw new ApiError(message, res.status)
     }
     return res.json()
+  },
+  /** Auth-aware logo blob URL for <img> (caller must revokeObjectURL). */
+  fetchLogoObjectUrl: async () => {
+    const headers = buildAuthHeaders({ json: false })
+    const res = await fetch(`${API_BASE_URL}/settings/logo-file?t=${Date.now()}`, { headers })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    if (!blob || !blob.type.startsWith('image/')) return null
+    return URL.createObjectURL(blob)
   },
   deleteLogo: () => apiRequest('/settings/logo', { method: 'DELETE' }),
   getDocumentFlow: () => apiRequest('/settings/document-flow'),

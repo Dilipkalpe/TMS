@@ -13,6 +13,7 @@ export const settingsCards = withHubTheme([
   { title: 'Field configuration', path: '/settings/field-configuration', icon: 'SlidersHorizontal', description: 'Show/hide, require, and rename Booking & LR form fields' },
   { title: 'SMS & WhatsApp', path: '/settings/notifications', icon: 'Bell', description: 'Notification channels and templates' },
   { title: 'Data cleanup', path: '/settings/data-cleanup', icon: 'Trash2', description: 'Delete transaction & master data; keep configuration' },
+  { title: 'About / System', path: '/settings/about', icon: 'Info', description: 'CodeeStack TMS product and system information' },
 ])
 
 const byPath = Object.fromEntries(settingsCards.map((c) => [c.path, c]))
@@ -36,5 +37,6 @@ export const settingsHubSections = [
   hubSection('Channels & data', 'Notifications and cleanup tools', pick(
     '/settings/notifications',
     '/settings/data-cleanup',
+    '/settings/about',
   ), { chip: 'Tools' }),
 ]

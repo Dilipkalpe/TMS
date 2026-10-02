@@ -9,6 +9,7 @@ import { glApi, vendorsApi } from '../../../services/api'
 import { useToast } from '../../../context/ToastContext'
 import { formatCurrency } from '../../../components/ui/ReportFilters'
 import { Plus, Loader2 } from 'lucide-react'
+import { withBranchColumn } from '../../../utils/branchColumns'
 
 export default function GlVendorBillsPage() {
   const { toast } = useToast()
@@ -57,7 +58,7 @@ export default function GlVendorBillsPage() {
     } finally { setSaving(false) }
   }
 
-  const columns = [
+  const columns = withBranchColumn([
     { key: 'billNo', label: 'Bill No' },
     { key: 'billDate', label: 'Date' },
     { key: 'vendorName', label: 'Vendor' },
@@ -66,7 +67,7 @@ export default function GlVendorBillsPage() {
     { key: 'tdsAmount', label: 'TDS', render: (r) => formatCurrency(r.tdsAmount) },
     { key: 'balance', label: 'Balance', render: (r) => formatCurrency(r.balance) },
     { key: 'status', label: 'Status' },
-  ]
+  ], { afterKey: 'billNo' })
 
   return (
     <ERPContentPage module="Accounting" title="Vendor Bills (AP)">

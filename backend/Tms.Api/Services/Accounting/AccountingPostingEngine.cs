@@ -254,9 +254,187 @@ public class AccountingPostingEngine(
         original.ReversedByVoucherId = rev.Id;
         original.UpdatedAt = DateTime.UtcNow;
         rev.ReversalOfVoucherId = original.Id;
-        await ApplyBalanceCacheAsync(original.Lines, -1, ct);
+        // Offsetting ledger impact is applied by PostAsync on the reversing voucher (swapped lines).
+        // Do not apply a second -1 on the original — that would double-count.
         await db.SaveChangesAsync(ct);
         return rev;
+    }
+
+    /// <summary>Update DRAFT voucher header/lines in place (no ledger balance impact).</summary>
+    public async Task<Voucher> UpdateDraftAsync(Guid voucherId, PostingRequest request, CancellationToken ct = default)
+    {
+        ValidateBalanced(request.Lines);
+        var voucher = await db.Vouchers.Include(v => v.Lines)
+            .FirstOrDefaultAsync(v => v.Id == voucherId && v.CompanyId == CompanyId, ct)
+            ?? throw new InvalidOperationException("Voucher not found.");
+        if (voucher.Status != VoucherStatuses.Draft)
+            throw new InvalidOperationException("Only DRAFT vouchers can be edited in place. Reverse a posted voucher and create a new one.");
+
+        await ReplaceHeaderAndLinesAsync(voucher, request, ct);
+        voucher.UpdatedAt = DateTime.UtcNow;
+        db.AccountingAuditLogs.Add(new AccountingAuditLog
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = CompanyId,
+            EntityType = "Voucher",
+            EntityId = voucher.Id.ToString("N"),
+            Action = "UPDATE_DRAFT",
+            Details = $"{voucher.VoucherType} {voucher.VoucherNo}",
+            UserName = request.CreatedBy,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+        return voucher;
+    }
+
+    /// <summary>
+    /// Update a posted voucher without leaving duplicate active GL impact.
+    /// Engine-posted (has FY): reverse then post a new voucher.
+    /// Legacy accounting entry (no FY): replace lines in place (create path never applied balance cache).
+    /// </summary>
+    public async Task<Voucher> UpdatePostedAsync(Guid voucherId, PostingRequest request, CancellationToken ct = default)
+    {
+        ValidateBalanced(request.Lines);
+        var voucher = await db.Vouchers.Include(v => v.Lines)
+            .FirstOrDefaultAsync(v => v.Id == voucherId && v.CompanyId == CompanyId, ct)
+            ?? throw new InvalidOperationException("Voucher not found.");
+        if (voucher.Status != VoucherStatuses.Posted)
+            throw new InvalidOperationException("Only POSTED vouchers can be corrected via update.");
+        if (voucher.ReversedByVoucherId != null)
+            throw new InvalidOperationException("Voucher already reversed.");
+
+        if (voucher.FinancialYearId != null)
+        {
+            await ReverseAsync(voucherId, $"Corrected via edit of {voucher.VoucherNo}", request.CreatedBy, ct);
+            var recreate = request with
+            {
+                SourceType = string.IsNullOrWhiteSpace(request.SourceType) ? "VOUCHER_EDIT" : request.SourceType,
+                SourceId = string.IsNullOrWhiteSpace(request.SourceId) ? Guid.NewGuid().ToString("N") : request.SourceId,
+                AsDraft = false,
+            };
+            return await PostAsync(recreate, ct);
+        }
+
+        // Legacy CreateVoucher path — never touched LedgerAccount.Balance
+        await ReplaceHeaderAndLinesAsync(voucher, request, ct);
+        voucher.UpdatedAt = DateTime.UtcNow;
+        db.AccountingAuditLogs.Add(new AccountingAuditLog
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = CompanyId,
+            EntityType = "Voucher",
+            EntityId = voucher.Id.ToString("N"),
+            Action = "UPDATE_POSTED_LEGACY",
+            Details = $"{voucher.VoucherType} {voucher.VoucherNo}",
+            UserName = request.CreatedBy,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+        return voucher;
+    }
+
+    /// <summary>Hard-delete a DRAFT voucher (no balances were applied).</summary>
+    public async Task DeleteDraftAsync(Guid voucherId, string? userName, CancellationToken ct = default)
+    {
+        var voucher = await db.Vouchers.Include(v => v.Lines)
+            .FirstOrDefaultAsync(v => v.Id == voucherId && v.CompanyId == CompanyId, ct)
+            ?? throw new InvalidOperationException("Voucher not found.");
+        if (voucher.Status != VoucherStatuses.Draft)
+            throw new InvalidOperationException("Only DRAFT vouchers can be permanently deleted. Posted vouchers must be reversed.");
+
+        db.VoucherLines.RemoveRange(voucher.Lines);
+        db.Vouchers.Remove(voucher);
+        db.AccountingAuditLogs.Add(new AccountingAuditLog
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = CompanyId,
+            EntityType = "Voucher",
+            EntityId = voucherId.ToString("N"),
+            Action = "DELETE_DRAFT",
+            Details = $"{voucher.VoucherType} {voucher.VoucherNo}",
+            UserName = userName,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Soft-cancel a legacy posted voucher that cannot go through FY-aware reverse.</summary>
+    public async Task SoftCancelLegacyAsync(Guid voucherId, string? remarks, string? userName, CancellationToken ct = default)
+    {
+        var voucher = await db.Vouchers.Include(v => v.Lines)
+            .FirstOrDefaultAsync(v => v.Id == voucherId && v.CompanyId == CompanyId, ct)
+            ?? throw new InvalidOperationException("Voucher not found.");
+        if (voucher.Status != VoucherStatuses.Posted)
+            throw new InvalidOperationException("Only POSTED vouchers can be cancelled.");
+        if (voucher.FinancialYearId != null)
+            throw new InvalidOperationException("Use reverse for engine-posted vouchers.");
+
+        voucher.Status = VoucherStatuses.Reversed;
+        voucher.UpdatedAt = DateTime.UtcNow;
+        voucher.Narration = string.IsNullOrWhiteSpace(remarks)
+            ? voucher.Narration
+            : $"{voucher.Narration} | Cancelled: {remarks}".Trim(' ', '|');
+        db.AccountingAuditLogs.Add(new AccountingAuditLog
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = CompanyId,
+            EntityType = "Voucher",
+            EntityId = voucher.Id.ToString("N"),
+            Action = "SOFT_CANCEL",
+            Details = remarks ?? $"Cancelled {voucher.VoucherNo}",
+            UserName = userName,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+    }
+
+    async Task ReplaceHeaderAndLinesAsync(Voucher voucher, PostingRequest request, CancellationToken ct)
+    {
+        var ledgerIds = request.Lines.Select(l => l.LedgerAccountId).Distinct().ToList();
+        var ledgers = await db.LedgerAccounts.Where(l => l.CompanyId == CompanyId && ledgerIds.Contains(l.Id)).ToListAsync(ct);
+        foreach (var id in ledgerIds)
+        {
+            var led = ledgers.FirstOrDefault(l => l.Id == id)
+                ?? throw new InvalidOperationException($"Ledger not found: {id}");
+            if (!led.IsActive)
+                throw new InvalidOperationException($"Ledger inactive: {led.Code} {led.Name}");
+        }
+
+        var postDate = request.PostingDate ?? request.TransactionDate;
+        voucher.VoucherType = request.VoucherType;
+        voucher.VoucherDate = postDate;
+        voucher.TransactionDate = request.TransactionDate;
+        voucher.PostingDate = postDate;
+        voucher.PartyName = request.PartyName;
+        voucher.Mode = request.Mode;
+        voucher.Narration = request.Narration;
+        voucher.ReferenceNo = request.ReferenceNo;
+        voucher.CostCentreId = request.CostCentreId ?? voucher.CostCentreId;
+        if (request.BranchId != null) voucher.BranchId = request.BranchId;
+        voucher.TotalAmount = Math.Round(request.Lines.Sum(l => l.Debit), 2);
+
+        db.VoucherLines.RemoveRange(voucher.Lines);
+        voucher.Lines.Clear();
+        var lineNo = 1;
+        foreach (var line in request.Lines)
+        {
+            var led = ledgers.First(l => l.Id == line.LedgerAccountId);
+            voucher.Lines.Add(new VoucherLine
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = CompanyId,
+                VoucherId = voucher.Id,
+                LedgerAccountId = line.LedgerAccountId,
+                LedgerName = string.IsNullOrWhiteSpace(line.LedgerName) ? led.Name : line.LedgerName,
+                Debit = line.Debit,
+                Credit = line.Credit,
+                LineNarration = line.Narration ?? request.Narration,
+                CostCentreId = line.CostCentreId,
+                PartyType = line.PartyType,
+                PartyId = line.PartyId,
+                LineNo = lineNo++,
+            });
+        }
     }
 
     public async Task<LedgerAccount> ResolveLedgerByNameAsync(string name, CancellationToken ct = default)

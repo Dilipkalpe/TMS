@@ -6,6 +6,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { serverListProps } from '../../utils/serverListProps'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 export default function LedgerMaster() {
   const navigate = useNavigate()
@@ -14,12 +15,12 @@ export default function LedgerMaster() {
       accountingApi.ledgerMaster(buildListParams({ page, pageSize, search, filter, filterKey: 'type' })),
     [],
   )
-  const columns = [
+  const columns = withBranchColumn([
     { key: 'code', label: 'Code' },
     { key: 'name', label: 'Ledger Name' },
     { key: 'type', label: 'Type', render: (r) => <Badge variant="info">{r.type}</Badge> },
     { key: 'balance', label: 'Balance', render: (r) => formatCurrency(r.balance) },
-  ]
+  ], { afterKey: 'code' })
 
   return (
     <ERPListPage

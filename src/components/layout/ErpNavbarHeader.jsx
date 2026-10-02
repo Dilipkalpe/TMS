@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 import { usePageTitle } from '../../context/PageTitleContext'
 import { buildErpBreadcrumb } from '../../utils/erpBreadcrumb'
 import BranchSelector from './BranchSelector'
+import CompanySelector from './CompanySelector'
 
 function BreadcrumbTrail({ items }) {
   if (!items?.length) return null
@@ -98,13 +99,15 @@ function UserMenu() {
 export default function ErpNavbarHeader() {
   const { module, title, breadcrumb, shortcuts, headerActions, toolbar } = usePageTitle()
   const { toggleMenu } = useSidebar()
+  const { user } = useAuth()
 
   const shortcutList = shortcuts?.length ? shortcuts : null
   const crumbs = breadcrumb ?? buildErpBreadcrumb(module, title)
+  const showCompanySelector = Boolean(user?.isPlatformAdmin)
 
   return (
     <header className="app-header z-30 shrink-0 border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-5">
+      <div className="flex min-h-14 flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 lg:px-5 lg:py-0">
         <button
           type="button"
           onClick={toggleMenu}
@@ -133,8 +136,11 @@ export default function ErpNavbarHeader() {
           </div>
         )}
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-          <BranchSelector variant="erp" />
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
+            {showCompanySelector ? <CompanySelector variant="erp" /> : null}
+            <BranchSelector variant="erp" />
+          </div>
           <UserMenu />
         </div>
       </div>

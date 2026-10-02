@@ -13,7 +13,8 @@ export default function AccountingHub() {
       headline="Books, ledgers & statements"
       description="Post vouchers, review ledgers, and close the period with trial balance, P&L, and balance sheet."
       quickActions={[
-        { label: 'Voucher entry', path: '/accounting/voucher-entry', variant: 'accent' },
+        { label: 'Voucher list', path: '/accounting/vouchers', variant: 'accent' },
+        { label: 'Voucher entry', path: '/accounting/voucher-entry' },
         { label: 'Outstanding', path: '/accounting/outstanding', variant: 'ghost' },
         { label: 'Trial balance', path: '/accounting/trial-balance', variant: 'ghost' },
       ]}

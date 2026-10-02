@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useBranch } from '../../context/BranchContext'
+import { APP_VERSION, BRAND, brandCopyright } from '../../config/brand'
 
 export default function AppFooter() {
   const { user } = useAuth()
@@ -36,21 +37,29 @@ export default function AppFooter() {
   })
 
   return (
-    <footer className="app-footer shrink-0 border-t border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex flex-col gap-2 text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between dark:text-slate-400">
-        <span className="text-center sm:text-left">
+    <footer className="app-footer shrink-0 border-t border-slate-200 bg-white px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="min-w-0 truncate">
           Logged in as <strong className="text-slate-700 dark:text-slate-300">{user?.name ?? 'User'}</strong>
           {' '}| Role: {user?.role ?? 'Operator'}
           {' '}| Branch: {branchLabel ?? '—'}
+          <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
+          {brandCopyright()}
+          <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
+          Powered by {BRAND.companyName}
+          {' | '}
+          <a href={BRAND.websiteUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+            {BRAND.website}
+          </a>
         </span>
-        <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-end">
+        <span className="inline-flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
           <span>Server Time: {timeStr}</span>
           <span className={`inline-flex items-center gap-1 font-medium ${online ? 'text-emerald-600' : 'text-red-500'}`}>
             <span className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-500' : 'bg-red-500'}`} />
             {online ? 'Connected' : 'Offline'}
           </span>
-          <span className="text-slate-400">v 1.0.0</span>
-        </div>
+          <span className="text-slate-400">v {APP_VERSION}</span>
+        </span>
       </div>
     </footer>
   )

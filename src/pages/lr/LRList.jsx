@@ -16,6 +16,7 @@ import { usePrint } from '../../context/PrintContext'
 import { printGridRowDocument } from '../../utils/printGridDocument'
 import { PRINT_MODULE_CODES } from '../../config/printModules'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { BRANCH_COLUMN } from '../../utils/branchColumns'
 
 const STATUS_FILTER_OPTIONS = ['(All)', ...LR_STATUS_STEPS]
 
@@ -37,7 +38,7 @@ export default function LRList() {
   const columns = useMemo(() => withAuditColumns([
     { key: 'lrNumber', label: 'LR No.' },
     { key: 'lrDate', label: 'Date' },
-    { key: 'branchName', label: 'Branch', render: (r) => r.branchName || '—' },
+    BRANCH_COLUMN,
     { key: 'consignor', label: 'Consignor' },
     { key: 'consignee', label: 'Consignee' },
     { key: 'from', label: 'From' },

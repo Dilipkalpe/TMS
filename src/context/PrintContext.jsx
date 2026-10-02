@@ -56,6 +56,14 @@ export function PrintProvider({ children }) {
     loadPrintTemplateConfig().catch(() => {})
   }, [booting, isAuthenticated, loadCompany])
 
+  // Platform admin company switch — reload that tenant's settings/logo
+  useEffect(() => {
+    if (booting || !isAuthenticated || !getToken()) return
+    const onCompanyChanged = () => loadCompany()
+    window.addEventListener('tms-company-changed', onCompanyChanged)
+    return () => window.removeEventListener('tms-company-changed', onCompanyChanged)
+  }, [booting, isAuthenticated, loadCompany])
+
   const print = useCallback((node) => {
     flushSync(() => {
       setPrintNode(node)

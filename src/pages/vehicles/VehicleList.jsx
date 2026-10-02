@@ -8,6 +8,7 @@ import { vehiclesApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { importTemplates } from '../../config/importTemplates'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { withBranchColumn } from '../../utils/branchColumns'
 import { formatCurrentLocation } from '../../utils/formatCurrentLocation'
 
 function formatAge(iso) {
@@ -30,7 +31,7 @@ export default function VehicleList() {
     [],
   )
 
-  const columns = withAuditColumns([
+  const columns = withAuditColumns(withBranchColumn([
     { key: 'number', label: 'Vehicle' },
     { key: 'currentDriverName', label: 'Driver', render: (r) => r.currentDriverName || '—' },
     { key: 'currentLocation', label: 'Current Location', render: (r) => formatCurrentLocation(r.currentLocation) },
@@ -44,7 +45,7 @@ export default function VehicleList() {
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
     { key: 'trips', label: 'Trips' },
     { key: 'revenue', label: 'Revenue', render: (r) => formatCurrency(r.revenue) },
-  ])
+  ], { afterKey: 'number' }))
 
   return (
     <ERPListPage

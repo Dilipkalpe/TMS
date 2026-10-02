@@ -7,6 +7,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { accountingApi } from '../../services/api'
 import { addRecordRoutes } from '../../config/addRecordRoutes'
 import { serverListProps } from '../../utils/serverListProps'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 export default function SalesRegister() {
   const navigate = useNavigate()
@@ -14,7 +15,7 @@ export default function SalesRegister() {
     ({ page, pageSize, search }) => accountingApi.salesRegister(buildListParams({ page, pageSize, search })),
     [],
   )
-  const columns = [
+  const columns = withBranchColumn([
     { key: 'date', label: 'Date' },
     { key: 'lrNo', label: 'Invoice / LR No.' },
     { key: 'customer', label: 'Customer' },
@@ -24,7 +25,7 @@ export default function SalesRegister() {
     { key: 'total', label: 'Total', render: (r) => formatCurrency(r.total) },
     { key: 'balance', label: 'Balance', render: (r) => (r.balance != null ? formatCurrency(r.balance) : '—') },
     { key: 'status', label: 'Status' },
-  ]
+  ], { afterKey: 'date' })
 
   return (
     <ERPListPage

@@ -56,6 +56,7 @@ public class SettingsController(
             fleetSize = s.FleetSize,
             documentFlow = DocumentFlow.Normalize(s.DocumentFlow),
             documentFlowLabel = DocumentFlow.DisplayLabel(s.DocumentFlow),
+            updatedAt = s.UpdatedAt,
             gstType = "Regular",
             stateCode = "27 - Maharashtra",
             yearStart = "2025-04-01",
@@ -154,6 +155,31 @@ public class SettingsController(
         });
     }
 
+    /// <summary>
+    /// Streams the current tenant company logo (auth required).
+    /// Used by SPA sidebar/settings because &lt;img src&gt; cannot send Bearer tokens to /uploads reliably in all deploys.
+    /// </summary>
+    [HttpGet("logo-file")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> GetLogoFile(CancellationToken ct)
+    {
+        var s = await FindSettingsAsync(ct);
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var path = ResolveLogoFilePath(webRoot, s?.LogoUrl);
+        if (path == null)
+            return NotFound();
+
+        var contentType = Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".svg" => "image/svg+xml",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream",
+        };
+        return PhysicalFile(path, contentType);
+    }
+
     [HttpPost("logo")]
     [RequestSizeLimit(MaxLogoBytes)]
     public async Task<ActionResult<object>> UploadLogo(IFormFile? file, CancellationToken ct)
@@ -171,15 +197,23 @@ public class SettingsController(
         var uploadsDir = Path.Combine(webRoot, "uploads");
         Directory.CreateDirectory(uploadsDir);
 
-        var fileName = $"company-logo{ext}";
+        // Per-tenant file so platform company switches do not overwrite each other
+        var companyId = tenants.EffectiveCompanyId ?? tenants.AssignCompanyId ?? TenantContext.DefaultCompanyId;
+        var fileName = $"company-logo-{companyId:N}{ext}";
         var fullPath = Path.Combine(uploadsDir, fileName);
 
-        foreach (var old in Directory.GetFiles(uploadsDir, "company-logo.*"))
+        foreach (var old in Directory.GetFiles(uploadsDir, $"company-logo-{companyId:N}.*"))
         {
             if (!old.Equals(fullPath, StringComparison.OrdinalIgnoreCase))
             {
                 try { System.IO.File.Delete(old); } catch { /* ignore */ }
             }
+        }
+
+        // Remove legacy shared filename if present
+        foreach (var old in Directory.GetFiles(uploadsDir, "company-logo.*"))
+        {
+            try { System.IO.File.Delete(old); } catch { /* ignore */ }
         }
 
         await using (var stream = System.IO.File.Create(fullPath))
@@ -191,7 +225,7 @@ public class SettingsController(
         s.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return Ok(new { message = "Company logo uploaded.", logoUrl });
+        return Ok(new { message = "Company logo uploaded.", logoUrl, updatedAt = s.UpdatedAt });
     }
 
     [HttpDelete("logo")]
@@ -201,8 +235,8 @@ public class SettingsController(
         if (s?.LogoUrl != null)
         {
             var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
-            var path = Path.Combine(webRoot, s.LogoUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-            if (System.IO.File.Exists(path))
+            var path = ResolveLogoFilePath(webRoot, s.LogoUrl);
+            if (path != null)
             {
                 try { System.IO.File.Delete(path); } catch { /* ignore */ }
             }
@@ -211,6 +245,27 @@ public class SettingsController(
             await db.SaveChangesAsync(ct);
         }
         return Ok(new { message = "Logo removed." });
+    }
+
+    static string? ResolveLogoFilePath(string webRoot, string? logoUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(logoUrl) &&
+            !logoUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !logoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !logoUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var relative = logoUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            var path = Path.Combine(webRoot, relative);
+            if (System.IO.File.Exists(path))
+                return path;
+        }
+
+        // Legacy shared upload name (pre per-tenant filenames)
+        var uploadsDir = Path.Combine(webRoot, "uploads");
+        if (!Directory.Exists(uploadsDir)) return null;
+        return Directory.GetFiles(uploadsDir, "company-logo.*")
+            .OrderByDescending(System.IO.File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
     }
 
     /// <summary>

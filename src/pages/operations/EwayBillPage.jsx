@@ -348,6 +348,7 @@ export default function EwayBillPage() {
               <thead className="bg-slate-50 dark:bg-slate-800/60">
                 <tr>
                   <th className="px-3 py-2 text-left">LR No.</th>
+                  <th className="px-3 py-2 text-left">Branch</th>
                   <th className="px-3 py-2 text-left">E-Way No.</th>
                   <th className="px-3 py-2 text-left">Valid Upto</th>
                   <th className="px-3 py-2 text-left">Vehicle</th>
@@ -362,6 +363,7 @@ export default function EwayBillPage() {
                     <td className="px-3 py-2">
                       <Link className="font-medium text-primary hover:underline" to={lrDetailPath(r.lrNumber)}>{r.lrNumber}</Link>
                     </td>
+                    <td className="px-3 py-2">{r.branchName || r.branch || '—'}</td>
                     <td className="px-3 py-2">{r.ewayBillNo || '—'}</td>
                     <td className="px-3 py-2">{r.validUpto || '—'}</td>
                     <td className="px-3 py-2">{r.vehicleNo || '—'}</td>

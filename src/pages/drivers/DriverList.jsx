@@ -7,6 +7,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { driversApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { withBranchColumn } from '../../utils/branchColumns'
 import { formatCurrentLocation } from '../../utils/formatCurrentLocation'
 
 function formatAge(iso) {
@@ -30,7 +31,7 @@ export default function DriverList() {
     [],
   )
 
-  const columns = withAuditColumns([
+  const columns = withAuditColumns(withBranchColumn([
     { key: 'id', label: 'Driver ID' },
     { key: 'name', label: 'Driver' },
     { key: 'phone', label: 'Mobile' },
@@ -53,7 +54,7 @@ export default function DriverList() {
     },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
     { key: 'salary', label: 'Salary', render: (r) => formatCurrency(r.salary) },
-  ])
+  ], { afterKey: 'name' }))
 
   return (
     <ERPListPage

@@ -6,6 +6,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { consignorsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 export default function ConsignorList() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export default function ConsignorList() {
     [],
   )
 
-  const columns = withAuditColumns([
+  const columns = withAuditColumns(withBranchColumn([
     { key: 'name', label: 'Consignor' },
     { key: 'companyName', label: 'Company', render: (r) => r.companyName || '—' },
     { key: 'city', label: 'City', render: (r) => r.city || '—' },
@@ -24,7 +25,7 @@ export default function ConsignorList() {
     { key: 'gst', label: 'GST' },
     { key: 'defaultFromLocation', label: 'Default From', render: (r) => r.defaultFromLocation || '—' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ])
+  ], { afterKey: 'name' }))
 
   return (
     <ERPListPage

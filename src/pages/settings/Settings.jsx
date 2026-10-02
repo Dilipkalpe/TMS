@@ -9,7 +9,7 @@ import TallyModeToggle from '../../components/keyboard/TallyModeToggle'
 import { usePrint } from '../../context/PrintContext'
 import { settingsApi, authApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
-import { getStoredPrintLogoUrl, resolveCompanyLogoUrl } from '../../utils/printLogo'
+import { getStoredPrintLogoUrl } from '../../utils/printLogo'
 import { Save, Download, Shield, Loader2, Upload, X, ImageIcon, GitBranch, Building2 } from 'lucide-react'
 import { DOCUMENT_FLOW, DOCUMENT_FLOW_LABELS } from '../../hooks/useDocumentFlow'
 import {
@@ -40,6 +40,7 @@ export default function Settings() {
   })
 
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoPreviewSrc, setLogoPreviewSrc] = useState(null)
 
   useEffect(() => {
     settingsApi.get()
@@ -48,6 +49,33 @@ export default function Settings() {
       .finally(() => setLoading(false))
     setNotificationDuration(getNotificationDisplayDurationSeconds())
   }, [])
+
+  // Auth-aware preview (Bearer token) — avoids broken <img> when /uploads isn't publicly routed
+  useEffect(() => {
+    let objectUrl = null
+    let cancelled = false
+    const hasLogo = Boolean(settings?.logoUrl?.trim() || settings?.printLogoUrl?.trim())
+    if (!hasLogo) {
+      setLogoPreviewSrc(null)
+      return undefined
+    }
+    settingsApi.fetchLogoObjectUrl()
+      .then((url) => {
+        if (cancelled) {
+          if (url) URL.revokeObjectURL(url)
+          return
+        }
+        objectUrl = url
+        setLogoPreviewSrc(url)
+      })
+      .catch(() => {
+        if (!cancelled) setLogoPreviewSrc(null)
+      })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [settings?.logoUrl, settings?.printLogoUrl, settings?.updatedAt])
 
   const update = (key, value) => setSettings((s) => ({ ...s, [key]: value }))
 
@@ -91,8 +119,10 @@ export default function Settings() {
       const result = await settingsApi.uploadLogo(file)
       update('logoUrl', result.logoUrl)
       update('printLogoUrl', result.logoUrl)
+      if (result.updatedAt) update('updatedAt', result.updatedAt)
+      try { localStorage.setItem('tms-print-logo-url', result.logoUrl) } catch { /* ignore */ }
       refreshCompany()
-      toast({ title: 'Logo uploaded', message: 'Company logo saved for payslips, LR, and reports.', type: 'success' })
+      toast({ title: 'Logo uploaded', message: 'Company logo saved for payslips, LR, reports, and sidebar.', type: 'success' })
     } catch (err) {
       toast({ title: 'Upload failed', message: err.message, type: 'error' })
     } finally {
@@ -106,14 +136,13 @@ export default function Settings() {
       await settingsApi.deleteLogo()
       update('logoUrl', '')
       update('printLogoUrl', '')
+      try { localStorage.removeItem('tms-print-logo-url') } catch { /* ignore */ }
       refreshCompany()
       toast({ title: 'Logo removed', type: 'success' })
     } catch (err) {
       toast({ title: 'Failed', message: err.message, type: 'error' })
     }
   }
-
-  const logoPreview = resolveCompanyLogoUrl(settings.logoUrl || settings.printLogoUrl)
 
   const updateSecurityField = (key, value) => setSecurityForm((s) => ({ ...s, [key]: value }))
 
@@ -169,8 +198,13 @@ export default function Settings() {
             <p className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-200">Company Logo (Payslips, LR, Reports)</p>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border bg-white p-2">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Company logo" className="max-h-full max-w-full object-contain" />
+                {logoPreviewSrc ? (
+                  <img
+                    src={logoPreviewSrc}
+                    alt="Company logo"
+                    className="max-h-full max-w-full object-contain"
+                    onError={() => setLogoPreviewSrc(null)}
+                  />
                 ) : (
                   <ImageIcon className="h-8 w-8 text-slate-400" />
                 )}

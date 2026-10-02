@@ -278,6 +278,7 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             lrStatus = x.Lr.Status,
             shipmentStatus = x.Delivery.ShipmentStatus,
             createdBy = x.Pass.CreatedBy,
+            branchName = x.Lr.Branch != null ? x.Lr.Branch.Name : null,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         var missingVehicle = pageItems
@@ -309,6 +310,7 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             x.lrCount,
             status = ResolveDispatchListStatus(x.lrStatus, x.shipmentStatus, x.dispatchNo),
             x.createdBy,
+            x.branchName,
         }).ToList();
 
         return Ok(new PagedResult<object>(items, total, pNo, size, hasMore, approx));
@@ -380,6 +382,7 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             expectedDelivery = x.Pass != null ? x.Pass.ExpectedDelivery : null,
             status = "In Transit",
             createdBy = x.Sheet.CreatedBy,
+            branchName = x.Lr.Branch != null ? x.Lr.Branch.Name : null,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
@@ -529,6 +532,7 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
                 && EF.Functions.JsonContains(x.Sheet.ExtendedDataJson, """{"inTransitStatus":"Reached Destination"}""")
                     ? "Ready for Delivery"
                     : x.Sheet.ShipmentStatus,
+            branchName = x.Lr.Branch != null ? x.Lr.Branch.Name : null,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
@@ -601,6 +605,8 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
             outstanding = i.Balance,
             paymentStatus = i.Balance <= 0 ? "Paid" : i.AmountPaid > 0 ? "Partial" : "Unpaid",
             billingStatus = "Billed",
+            branchId = i.BranchId,
+            branchName = i.Branch != null ? i.Branch.Name : null,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));
@@ -669,6 +675,7 @@ public class OperationsModulesController(TmsDbContext db, ITenantContext tenants
                 : x.Expense.Id.ToString(),
             status = x.Expense.Status,
             lrNumber = x.Expense.LrNumber,
+            branchName = x.Lr.Branch != null ? x.Lr.Branch.Name : null,
         }).ToPagedListAsync(pNo, size, includeTotal, ct);
 
         return Ok(new PagedResult<object>(items.Cast<object>().ToList(), total, pNo, size, hasMore, approx));

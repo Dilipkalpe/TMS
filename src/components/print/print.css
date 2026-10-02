@@ -131,6 +131,11 @@
     text-align: center;
   }
 
+  .print-powered-by {
+    font-size: 7.5pt;
+    color: #777;
+  }
+
   /* Template variants T1-T5 */
   .print-variant-T1 { /* Classic - default styles */ }
 

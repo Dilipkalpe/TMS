@@ -1,4 +1,6 @@
 /** TMS module registry — List + Add/Edit routes per business flow (LR master → child transactions). */
+import { withBranchColumn } from '../utils/branchColumns'
+
 export const TMS_MODULES = {
   lr: {
     id: 'lr',
@@ -82,7 +84,7 @@ export const TMS_MODULES = {
   },
 }
 
-export const LOADING_SLIP_COLUMNS = [
+export const LOADING_SLIP_COLUMNS = withBranchColumn([
   { key: 'sheetNumber', label: 'Loading Slip No.' },
   { key: 'loadingDate', label: 'Loading Date', render: (r) => r.loadingDate?.slice?.(0, 16)?.replace('T', ' ') ?? r.loadingDate },
   { key: 'lrNumber', label: 'LR No.' },
@@ -94,9 +96,9 @@ export const LOADING_SLIP_COLUMNS = [
   { key: 'loadingStatus', label: 'Loading Status', badge: true },
   { key: 'verifiedStatus', label: 'Verified', badge: true },
   { key: 'createdBy', label: 'Created By' },
-]
+], { afterKey: 'sheetNumber' })
 
-export const TRANSIT_PASS_COLUMNS = [
+export const TRANSIT_PASS_COLUMNS = withBranchColumn([
   { key: 'passNumber', label: 'Transit Pass No.' },
   { key: 'passDate', label: 'Pass Date' },
   { key: 'lrNumber', label: 'LR No.' },
@@ -106,9 +108,9 @@ export const TRANSIT_PASS_COLUMNS = [
   { key: 'driver', label: 'Driver' },
   { key: 'status', label: 'Status', badge: true },
   { key: 'createdBy', label: 'Created By' },
-]
+], { afterKey: 'passNumber' })
 
-export const DISPATCH_COLUMNS = [
+export const DISPATCH_COLUMNS = withBranchColumn([
   { key: 'transitPassNo', label: 'Transit Pass No.' },
   { key: 'dispatchNo', label: 'Dispatch No.' },
   { key: 'lrNumber', label: 'LR No.' },
@@ -118,9 +120,9 @@ export const DISPATCH_COLUMNS = [
   { key: 'from', label: 'From' },
   { key: 'to', label: 'Destination' },
   { key: 'status', label: 'Status', badge: true },
-]
+], { afterKey: 'dispatchNo' })
 
-export const IN_TRANSIT_COLUMNS = [
+export const IN_TRANSIT_COLUMNS = withBranchColumn([
   { key: 'tripNo', label: 'Trip / Dispatch No.' },
   { key: 'transitPassNo', label: 'Transit Pass' },
   { key: 'lrNumber', label: 'LR No.' },
@@ -130,9 +132,9 @@ export const IN_TRANSIT_COLUMNS = [
   { key: 'to', label: 'Destination' },
   { key: 'dispatchTime', label: 'Dispatch Time' },
   { key: 'status', label: 'Status', badge: true },
-]
+], { afterKey: 'tripNo' })
 
-export const DELIVERY_COLUMNS = [
+export const DELIVERY_COLUMNS = withBranchColumn([
   { key: 'lrNumber', label: 'LR No.' },
   { key: 'tripNo', label: 'Trip No.' },
   { key: 'customer', label: 'Customer' },
@@ -142,9 +144,9 @@ export const DELIVERY_COLUMNS = [
   { key: 'receiverName', label: 'Receiver' },
   { key: 'deliveryStatus', label: 'Delivery Status', badge: true },
   { key: 'podStatus', label: 'POD Status', badge: true },
-]
+], { afterKey: 'lrNumber' })
 
-export const POD_COLUMNS = [
+export const POD_COLUMNS = withBranchColumn([
   { key: 'podNo', label: 'POD No.' },
   { key: 'lrNumber', label: 'LR No.' },
   { key: 'customer', label: 'Customer' },
@@ -155,9 +157,9 @@ export const POD_COLUMNS = [
   { key: 'podStatus', label: 'POD Status', badge: true },
   { key: 'verificationStatus', label: 'Verification', badge: true },
   { key: 'receivedBy', label: 'Received By' },
-]
+], { afterKey: 'podNo' })
 
-export const BILLING_COLUMNS = [
+export const BILLING_COLUMNS = withBranchColumn([
   { key: 'invoiceNo', label: 'Invoice No.' },
   { key: 'invoiceDate', label: 'Invoice Date' },
   { key: 'lrNumber', label: 'LR No.' },
@@ -167,9 +169,9 @@ export const BILLING_COLUMNS = [
   { key: 'totalAmount', label: 'Total (₹)', money: true },
   { key: 'outstanding', label: 'Outstanding (₹)', money: true },
   { key: 'paymentStatus', label: 'Payment', badge: true },
-]
+], { afterKey: 'invoiceNo' })
 
-export const EXPENSE_COLUMNS = [
+export const EXPENSE_COLUMNS = withBranchColumn([
   { key: 'expenseDate', label: 'Expense Date' },
   { key: 'lrNumber', label: 'LR No.' },
   { key: 'tripNo', label: 'Trip / Vehicle' },
@@ -180,7 +182,7 @@ export const EXPENSE_COLUMNS = [
   { key: 'description', label: 'Description' },
   { key: 'amount', label: 'Amount (₹)', money: true },
   { key: 'status', label: 'Status', badge: true },
-]
+], { afterKey: 'expenseDate' })
 
 export const MODULE_COLUMN_MAP = {
   'loading-slips': LOADING_SLIP_COLUMNS,

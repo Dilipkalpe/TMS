@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { brandDocumentTitle } from '../config/brand'
 import { buildErpBreadcrumb } from '../utils/erpBreadcrumb'
 
 const defaultTitle = {
@@ -15,6 +16,13 @@ const PageTitleContext = createContext(null)
 export function PageTitleProvider({ children }) {
   const [pageTitle, setPageTitleState] = useState(defaultTitle)
   const [headerActions, setHeaderActions] = useState({})
+
+  useEffect(() => {
+    const page = pageTitle.title && pageTitle.title !== pageTitle.module
+      ? pageTitle.title
+      : (pageTitle.module || pageTitle.title)
+    document.title = brandDocumentTitle(page)
+  }, [pageTitle.module, pageTitle.title])
 
   const setPageTitle = useCallback((module, title, options = {}) => {
     const resolvedTitle = title || module || 'Overview'

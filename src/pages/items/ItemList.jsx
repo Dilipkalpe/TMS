@@ -6,6 +6,7 @@ import { usePagedApiResource, buildListParams } from '../../hooks/usePagedApiRes
 import { itemsApi } from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { withAuditColumns } from '../../utils/auditColumns'
+import { withBranchColumn } from '../../utils/branchColumns'
 
 export default function ItemList() {
   const navigate = useNavigate()
@@ -16,13 +17,13 @@ export default function ItemList() {
     [],
   )
 
-  const columns = withAuditColumns([
+  const columns = withAuditColumns(withBranchColumn([
     { key: 'name', label: 'Item Name' },
     { key: 'hsn', label: 'HSN', render: (r) => r.hsn || '—' },
     { key: 'defaultPackageType', label: 'Pkg Type', render: (r) => r.defaultPackageType || '—' },
     { key: 'unit', label: 'Unit', render: (r) => r.unit || '—' },
     { key: 'status', label: 'Status', render: (r) => <Badge variant={statusVariant(r.status)}>{r.status}</Badge> },
-  ])
+  ], { afterKey: 'name' }))
 
   return (
     <ERPListPage

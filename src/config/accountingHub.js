@@ -3,6 +3,7 @@ import { hubSection, withHubTheme } from './hubTheme'
 export const accountingCards = withHubTheme([
   { title: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: 'ListTree', description: 'Master list of all ledger accounts' },
   { title: 'Ledger Master', path: '/accounting/ledger-master', icon: 'BookOpen', description: 'Create and manage ledger accounts' },
+  { title: 'Voucher List', path: '/accounting/vouchers', icon: 'FileText', description: 'Search, view, edit and delete vouchers' },
   { title: 'Voucher Entry', path: '/accounting/voucher-entry', icon: 'FilePlus', description: 'Record journal, receipt and payment vouchers' },
   { title: 'Ledger Report', path: '/accounting/ledger-report', icon: 'ScrollText', description: 'Account-wise transaction ledger' },
   { title: 'Customer Ledger', path: '/accounting/customer-ledger', icon: 'Users', description: 'Customer account statements' },
@@ -47,6 +48,7 @@ export const accountingHubSections = [
   hubSection('Masters & entry', 'Account structure and voucher posting', pick(
     '/accounting/chart-of-accounts',
     '/accounting/ledger-master',
+    '/accounting/vouchers',
     '/accounting/voucher-entry',
   ), { chip: 'Entry' }),
   hubSection('Ledgers', 'Party and asset ledgers', pick(

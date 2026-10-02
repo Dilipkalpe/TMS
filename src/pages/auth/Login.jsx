@@ -14,7 +14,9 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import LoginBackground from '../../components/auth/LoginBackground'
 import ApiStatusIndicator from '../../components/auth/ApiStatusIndicator'
+import BrandLogo from '../../components/brand/BrandLogo'
 import Button from '../../components/ui/Button'
+import { BRAND, brandCopyright } from '../../config/brand'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -43,17 +45,8 @@ export default function Login() {
     <div className="login-page relative flex min-h-screen flex-col overflow-auto">
       <LoginBackground />
 
-      {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-4 py-4 sm:px-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark shadow-lg shadow-primary/30 ring-2 ring-accent/30">
-            <Truck className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <p className="text-lg font-bold text-slate-800 dark:text-white">TMS Pro</p>
-            <p className="text-xs font-medium text-primary">Transport · Freight · Fleet ERP</p>
-          </div>
-        </div>
+        <BrandLogo variant="theme" imgClassName="h-9 w-auto max-h-10 sm:h-10" />
         <div className="hidden items-center gap-6 text-sm text-slate-600 dark:text-slate-400 md:flex">
           <span className="flex items-center gap-1.5">
             <Route className="h-4 w-4 text-primary" />
@@ -66,19 +59,18 @@ export default function Login() {
         </div>
       </header>
 
-      {/* Center card */}
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6">
         <div className="w-full max-w-[420px] animate-fade-in">
           <div className="overflow-hidden rounded-2xl border border-white/60 bg-white/85 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-900/90">
-            {/* Card accent strip */}
             <div className="h-1.5 bg-gradient-to-r from-primary via-accent to-primary" />
 
             <div className="p-6 sm:p-8">
-              <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Sign in to TMS</h1>
-                <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-                  Fleet, freight & accounting in one place
-                </p>
+              <div className="mb-6 flex justify-center">
+                <h1 className="sr-only">{BRAND.productName}</h1>
+                <BrandLogo
+                  variant="hero"
+                  imgClassName="h-12 w-auto max-w-[260px] sm:h-14 sm:max-w-[300px]"
+                />
               </div>
 
               {error && (
@@ -169,7 +161,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Feature chips */}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {[
               { icon: Truck, label: 'Fleet Mgmt' },
@@ -188,10 +179,19 @@ export default function Login() {
         </div>
       </main>
 
-      <footer className="relative z-10 px-4 py-4 text-center text-xs text-slate-500 dark:text-slate-500">
-        © 2026 TMS Pro · Enterprise Transport Management · India
-        {' · '}
-        <Link to="/portal/login" className="text-primary hover:underline">Customer portal</Link>
+      <footer className="relative z-10 space-y-1 px-4 py-4 text-center text-xs text-slate-500 dark:text-slate-500">
+        <p>
+          Powered by {BRAND.companyName}
+          {' · '}
+          <a href={BRAND.websiteUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+            {BRAND.website}
+          </a>
+        </p>
+        <p className="text-[10px] text-slate-400">
+          {brandCopyright()}
+          {' · '}
+          <Link to="/portal/login" className="text-primary hover:underline">Customer portal</Link>
+        </p>
       </footer>
     </div>
   )

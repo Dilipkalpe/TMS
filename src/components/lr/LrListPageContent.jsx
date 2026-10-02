@@ -28,6 +28,7 @@ import {
 } from '../../utils/lrDisplayHelpers'
 import { clearLrFilterKeys } from '../../utils/lrListFilterUtils'
 import { formatCurrency } from '../ui/ReportFilters'
+import { withBranchColumn } from '../../utils/branchColumns'
 import { exportToCsv } from '../../utils/export'
 import { usePrint } from '../../context/PrintContext'
 import { useToast } from '../../context/ToastContext'
@@ -73,7 +74,7 @@ const EMPTY_FILTERS = {
   freightType: '(All)',
 }
 
-const EXPORT_COLUMNS = [
+const EXPORT_COLUMNS = withBranchColumn([
   { key: 'lrNumber', label: 'LR No' },
   { key: 'lrDate', label: 'Date' },
   { key: 'customer', label: 'Customer' },
@@ -87,7 +88,7 @@ const EXPORT_COLUMNS = [
   { key: 'billingStatus', label: 'Billing Status' },
   { key: 'podStatus', label: 'POD Status' },
   { key: 'amount', label: 'Amount' },
-]
+], { afterKey: 'lrNumber' })
 
 function buildFilterSearch(filters) {
   return [filters.lrNo, filters.customer, filters.consignee, filters.fromCity, filters.toCity, filters.vehicle]
@@ -115,6 +116,7 @@ function mapExportRow(r) {
   const pkg = parsePackagesWeight(r.quantity)
   return {
     lrNumber: r.lrNumber,
+    branchName: r.branchName || r.branch || '',
     lrDate: formatLrDate(r.lrDate),
     customer: r.customerName || r.consignor || '',
     consignee: r.consignee || '',
@@ -350,7 +352,7 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
     [appliedFilters],
   )
 
-  const columns = useMemo(() => [
+  const columns = useMemo(() => withBranchColumn([
     {
       key: 'lrNumber',
       label: 'LR No',
@@ -397,7 +399,7 @@ export default function LrListPageContent({ embedded = false, onChanged }) {
       },
     },
     { key: 'amount', label: 'Amount (₹)', render: (r) => formatCurrency(lrTotalAmount(r)) },
-  ], [navigate])
+  ], { afterKey: 'lrNumber' }), [navigate])
 
   const tableToolbar = (
     <LrListTableToolbar

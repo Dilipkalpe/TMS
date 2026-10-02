@@ -10,13 +10,14 @@ import {
   MapPin,
   Package,
   Phone,
-  Truck,
   User,
 } from 'lucide-react'
 import LoginBackground from '../../components/auth/LoginBackground'
+import BrandLogo from '../../components/brand/BrandLogo'
 import Button from '../../components/ui/Button'
 import { portalApi } from '../../services/api'
 import { usePortalAuth } from '../../context/PortalAuthContext'
+import { BRAND, brandCopyright } from '../../config/brand'
 
 const FALLBACK_DEMOS = [
   { branchCode: 'HO-MUM', branchName: 'Head Office — Mumbai', customerName: 'Reliance Logistics', phone: '9820012345', pin: '123456', sampleBooking: 'BK-1042' },
@@ -89,14 +90,9 @@ export default function PortalLogin() {
       <LoginBackground />
 
       <header className="relative z-10 flex items-center justify-between px-4 py-4 sm:px-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark shadow-lg ring-2 ring-accent/30">
-            <Truck className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <p className="text-lg font-bold text-slate-800 dark:text-white">TMS Pro</p>
-            <p className="text-xs font-medium text-primary">Customer Tracking Portal</p>
-          </div>
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandLogo variant="theme" imgClassName="h-9 w-auto max-h-10 sm:h-10" />
+          <p className="truncate text-sm font-semibold text-primary">Customer Tracking Portal</p>
         </div>
         <Link to="/login" className="text-sm font-medium text-primary hover:underline">Staff login</Link>
       </header>
@@ -263,8 +259,13 @@ export default function PortalLogin() {
         </div>
       </main>
 
-      <footer className="relative z-10 px-4 py-4 text-center text-xs text-slate-500">
-        © 2026 TMS Pro · Secure customer portal · Powered by GPS & notifications
+      <footer className="relative z-10 space-y-1 px-4 py-4 text-center text-xs text-slate-500">
+        <p>
+          Powered by {BRAND.companyName}
+          {' · '}
+          <a href={BRAND.websiteUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">{BRAND.website}</a>
+        </p>
+        <p className="text-[10px] text-slate-400">{brandCopyright()} · Secure customer portal</p>
       </footer>
     </div>
   )

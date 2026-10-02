@@ -174,20 +174,102 @@ public class GlAccountingController(
     }
 
     [HttpGet("vouchers")]
-    public async Task<ActionResult<object>> ListVouchers([FromQuery] string? status, [FromQuery] string? from, [FromQuery] string? to)
+    public async Task<ActionResult<object>> ListVouchers(
+        [FromQuery] string? status,
+        [FromQuery] string? from,
+        [FromQuery] string? to,
+        [FromQuery] string? search,
+        [FromQuery] string? voucherType,
+        [FromQuery] Guid? ledgerId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = QueryExtensions.DefaultPageSize,
+        [FromQuery] bool includeTotal = true)
     {
         var q = db.Vouchers.AsNoTracking().Where(v => v.CompanyId == CompanyId);
-        if (!string.IsNullOrWhiteSpace(status)) q = q.Where(v => v.Status == status);
+        // Active list excludes reversed unless a specific status is requested
+        if (!string.IsNullOrWhiteSpace(status) && status != "(All)")
+            q = q.Where(v => v.Status == status);
+        else
+            q = q.Where(v => v.Status != VoucherStatuses.Reversed);
+
         if (DateOnly.TryParse(from, out var f)) q = q.Where(v => (v.PostingDate ?? v.VoucherDate) >= f);
         if (DateOnly.TryParse(to, out var t)) q = q.Where(v => (v.PostingDate ?? v.VoucherDate) <= t);
-        var rows = await q.OrderByDescending(v => v.PostingDate ?? v.VoucherDate).Take(500)
-            .Select(v => new
+        if (!string.IsNullOrWhiteSpace(voucherType) && voucherType != "(All)")
+        {
+            var vt = voucherType.Replace(" Voucher", "", StringComparison.OrdinalIgnoreCase).Trim();
+            q = q.Where(v => v.VoucherType == voucherType || v.VoucherType == vt);
+        }
+        if (ledgerId != null)
+            q = q.Where(v => v.Lines.Any(l => l.LedgerAccountId == ledgerId));
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLowerInvariant();
+            q = q.Where(v =>
+                v.VoucherNo.ToLower().Contains(s) ||
+                (v.Narration != null && v.Narration.ToLower().Contains(s)) ||
+                (v.ReferenceNo != null && v.ReferenceNo.ToLower().Contains(s)) ||
+                (v.PartyName != null && v.PartyName.ToLower().Contains(s)) ||
+                v.Lines.Any(l => l.LedgerName != null && l.LedgerName.ToLower().Contains(s)));
+        }
+
+        q = q.OrderByDescending(v => v.PostingDate ?? v.VoucherDate).ThenByDescending(v => v.CreatedAt);
+        var (p, size) = QueryExtensions.NormalizePaging(page, pageSize);
+        var (items, total, hasMore, approx) = await q.ToPagedListAsync(p, size, includeTotal);
+
+        var ids = items.Select(v => v.Id).ToList();
+        var lineRows = ids.Count == 0
+            ? []
+            : await db.VoucherLines.AsNoTracking()
+                .Where(l => ids.Contains(l.VoucherId))
+                .Select(l => new { l.VoucherId, l.LedgerName, l.Debit, l.Credit, l.LineNo })
+                .ToListAsync();
+        var aggMap = lineRows.GroupBy(l => l.VoucherId).ToDictionary(
+            g => g.Key,
+            g =>
             {
-                v.Id, v.VoucherNo, v.VoucherType, v.Status, v.PartyName, v.TotalAmount, v.Narration, v.ReferenceNo,
+                var ordered = g.OrderBy(x => x.LineNo).ToList();
+                return new
+                {
+                    TotalDebit = ordered.Sum(x => x.Debit),
+                    TotalCredit = ordered.Sum(x => x.Credit),
+                    AccountSummary = string.Join(" / ", ordered.Select(x => x.LedgerName).Where(n => !string.IsNullOrWhiteSpace(n)).Take(4)),
+                };
+            });
+        var branchIds = items.Where(v => v.BranchId != null).Select(v => v.BranchId!.Value).Distinct().ToList();
+        var branchMap = branchIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await db.Branches.AsNoTracking().Where(b => branchIds.Contains(b.Id)).ToDictionaryAsync(b => b.Id, b => b.Name);
+
+        var rows = items.Select(v =>
+        {
+            aggMap.TryGetValue(v.Id, out var agg);
+            return (object)new
+            {
+                v.Id,
+                v.VoucherNo,
+                voucherDate = (v.PostingDate ?? v.VoucherDate).ToString("yyyy-MM-dd"),
                 date = (v.PostingDate ?? v.VoucherDate).ToString("yyyy-MM-dd"),
-                v.SourceType, v.SourceId, v.CreatedBy, v.ApprovedBy,
-            }).ToListAsync();
-        return Ok(rows);
+                v.VoucherType,
+                v.ReferenceNo,
+                account = agg?.AccountSummary,
+                ledger = agg?.AccountSummary,
+                v.Narration,
+                totalDebit = agg?.TotalDebit ?? v.TotalAmount,
+                totalCredit = agg?.TotalCredit ?? v.TotalAmount,
+                v.TotalAmount,
+                v.Status,
+                v.PartyName,
+                v.SourceType,
+                v.SourceId,
+                v.CreatedBy,
+                createdAt = v.CreatedAt,
+                createdDate = v.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+                branchId = v.BranchId,
+                branchName = v.BranchId != null && branchMap.TryGetValue(v.BranchId.Value, out var bn) ? bn : null,
+            };
+        }).ToList();
+
+        return Ok(new PagedResult<object>(rows, total, p, size, hasMore, approx));
     }
 
     [HttpGet("vouchers/{id:guid}")]
@@ -196,16 +278,99 @@ public class GlAccountingController(
         var v = await db.Vouchers.AsNoTracking().Include(x => x.Lines)
             .FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == CompanyId);
         if (v == null) return NotFound();
+        var totalDebit = v.Lines.Sum(l => l.Debit);
+        var totalCredit = v.Lines.Sum(l => l.Credit);
+        string? branchName = null;
+        if (v.BranchId != null)
+            branchName = await db.Branches.AsNoTracking().Where(b => b.Id == v.BranchId).Select(b => b.Name).FirstOrDefaultAsync();
         return Ok(new
         {
-            v.Id, v.VoucherNo, v.VoucherType, v.Status, v.PartyName, v.Mode, v.Narration, v.ReferenceNo, v.TotalAmount,
+            v.Id,
+            v.VoucherNo,
+            v.VoucherType,
+            v.Status,
+            v.PartyName,
+            v.Mode,
+            v.Narration,
+            v.ReferenceNo,
+            v.TotalAmount,
+            totalDebit,
+            totalCredit,
+            difference = Math.Round(totalDebit - totalCredit, 2),
             date = (v.PostingDate ?? v.VoucherDate).ToString("yyyy-MM-dd"),
-            v.CreatedBy, v.ApprovedBy, v.SourceType, v.SourceId,
+            voucherDate = (v.PostingDate ?? v.VoucherDate).ToString("yyyy-MM-dd"),
+            v.CreatedBy,
+            v.ApprovedBy,
+            v.SourceType,
+            v.SourceId,
+            v.BranchId,
+            branchName,
+            createdAt = v.CreatedAt,
+            createdDate = v.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+            financialYearId = v.FinancialYearId,
             lines = v.Lines.OrderBy(l => l.LineNo).Select(l => new
             {
-                l.LedgerAccountId, l.LedgerName, l.Debit, l.Credit, l.LineNarration, l.PartyType, l.PartyId,
+                l.Id,
+                l.LedgerAccountId,
+                l.LedgerName,
+                description = l.LineNarration,
+                l.Debit,
+                l.Credit,
+                l.LineNarration,
+                l.PartyType,
+                l.PartyId,
+                l.LineNo,
             }),
         });
+    }
+
+    [HttpPut("vouchers/{id:guid}")]
+    public async Task<ActionResult<object>> UpdateVoucher(Guid id, [FromBody] Dictionary<string, object?> body)
+    {
+        try
+        {
+            var existing = await db.Vouchers.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id && v.CompanyId == CompanyId);
+            if (existing == null) return NotFound();
+            var request = ParsePostingRequest(body, existing.VoucherType);
+            Voucher v;
+            if (existing.Status == VoucherStatuses.Draft)
+                v = await engine.UpdateDraftAsync(id, request);
+            else if (existing.Status == VoucherStatuses.Posted)
+                v = await engine.UpdatePostedAsync(id, request);
+            else
+                return BadRequest(new ApiError("Reversed vouchers cannot be edited."));
+            return Ok(new { v.Id, v.VoucherNo, v.Status, message = "Voucher updated." });
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiError(ex.Message)); }
+    }
+
+    [HttpDelete("vouchers/{id:guid}")]
+    public async Task<ActionResult<object>> DeleteVoucher(Guid id, [FromBody] Dictionary<string, object?>? body)
+    {
+        try
+        {
+            var existing = await db.Vouchers.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id && v.CompanyId == CompanyId);
+            if (existing == null) return NotFound();
+            if (existing.Status == VoucherStatuses.Reversed)
+                return BadRequest(new ApiError("This voucher is already reversed/cancelled."));
+
+            if (existing.Status == VoucherStatuses.Draft)
+            {
+                await engine.DeleteDraftAsync(id, User.Identity?.Name);
+                return Ok(new { message = "Draft voucher deleted.", id });
+            }
+
+            // POSTED — soft cancel via reverse (engine) or legacy soft-cancel
+            if (existing.FinancialYearId != null)
+            {
+                var rev = await engine.ReverseAsync(id, body?.GetValueOrDefault("remarks")?.ToString() ?? "Deleted from voucher list", User.Identity?.Name);
+                return Ok(new { message = "Voucher reversed (soft delete).", id, reversalVoucherId = rev.Id, reversalVoucherNo = rev.VoucherNo, status = VoucherStatuses.Reversed });
+            }
+
+            await engine.SoftCancelLegacyAsync(id, body?.GetValueOrDefault("remarks")?.ToString() ?? "Deleted from voucher list", User.Identity?.Name);
+            return Ok(new { message = "Voucher cancelled.", id, status = VoucherStatuses.Reversed });
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiError(ex.Message)); }
     }
 
     [HttpPost("vouchers/{id:guid}/post")]
@@ -224,10 +389,75 @@ public class GlAccountingController(
     {
         try
         {
+            var existing = await db.Vouchers.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id && v.CompanyId == CompanyId);
+            if (existing == null) return NotFound();
+            if (existing.FinancialYearId == null)
+            {
+                await engine.SoftCancelLegacyAsync(id, body?.GetValueOrDefault("remarks")?.ToString(), User.Identity?.Name);
+                return Ok(new { existing.Id, existing.VoucherNo, Status = VoucherStatuses.Reversed });
+            }
             var v = await engine.ReverseAsync(id, body?.GetValueOrDefault("remarks")?.ToString(), User.Identity?.Name);
             return Ok(new { v.Id, v.VoucherNo, v.Status });
         }
         catch (InvalidOperationException ex) { return BadRequest(new ApiError(ex.Message)); }
+    }
+
+    PostingRequest ParsePostingRequest(Dictionary<string, object?> body, string fallbackType)
+    {
+        var date = DateOnly.TryParse(body.GetValueOrDefault("transactionDate")?.ToString()
+            ?? body.GetValueOrDefault("date")?.ToString(), out var d)
+            ? d : DateOnly.FromDateTime(DateTime.UtcNow);
+        var lines = new List<PostingLine>();
+        var linesRaw = body.GetValueOrDefault("lines");
+        if (linesRaw is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var item in je.EnumerateArray())
+            {
+                var lid = Guid.Parse(item.GetProperty("ledgerAccountId").GetString()!);
+                var debit = item.TryGetProperty("debit", out var dbEl) ? dbEl.GetDecimal() : 0;
+                var credit = item.TryGetProperty("credit", out var crEl) ? crEl.GetDecimal() : 0;
+                var name = item.TryGetProperty("ledgerName", out var n) ? n.GetString() : "";
+                var narr = item.TryGetProperty("narration", out var nr) ? nr.GetString()
+                    : item.TryGetProperty("lineNarration", out var ln) ? ln.GetString() : null;
+                lines.Add(new PostingLine(lid, name ?? "", debit, credit, narr));
+            }
+        }
+        else
+        {
+            // Simple 2-line voucher (Voucher Entry form)
+            var amount = decimal.TryParse(body.GetValueOrDefault("amount")?.ToString(), out var a) ? a : 0;
+            if (!Guid.TryParse(body.GetValueOrDefault("debitLedgerId")?.ToString(), out var debitId))
+                throw new InvalidOperationException("Debit ledger is required.");
+            if (!Guid.TryParse(body.GetValueOrDefault("creditLedgerId")?.ToString(), out var creditId))
+                throw new InvalidOperationException("Credit ledger is required.");
+            if (amount <= 0)
+                throw new InvalidOperationException("Amount must be greater than zero.");
+            if (debitId == creditId)
+                throw new InvalidOperationException("Debit and credit ledgers must be different.");
+            var debitName = body.GetValueOrDefault("debitLedger")?.ToString() ?? "";
+            var creditName = body.GetValueOrDefault("creditLedger")?.ToString() ?? "";
+            var narr = body.GetValueOrDefault("narration")?.ToString();
+            lines.Add(new PostingLine(debitId, debitName, amount, 0, narr));
+            lines.Add(new PostingLine(creditId, creditName, 0, amount, narr));
+        }
+
+        AccountingPostingEngine.ValidateBalanced(lines);
+        var type = body.GetValueOrDefault("voucherType")?.ToString()?.Replace(" Voucher", "") ?? fallbackType;
+        return new PostingRequest(
+            type,
+            date,
+            date,
+            body.GetValueOrDefault("partyName")?.ToString(),
+            body.GetValueOrDefault("mode")?.ToString(),
+            body.GetValueOrDefault("narration")?.ToString(),
+            body.GetValueOrDefault("referenceNo")?.ToString(),
+            body.GetValueOrDefault("sourceType")?.ToString(),
+            body.GetValueOrDefault("sourceId")?.ToString(),
+            branches.AssignBranchId,
+            Guid.TryParse(body.GetValueOrDefault("costCentreId")?.ToString(), out var cc) ? cc : null,
+            lines,
+            User.Identity?.Name,
+            false);
     }
 
     [HttpGet("reports/trial-balance")]
@@ -273,13 +503,18 @@ public class GlAccountingController(
     // Vendor bills
     [HttpGet("vendor-bills")]
     public async Task<ActionResult<object>> VendorBills() =>
-        Ok(await db.VendorBills.AsNoTracking().Where(b => b.CompanyId == CompanyId)
-            .OrderByDescending(b => b.BillDate).Take(500)
-            .Select(b => new
+        Ok(await (
+            from bill in db.VendorBills.AsNoTracking().Where(b => b.CompanyId == CompanyId)
+            join br in db.Branches.AsNoTracking() on bill.BranchId equals br.Id into bj
+            from br in bj.DefaultIfEmpty()
+            orderby bill.BillDate descending
+            select new
             {
-                b.Id, b.BillNo, billDate = b.BillDate.ToString("yyyy-MM-dd"), b.VendorId, b.VendorName,
-                b.TaxableAmount, b.TotalAmount, b.AmountPaid, b.Balance, b.Status, b.TdsAmount,
-            }).ToListAsync());
+                bill.Id, bill.BillNo, billDate = bill.BillDate.ToString("yyyy-MM-dd"), bill.VendorId, bill.VendorName,
+                bill.TaxableAmount, bill.TotalAmount, bill.AmountPaid, bill.Balance, bill.Status, bill.TdsAmount,
+                branchId = bill.BranchId,
+                branchName = br != null ? br.Name : null,
+            }).Take(500).ToListAsync());
 
     [HttpPost("vendor-bills")]
     public async Task<ActionResult<object>> CreateVendorBill([FromBody] Dictionary<string, object?> body)

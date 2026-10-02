@@ -17,7 +17,7 @@ public class CustomerPortalController(TmsDbContext db, ITenantContext tenants, I
 
     [HttpGet("shipments")]
     public async Task<IActionResult> Shipments() =>
-        Ok(await ScopedBookings().OrderByDescending(b => b.BookingDate).Take(100)
+        Ok(await ScopedBookings().Include(b => b.Branch).OrderByDescending(b => b.BookingDate).Take(100)
             .Select(b => new
             {
                 id = b.Id,
@@ -28,6 +28,8 @@ public class CustomerPortalController(TmsDbContext db, ITenantContext tenants, I
                 customer = new { name = b.CustomerName },
                 freightAmount = b.Freight,
                 bookedAt = b.BookingDate,
+                branchId = b.BranchId,
+                branchName = b.Branch != null ? b.Branch.Name : null,
             }).ToListAsync());
 
     public record PortalBooking(string Origin, string Destination, string CustomerName, decimal FreightAmount, string? Material, string? CustomerId = null);
@@ -101,7 +103,7 @@ public class ShipmentsController(TmsDbContext db, ITenantContext tenants, IBranc
 {
     [HttpGet]
     public async Task<IActionResult> List() =>
-        Ok(await tenants.Filter(branches.Filter(db.Bookings.AsQueryable()))
+        Ok(await tenants.Filter(branches.Filter(db.Bookings.AsQueryable().Include(b => b.Branch)))
             .OrderByDescending(b => b.BookingDate).Take(100)
             .Select(b => new
             {
@@ -109,6 +111,8 @@ public class ShipmentsController(TmsDbContext db, ITenantContext tenants, IBranc
                 origin = b.FromCity, destination = b.ToCity,
                 customer = new { name = b.CustomerName },
                 freightAmount = b.Freight, bookedAt = b.BookingDate,
+                branchId = b.BranchId,
+                branchName = b.Branch != null ? b.Branch.Name : null,
             }).ToListAsync());
 
     [HttpGet("{id}/track")]
@@ -374,9 +378,12 @@ public class FinanceController(TmsDbContext db, ITenantContext tenants, IBranchC
     }
 
     [HttpGet("expenses")]
-    public async Task<IActionResult> Expenses() =>
-        Ok(await tenants.Filter(branches.Filter(db.Expenses.AsQueryable()))
-            .OrderByDescending(e => e.ExpenseDate).Take(100).ToListAsync());
+    public async Task<IActionResult> Expenses()
+    {
+        var rows = await tenants.Filter(branches.Filter(db.Expenses.AsNoTracking().Include(e => e.Branch)))
+            .OrderByDescending(e => e.ExpenseDate).Take(100).ToListAsync();
+        return Ok(rows.Select(e => EntityMappers.ToDto(e)).ToList());
+    }
 
     [HttpGet("summary")]
     public async Task<IActionResult> Summary()

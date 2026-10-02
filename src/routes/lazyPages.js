@@ -67,6 +67,7 @@ export const DocumentNumberingPage = lazy(() => import('../pages/settings/Docume
 export const FieldConfigurationPage = lazy(() => import('../pages/settings/FieldConfigurationPage'))
 export const PrintTemplateSettingsPage = lazy(() => import('../pages/settings/PrintTemplateSettingsPage'))
 export const LabelTemplatesSettingsPage = lazy(() => import('../pages/settings/LabelTemplatesSettingsPage'))
+export const AboutSystemPage = lazy(() => import('../pages/settings/AboutSystemPage'))
 export const NotificationSettings = lazy(() => import('../pages/settings/NotificationSettings'))
 
 // Portal
@@ -89,6 +90,8 @@ export const ChartOfAccounts = lazy(() => import('../pages/accounting/ChartOfAcc
 export const LedgerMaster = lazy(() => import('../pages/accounting/LedgerMaster'))
 export const NewLedger = lazy(() => import('../pages/accounting/NewLedger'))
 export const VoucherEntry = lazy(() => import('../pages/accounting/VoucherEntry'))
+export const VoucherList = lazy(() => import('../pages/accounting/VoucherList'))
+export const VoucherDetail = lazy(() => import('../pages/accounting/VoucherDetail'))
 export const LedgerReport = lazy(() => import('../pages/accounting/LedgerReport'))
 export const CustomerLedgerReport = lazy(() => import('../pages/accounting/CustomerLedgerReport'))
 export const VendorLedgerReport = lazy(() => import('../pages/accounting/VendorLedgerReport'))
