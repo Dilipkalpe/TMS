@@ -210,44 +210,80 @@ public static class IdGenerator
 
     public static async Task<string> NextCustomerId(Data.TmsDbContext db)
     {
-        var count = await db.Customers.CountAsync();
-        return $"C-{(count + 1):D3}";
+        // PK is global (customers_pkey). Never use Count()+1 — gaps/deletes cause 23505 duplicates.
+        const string prefix = "C-";
+        var ids = await db.Customers.AsNoTracking()
+            .Where(c => c.Id.StartsWith(prefix))
+            .Select(c => c.Id)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(ids, prefix, 0);
+        return $"{prefix}{(max + 1):D3}";
     }
 
     public static async Task<string> NextVendorId(Data.TmsDbContext db)
     {
-        var count = await db.Vendors.CountAsync();
-        return $"VN-{(count + 1):D3}";
+        const string prefix = "VN-";
+        var ids = await db.Vendors.AsNoTracking()
+            .Where(v => v.Id.StartsWith(prefix))
+            .Select(v => v.Id)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(ids, prefix, 0);
+        return $"{prefix}{(max + 1):D3}";
     }
 
     public static async Task<string> NextDriverId(Data.TmsDbContext db)
     {
-        var count = await db.Drivers.CountAsync();
-        return $"D-{(count + 1):D3}";
+        const string prefix = "D-";
+        var ids = await db.Drivers.AsNoTracking()
+            .Where(d => d.Id.StartsWith(prefix))
+            .Select(d => d.Id)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(ids, prefix, 0);
+        return $"{prefix}{(max + 1):D3}";
     }
 
     public static async Task<string> NextVehicleId(Data.TmsDbContext db)
     {
-        var count = await db.Vehicles.CountAsync();
-        return $"V-{(count + 1):D3}";
+        const string prefix = "V-";
+        var ids = await db.Vehicles.AsNoTracking()
+            .Where(v => v.Id.StartsWith(prefix))
+            .Select(v => v.Id)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(ids, prefix, 0);
+        return $"{prefix}{(max + 1):D3}";
     }
 
     public static async Task<string> NextConsignorId(Data.TmsDbContext db)
     {
-        var count = await db.Consignors.CountAsync();
-        return $"CR-{(count + 1):D3}";
+        const string prefix = "CR-";
+        var ids = await db.Consignors.AsNoTracking()
+            .Where(c => c.Id.StartsWith(prefix))
+            .Select(c => c.Id)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(ids, prefix, 0);
+        return $"{prefix}{(max + 1):D3}";
     }
 
     public static async Task<string> NextConsigneeId(Data.TmsDbContext db)
     {
-        var count = await db.Consignees.CountAsync();
-        return $"CE-{(count + 1):D3}";
+        const string prefix = "CE-";
+        var ids = await db.Consignees.AsNoTracking()
+            .Where(c => c.Id.StartsWith(prefix))
+            .Select(c => c.Id)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(ids, prefix, 0);
+        return $"{prefix}{(max + 1):D3}";
     }
 
     public static async Task<string> NextItemId(Data.TmsDbContext db)
     {
-        var count = await db.Items.CountAsync();
-        return $"IT-{(count + 1):D4}";
+        const string prefix = "IT-";
+        var ids = await db.Items.AsNoTracking()
+            .Where(i => i.Id.StartsWith(prefix))
+            .Select(i => i.Id)
+            .ToListAsync();
+        var max = MaxNumericSuffixFromIds(ids, prefix, 0);
+        return $"{prefix}{(max + 1):D4}";
     }
 
     public static async Task<string> NextQuoteNo(Data.TmsDbContext db)

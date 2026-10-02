@@ -245,29 +245,42 @@ public class CustomersController(TmsDbContext db, IBranchContext branches, ITena
     [HttpPost]
     public async Task<ActionResult<CustomerDto>> Create([FromBody] Dictionary<string, object?> body)
     {
-        var id = await IdGenerator.NextCustomerId(db);
-        var c = new Customer
+        // Retry if a concurrent create races on the same generated id (customers_pkey).
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            Id = id,
-            Name = body.GetValueOrDefault("name")?.ToString() ?? "",
-            Contact = body.GetValueOrDefault("contact")?.ToString(),
-            Phone = body.GetValueOrDefault("phone")?.ToString(),
-            Email = body.GetValueOrDefault("email")?.ToString(),
-            Gst = body.GetValueOrDefault("gst")?.ToString(),
-            Pan = body.GetValueOrDefault("pan")?.ToString()?.Trim().ToUpperInvariant(),
-            Address = body.GetValueOrDefault("address")?.ToString(),
-            CreditLimit = decimal.TryParse(body.GetValueOrDefault("creditLimit")?.ToString(), out var cl) ? cl : 0,
-            TdsApplicable = body.GetValueOrDefault("tdsApplicable")?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
-                || body.GetValueOrDefault("tdsApplicable") is bool tba && tba,
-            DefaultTdsSectionId = Guid.TryParse(body.GetValueOrDefault("defaultTdsSectionId")?.ToString(), out var cts) ? cts : null,
-            BranchId = branches.AssignBranchId,
-            CompanyId = TenantScope.ResolveCompanyId(tenants),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-        db.Customers.Add(c);
-        await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(c));
+            var id = await IdGenerator.NextCustomerId(db);
+            var c = new Customer
+            {
+                Id = id,
+                Name = body.GetValueOrDefault("name")?.ToString() ?? "",
+                Contact = body.GetValueOrDefault("contact")?.ToString(),
+                Phone = body.GetValueOrDefault("phone")?.ToString(),
+                Email = body.GetValueOrDefault("email")?.ToString(),
+                Gst = body.GetValueOrDefault("gst")?.ToString(),
+                Pan = body.GetValueOrDefault("pan")?.ToString()?.Trim().ToUpperInvariant(),
+                Address = body.GetValueOrDefault("address")?.ToString(),
+                CreditLimit = decimal.TryParse(body.GetValueOrDefault("creditLimit")?.ToString(), out var cl) ? cl : 0,
+                TdsApplicable = body.GetValueOrDefault("tdsApplicable")?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
+                    || body.GetValueOrDefault("tdsApplicable") is bool tba && tba,
+                DefaultTdsSectionId = Guid.TryParse(body.GetValueOrDefault("defaultTdsSectionId")?.ToString(), out var cts) ? cts : null,
+                BranchId = branches.AssignBranchId,
+                CompanyId = TenantScope.ResolveCompanyId(tenants),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            db.Customers.Add(c);
+            try
+            {
+                await db.SaveChangesAsync();
+                return CreatedAtAction(nameof(Get), new { id }, EntityMappers.ToDto(c));
+            }
+            catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("customers_pkey", StringComparison.OrdinalIgnoreCase) == true
+                || ex.InnerException?.Message?.Contains("23505", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                db.Entry(c).State = EntityState.Detached;
+            }
+        }
+        return Conflict(new { message = "Could not allocate a unique customer id. Please retry." });
     }
 
     [HttpPut("{id}")]
