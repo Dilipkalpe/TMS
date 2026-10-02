@@ -574,6 +574,8 @@ public class TmsDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.ReversalOfVoucherId).HasColumnName("reversal_of_voucher_id");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            // Multi-tenant: voucher numbers are unique per company (not globally).
+            e.HasIndex(x => new { x.CompanyId, x.VoucherNo }).IsUnique();
             e.HasMany(x => x.Lines).WithOne(x => x.Voucher!).HasForeignKey(x => x.VoucherId);
         });
 

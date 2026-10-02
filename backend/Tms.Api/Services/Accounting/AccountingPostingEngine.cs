@@ -494,7 +494,31 @@ public class AccountingPostingEngine(
             "CONTRA" => "CV",
             _ => "VX",
         };
-        var count = await db.Vouchers.CountAsync(v => v.CompanyId == CompanyId && v.VoucherType == voucherType, ct) + 1;
-        return $"{prefix}-{date:yyyyMM}-{count:D5}";
+        var stem = $"{prefix}-{date:yyyyMM}-";
+
+        // Allocate per-company, then ensure global uniqueness (legacy DB had a global voucher_no unique key).
+        var existing = await db.Vouchers.AsNoTracking()
+            .Where(v => v.CompanyId == CompanyId && v.VoucherNo.StartsWith(stem))
+            .Select(v => v.VoucherNo)
+            .ToListAsync(ct);
+        var next = 1;
+        foreach (var no in existing)
+        {
+            var suffix = no.Length > stem.Length ? no[stem.Length..] : "";
+            if (int.TryParse(suffix, out var n) && n >= next)
+                next = n + 1;
+        }
+
+        for (var attempt = 0; attempt < 25; attempt++)
+        {
+            var candidate = $"{stem}{next:D5}";
+            var taken = await db.Vouchers.AsNoTracking().AnyAsync(v => v.VoucherNo == candidate, ct);
+            if (!taken)
+                return candidate;
+            next++;
+        }
+
+        // Extremely unlikely fallback — still unique under global constraint.
+        return $"{stem}{next:D5}-{CompanyId.ToString("N")[..6]}";
     }
 }

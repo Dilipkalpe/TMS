@@ -10,6 +10,7 @@ public static class AccountingGlSchemaMigrator
     public static async Task EnsureAsync(TmsDbContext db, CancellationToken ct = default)
     {
         await PsqlFileRunner.RunSqlFileAsync(db, "database/accounting/gl_schema.sql", ct);
+        await PsqlFileRunner.RunSqlFileAsync(db, "database/accounting/fix_voucher_no_unique_per_company.sql", ct);
         await SeedCompaniesAsync(db, ct);
     }
 

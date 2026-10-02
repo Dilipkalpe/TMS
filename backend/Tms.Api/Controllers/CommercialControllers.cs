@@ -777,6 +777,18 @@ public class FreightInvoicesController(
 
         await db.SaveChangesAsync();
 
+        try
+        {
+            await glPosting.TryPostCustomerReceiptAsync(
+                payment, inv.CustomerId, inv.CustomerName, User.Identity?.Name);
+        }
+        catch (Exception ex)
+        {
+            // Ops payment must succeed; surface posting failure for Ops↔GL reconciliation.
+            logger.LogWarning(ex, "GL auto-post failed for freight invoice payment {PaymentId} ({ReceiptNo})",
+                payment.Id, payment.ReceiptNo);
+        }
+
         return Ok(new
         {
             message = "Payment recorded.",
