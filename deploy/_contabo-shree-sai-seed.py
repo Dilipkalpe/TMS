@@ -160,13 +160,45 @@ def main() -> int:
         log(f"EXISTING vendor {vendor['id']}")
 
     customers = api.get("/api/customers?pageSize=20").get("items") or []
+    if not customers:
+        customers = [api.post("/api/customers", {
+            "name": "ABC Engineering Pvt. Ltd.", "contact": "Dilip Kalpe",
+            "phone": "9876500001", "gst": "27ABCDE1234F1Z5",
+            "address": "Waluj MIDC, Chhatrapati Sambhajinagar", "creditLimit": 500000,
+        })]
+        log(f"CREATED customer {customers[0]['id']}")
+
     consignors = api.get("/api/consignors?pageSize=20").get("items") or []
+    if not consignors:
+        consignors = [api.post("/api/consignors", {
+            "name": "ABC Engineering Pvt. Ltd.", "contact": "Dilip Kalpe",
+            "phone": "9876500001", "gst": "27ABCDE1234F1Z5",
+            "address": "Waluj MIDC, Chhatrapati Sambhajinagar", "city": "Chhatrapati Sambhajinagar",
+            "state": "Maharashtra", "status": "Active",
+        })]
+        log(f"CREATED consignor {consignors[0]['id']}")
+
     consignees = api.get("/api/consignees?pageSize=20").get("items") or []
+    if not consignees:
+        consignees = [api.post("/api/consignees", {
+            "name": "Sai Industries", "contact": "Store",
+            "phone": "9876500003", "gst": "27ABCDE3456F1Z7",
+            "address": "Pimpri, Pune", "city": "Pune", "state": "Maharashtra", "status": "Active",
+        })]
+        log(f"CREATED consignee {consignees[0]['id']}")
+
     items = api.get("/api/items?pageSize=20").get("items") or []
-    cust = next((c for c in customers if c["id"] == "C-007"), customers[0])
-    cr = next((c for c in consignors if c["id"] == "CR-007"), consignors[0])
-    ce = next((c for c in consignees if c["id"] == "CE-009"), consignees[0])  # Sai Industries destination-ish
-    item = items[0] if items else None
+    if not items:
+        items = [api.post("/api/items", {
+            "name": "ELECTRICAL", "hsn": "HS12909", "defaultPackageType": "Box",
+            "unit": "Kg", "status": "Active",
+        })]
+        log(f"CREATED item {items[0]['id']}")
+
+    cust = next((c for c in customers if c.get("id") == "C-007"), customers[0])
+    cr = next((c for c in consignors if c.get("id") == "CR-007"), consignors[0])
+    ce = next((c for c in consignees if c.get("id") == "CE-009"), consignees[-1])
+    item = items[0]
     driver = drivers[0]
     vehicle = vehicles[0]
 
@@ -464,15 +496,30 @@ def main() -> int:
     # Check receipt voucher exists for invoice payment
     src_types = {(v.get("sourceType") or "").upper() for v in vouchers}
     log(f"SOURCE TYPES present: {sorted(src_types)}")
-    if "CUSTOMER_INVOICE" not in src_types and "CUSTOMERINVOICE" not in "".join(src_types):
-        # check by narration
-        narr = " ".join((v.get("narration") or "") + " " + (v.get("voucherNo") or "") for v in vouchers).lower()
-        if "invoice" not in narr:
-            issue("No customer invoice voucher found after freight invoice create")
-    receipt_like = [v for v in vouchers if "receipt" in ((v.get("voucherType") or "") + (v.get("sourceType") or "") + (v.get("narration") or "")).lower()]
-    if bal > 0 and not receipt_like:
-        # After fix+redeploy this should appear; before fix it is expected failure
-        issue("No customer receipt voucher found after invoice payment (GL auto-post gap)")
+    if "CUSTOMER_INVOICE" not in src_types:
+        issue("No CUSTOMER_INVOICE voucher found after freight invoice create")
+    if "CUSTOMER_RECEIPT" not in src_types and bal > 0:
+        issue("No CUSTOMER_RECEIPT voucher found after invoice payment")
+
+    # AR should equal remaining invoice balance after receipt (approx)
+    ar_row = next((r for r in (tb.get("rows") or []) if (r.get("name") or "") == "Accounts Receivable"), None)
+    if ar_row:
+        ar_bal = float(ar_row.get("debit") or 0) - float(ar_row.get("credit") or 0)
+        # Prefer signed balance field when present
+        if ar_row.get("balance") is not None:
+            ar_bal = float(ar_row.get("balance") or 0)
+        inv_bal_now = float((api.get(f"/api/freight-invoices/{inv_id}").get("invoice") or {}).get("balance")
+                            if isinstance(api.get(f"/api/freight-invoices/{inv_id}"), dict) else 0)
+        # refresh once
+        inv_detail = api.get(f"/api/freight-invoices/{inv_id}")
+        inv_bal_now = float((inv_detail.get("invoice") or inv_detail).get("balance") or 0)
+        log(f"AR check ledgerBal={ar_bal:.2f} invoiceBal={inv_bal_now:.2f}")
+        if abs(ar_bal - inv_bal_now) > 1:
+            issue(f"AR ledger {ar_bal:.2f} != invoice balance {inv_bal_now:.2f}")
+
+    pl_income = float(pl.get("income") or 0)
+    if pl_income <= 0:
+        issue(f"P&L income is {pl_income} — freight invoice income not reflected")
 
     # Ops counts
     log(f"SUMMARY bookings={len(api.get('/api/bookings?pageSize=50').get('items') or [])} "

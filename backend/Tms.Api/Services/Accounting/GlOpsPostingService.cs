@@ -25,13 +25,21 @@ public class GlOpsPostingService(TmsDbContext db, AccountingPostingEngine engine
 
         var taxable = inv.TaxableAmount > 0 ? inv.TaxableAmount : Math.Max(0, inv.TotalAmount - inv.GstAmount);
         var gst = inv.GstAmount;
-        var total = inv.TotalAmount > 0 ? inv.TotalAmount : taxable + gst;
+        var advance = Math.Max(0, inv.AdvanceAdjusted);
+        // TotalAmount on freight invoices is net of advance; rebuild gross for balanced posting.
+        var gross = taxable + gst;
+        if (gross <= 0)
+            gross = inv.TotalAmount + advance;
+        var arAmount = inv.TotalAmount > 0 ? inv.TotalAmount : Math.Max(0, gross - advance);
+        // Keep voucher balanced if stored net/gross fields disagree slightly.
+        if (Math.Round(arAmount + advance, 2) != Math.Round(gross, 2))
+            arAmount = Math.Max(0, Math.Round(gross - advance, 2));
 
         var arLed = await db.LedgerAccounts.FindAsync([ar], ct);
         var incomeLed = await db.LedgerAccounts.FindAsync([income], ct);
         var lines = new List<PostingLine>
         {
-            new(ar, arLed?.Name ?? "Accounts Receivable", total, 0, $"Invoice {inv.InvoiceNo}", null, "CUSTOMER", inv.CustomerId),
+            new(ar, arLed?.Name ?? "Accounts Receivable", arAmount, 0, $"Invoice {inv.InvoiceNo}", null, "CUSTOMER", inv.CustomerId),
             new(income, incomeLed?.Name ?? "Freight Income", 0, taxable, $"Invoice {inv.InvoiceNo}"),
         };
         if (gst > 0 && map.TaxLedgerId is Guid taxId)
@@ -43,6 +51,27 @@ public class GlOpsPostingService(TmsDbContext db, AccountingPostingEngine engine
         {
             // Fold GST into income credit so voucher stays balanced when tax ledger missing
             lines[1] = lines[1] with { Credit = taxable + gst };
+        }
+
+        if (advance > 0)
+        {
+            // Booking advances post to Customer Advance liability; clear that liability on invoice.
+            var advMap = await engine.GetMapAsync(AccountingTxnTypes.AdvanceReceived, ct);
+            var advId = advMap?.CreditLedgerId
+                ?? await db.LedgerAccounts.Where(l => l.CompanyId == CompanyId && l.Name == "Customer Advance")
+                    .Select(l => (Guid?)l.Id).FirstOrDefaultAsync(ct);
+            if (advId == null)
+                throw new InvalidOperationException("Customer Advance ledger not configured for invoice advance adjustment.");
+            var advLed = await db.LedgerAccounts.FindAsync([advId.Value], ct);
+            lines.Insert(1, new(
+                advId.Value,
+                advLed?.Name ?? "Customer Advance",
+                advance,
+                0,
+                $"Advance adjusted on {inv.InvoiceNo}",
+                null,
+                "CUSTOMER",
+                inv.CustomerId));
         }
 
         var v = await engine.PostAsync(new PostingRequest(
