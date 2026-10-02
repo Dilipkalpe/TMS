@@ -250,12 +250,12 @@ public class AccountingPostingEngine(
             CreatedBy: userName,
             AsDraft: false), ct);
 
-        original.Status = VoucherStatuses.Reversed;
+        // Keep original POSTED so Trial Balance (which only sums POSTED vouchers) nets
+        // original + reversal to zero. Marking original REVERSED while also posting the
+        // contra voucher double-removes the original impact from reports.
         original.ReversedByVoucherId = rev.Id;
         original.UpdatedAt = DateTime.UtcNow;
         rev.ReversalOfVoucherId = original.Id;
-        // Offsetting ledger impact is applied by PostAsync on the reversing voucher (swapped lines).
-        // Do not apply a second -1 on the original — that would double-count.
         await db.SaveChangesAsync(ct);
         return rev;
     }

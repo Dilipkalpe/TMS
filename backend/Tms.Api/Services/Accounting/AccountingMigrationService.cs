@@ -31,7 +31,8 @@ public class AccountingMigrationService(
         var skipped = 0;
         var errors = new List<string>();
 
-        // Opening balance voucher if none
+        // Opening balance from ledger opening_balance only — never from live customer/vendor
+        // outstanding (those are backfilled as invoices/bills below and would double-count).
         if (!await db.Vouchers.AnyAsync(v => v.CompanyId == CompanyId && v.SourceType == AccountingSourceTypes.OpeningBalance, ct))
         {
             try
@@ -234,31 +235,29 @@ public class AccountingMigrationService(
 
     async Task PostOpeningBalancesAsync(DateOnly fyStart, string? user, CancellationToken ct)
     {
-        var settings = await engine.GetOrCreateSettingsAsync(ct);
-        var cashId = settings.DefaultCashLedgerId;
-        var bankId = settings.DefaultBankLedgerId;
-        var arId = settings.ArControlLedgerId;
-        var apId = settings.ApControlLedgerId;
         var capital = await db.LedgerAccounts.AsNoTracking()
             .Where(l => l.CompanyId == CompanyId && l.Name == "Owner Capital").Select(l => (Guid?)l.Id).FirstOrDefaultAsync(ct);
-        if (cashId == null || bankId == null || arId == null || apId == null || capital == null)
-            throw new InvalidOperationException("Opening balance ledgers not configured.");
+        if (capital == null)
+            throw new InvalidOperationException("Owner Capital ledger not configured.");
 
-        var ar = await db.Customers.Where(c => c.CompanyId == CompanyId).SumAsync(c => c.Outstanding, ct);
-        var ap = await db.Vendors.Where(v => v.CompanyId == CompanyId).SumAsync(v => v.Outstanding, ct);
-        // Minimal balanced OB: Dr AR + Cash/Bank suspense via Capital
+        var ledgers = await db.LedgerAccounts.AsNoTracking()
+            .Where(l => l.CompanyId == CompanyId && l.OpeningBalance != 0)
+            .OrderBy(l => l.Code)
+            .ToListAsync(ct);
+        if (ledgers.Count == 0) return;
+
         var lines = new List<PostingLine>();
-        if (ar > 0)
+        foreach (var led in ledgers)
         {
-            var arLed = await db.LedgerAccounts.FindAsync([arId.Value], ct);
-            lines.Add(new(arId.Value, arLed?.Name ?? "AR", ar, 0, "Opening AR"));
+            var amt = Math.Abs(led.OpeningBalance);
+            // Asset/Expense opening debit; Liability/Income/Capital opening credit (sign of OpeningBalance wins).
+            if (led.OpeningBalance > 0)
+                lines.Add(new(led.Id, led.Name, amt, 0, "Opening balance"));
+            else
+                lines.Add(new(led.Id, led.Name, 0, amt, "Opening balance"));
         }
-        if (ap > 0)
-        {
-            var apLed = await db.LedgerAccounts.FindAsync([apId.Value], ct);
-            lines.Add(new(apId.Value, apLed?.Name ?? "AP", 0, ap, "Opening AP"));
-        }
-        var net = lines.Sum(l => l.Debit) - lines.Sum(l => l.Credit);
+
+        var net = Math.Round(lines.Sum(l => l.Debit) - lines.Sum(l => l.Credit), 2);
         if (net != 0)
         {
             var capLed = await db.LedgerAccounts.FindAsync([capital.Value], ct);

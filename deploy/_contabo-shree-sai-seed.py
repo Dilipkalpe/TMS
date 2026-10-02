@@ -204,7 +204,10 @@ def main() -> int:
 
     # --- Booking 1 (full daily trip) ---
     bookings = api.get("/api/bookings?pageSize=20").get("items") or []
-    seed_booking = next((b for b in bookings if (b.get("remarks") or "").startswith("SSL-SEED-DAY1")), None)
+    seed_booking = next(
+        (b for b in bookings if (b.get("remarks") or "").startswith("SSL-SEED-DAY1 ")
+         or (b.get("remarks") or "").startswith("SSL-SEED-DAY1 Aurangabad")),
+        None)
     if seed_booking:
         booking = seed_booking
         log(f"EXISTING booking {booking['id']}")
@@ -405,9 +408,12 @@ def main() -> int:
 
     inv_id = inv["id"]
     bal = float(inv.get("balance") or 0)
+    paid = float(inv.get("amountPaid") or 0)
 
     # --- Customer receipt against invoice ---
-    if bal > 0:
+    if paid > 0:
+        log(f"SKIP payment — invoice already has amountPaid={paid} bal={bal}")
+    elif bal > 0:
         pay_amt = min(bal, 30000)
         pay = api.post(f"/api/freight-invoices/{inv_id}/payments", {
             "amount": pay_amt,
@@ -493,29 +499,51 @@ def main() -> int:
     coa = api.get("/api/accounting/chart-of-accounts")
     log(f"COA groups={list(coa.keys()) if isinstance(coa, dict) else type(coa)}")
 
-    # Check receipt voucher exists for invoice payment
-    src_types = {(v.get("sourceType") or "").upper() for v in vouchers}
-    log(f"SOURCE TYPES present: {sorted(src_types)}")
-    if "CUSTOMER_INVOICE" not in src_types:
-        issue("No CUSTOMER_INVOICE voucher found after freight invoice create")
-    if "CUSTOMER_RECEIPT" not in src_types and bal > 0:
-        issue("No CUSTOMER_RECEIPT voucher found after invoice payment")
+    # Backfill any ops docs missing GL vouchers (e.g. invoice created before advance-balance fix).
+    try:
+        mig = api.post("/api/gl/migration/run", {})
+        log(f"MIGRATION {json.dumps(mig)[:400]}")
+    except Exception as e:
+        issue(f"GL migration/run failed: {e}")
 
-    # AR should equal remaining invoice balance after receipt (approx)
+    # Refresh vouchers/reports after migration and re-check balance
+    vouchers = api.get("/api/gl/vouchers?pageSize=100").get("items") or []
+    for v in vouchers:
+        detail = api.get(f"/api/gl/vouchers/{v['id']}")
+        lines = detail.get("lines") or detail.get("voucherLines") or []
+        dr = sum(float(x.get("debit") or 0) for x in lines)
+        cr = sum(float(x.get("credit") or 0) for x in lines)
+        log(f"  voucher {detail.get('voucherNo')} src={detail.get('sourceType')} dr={dr:.2f} cr={cr:.2f} lines={len(lines)}")
+        if abs(dr - cr) > 0.01:
+            issue(f"unbalanced voucher {detail.get('voucherNo')} dr={dr} cr={cr}")
+
+    src_types = {(v.get("sourceType") or "").upper() for v in vouchers}
+    log(f"SOURCE TYPES after migration: {sorted(src_types)}")
+    if "CUSTOMER_INVOICE" not in src_types:
+        issue("No CUSTOMER_INVOICE voucher after migration backfill")
+    if "CUSTOMER_RECEIPT" not in src_types:
+        issue("No CUSTOMER_RECEIPT voucher after invoice payment")
+
+    tb = api.get("/api/gl/reports/trial-balance")
+    td = float(tb.get("totalDebit") or 0)
+    tc = float(tb.get("totalCredit") or 0)
+    log(f"TRIAL BALANCE after migration debit={td:.2f} credit={tc:.2f}")
+    if abs(td - tc) > 0.05:
+        issue(f"Trial Balance mismatch after migration debit={td} credit={tc}")
+    pl = api.get(f"/api/gl/reports/profit-loss?from=2025-04-01&to={TODAY}")
+    bs = api.get("/api/gl/reports/balance-sheet")
+    log(f"P&L after migration: {json.dumps(pl)[:400]}")
+    log(f"BS after migration: {json.dumps(bs)[:500]}")
+
     ar_row = next((r for r in (tb.get("rows") or []) if (r.get("name") or "") == "Accounts Receivable"), None)
     if ar_row:
-        ar_bal = float(ar_row.get("debit") or 0) - float(ar_row.get("credit") or 0)
-        # Prefer signed balance field when present
-        if ar_row.get("balance") is not None:
-            ar_bal = float(ar_row.get("balance") or 0)
-        inv_bal_now = float((api.get(f"/api/freight-invoices/{inv_id}").get("invoice") or {}).get("balance")
-                            if isinstance(api.get(f"/api/freight-invoices/{inv_id}"), dict) else 0)
-        # refresh once
-        inv_detail = api.get(f"/api/freight-invoices/{inv_id}")
-        inv_bal_now = float((inv_detail.get("invoice") or inv_detail).get("balance") or 0)
-        log(f"AR check ledgerBal={ar_bal:.2f} invoiceBal={inv_bal_now:.2f}")
-        if abs(ar_bal - inv_bal_now) > 1:
-            issue(f"AR ledger {ar_bal:.2f} != invoice balance {inv_bal_now:.2f}")
+        ar_bal = float(ar_row["balance"]) if ar_row.get("balance") is not None else (
+            float(ar_row.get("debit") or 0) - float(ar_row.get("credit") or 0))
+        all_inv = api.get("/api/freight-invoices?pageSize=50").get("items") or []
+        open_inv_bal = sum(float(i.get("balance") or 0) for i in all_inv if i.get("status") != "Cancelled")
+        log(f"AR check ledgerBal={ar_bal:.2f} openInvoiceBal={open_inv_bal:.2f}")
+        if abs(ar_bal - open_inv_bal) > 1:
+            issue(f"AR ledger {ar_bal:.2f} != open invoice balances {open_inv_bal:.2f}")
 
     pl_income = float(pl.get("income") or 0)
     if pl_income <= 0:
