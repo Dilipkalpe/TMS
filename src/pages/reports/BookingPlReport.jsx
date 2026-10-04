@@ -94,7 +94,7 @@ export default function BookingPlReport() {
           data={items}
           pageSize={Math.max(items.length, 25)}
           showActions={false}
-          emptyMessage="No bookings found for the selected date range."
+          emptyMessage="No bookings found for the selected date range. Default range is financial year (1 Apr → today)."
         />
       )}
     </ERPContentPage>

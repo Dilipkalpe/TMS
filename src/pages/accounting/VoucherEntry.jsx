@@ -49,6 +49,18 @@ function VoucherForm({ type, ledgers, onSave, initial, readOnlyType }) {
       toast({ title: 'Validation', message: 'Debit and credit ledgers must be different.', type: 'warning' })
       return
     }
+    const debitAcc = ledgers.find((l) => l.id === form.debitLedgerId)
+    const creditAcc = ledgers.find((l) => l.id === form.creditLedgerId)
+    const debitType = (debitAcc?.accountType || debitAcc?.type || '').toLowerCase()
+    const creditType = (creditAcc?.accountType || creditAcc?.type || '').toLowerCase()
+    if (type === 'Receipt' && debitType === 'income') {
+      toast({ title: 'Validation', message: 'Receipt: Income cannot be Debit. Debit Cash/Bank, Credit Income/Receivable.', type: 'warning' })
+      return
+    }
+    if (type === 'Payment' && creditType === 'expense') {
+      toast({ title: 'Validation', message: 'Payment: Expense cannot be Credit. Debit Expense, Credit Cash/Bank.', type: 'warning' })
+      return
+    }
     if (amount <= 0) {
       toast({ title: 'Validation', message: 'Amount must be greater than zero. Total Debit must equal Total Credit.', type: 'warning' })
       return
@@ -115,6 +127,8 @@ function VoucherForm({ type, ledgers, onSave, initial, readOnlyType }) {
       <Input label="Amount (₹)" type="number" placeholder="0" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
       <div className="sm:col-span-2 lg:col-span-3 text-xs text-slate-500">
         Total Debit and Total Credit will both equal the amount above (must balance).
+        {type === 'Receipt' && ' Receipt tip: Debit Cash/Bank · Credit Income or Receivable.'}
+        {type === 'Payment' && ' Payment tip: Debit Expense · Credit Cash/Bank.'}
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <Textarea label="Narration" placeholder="Enter narration..." value={form.narration} onChange={(e) => setForm((f) => ({ ...f, narration: e.target.value }))} />

@@ -28,7 +28,9 @@ export function toReportQuery(filters = {}) {
 
 export function defaultReportFilters() {
   const now = new Date()
-  const from = new Date(now.getFullYear(), now.getMonth(), 1)
+  // Indian FY default (1 Apr → today) so Booking/Direct LR P&L is not empty mid-year.
+  const fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1
+  const from = new Date(fyStartYear, 3, 1)
   return {
     fromDate: localDateString(from),
     toDate: localDateString(now),

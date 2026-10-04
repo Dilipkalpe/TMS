@@ -77,6 +77,7 @@ export default function ERPListPage({
   openColumnsSignal = 0,
   tableToolbar = null,
   listVariant = 'default',
+  emptyMessage = 'No records found.',
 }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState(filterOptions[0])
@@ -323,6 +324,7 @@ export default function ERPListPage({
             printTitle={rowPrintTitle}
             sortKey={sortKey}
             sortDir={defaultSortDir}
+            emptyMessage={emptyMessage}
           />
         </div>
 

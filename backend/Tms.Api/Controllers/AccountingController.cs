@@ -167,6 +167,25 @@ public class AccountingController(
         if (debit.Id != null && credit.Id != null && debit.Id == credit.Id)
             return BadRequest(new ApiError("Debit and credit ledgers must be different."));
 
+        // Prevent common Debit/Credit swap that makes P&L income negative.
+        async Task<string?> LedgerTypeAsync(Guid? id)
+        {
+            if (id == null) return null;
+            return await tenants.Filter(db.LedgerAccounts.AsQueryable())
+                .Where(a => a.Id == id).Select(a => a.AccountType).FirstOrDefaultAsync();
+        }
+        var debitType = await LedgerTypeAsync(debit.Id);
+        var creditType = await LedgerTypeAsync(credit.Id);
+        var typeNorm = type.Trim();
+        if (typeNorm.Equals("Receipt", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(debitType, "Income", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new ApiError(
+                "Receipt voucher: Income cannot be Debit. Use Debit = Cash/Bank and Credit = Income or Accounts Receivable."));
+        if (typeNorm.Equals("Payment", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(creditType, "Expense", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new ApiError(
+                "Payment voucher: Expense cannot be Credit. Use Debit = Expense and Credit = Cash/Bank."));
+
         // Balanced by construction: one debit line and one credit line for the same amount
         var totalDebit = amount;
         var totalCredit = amount;

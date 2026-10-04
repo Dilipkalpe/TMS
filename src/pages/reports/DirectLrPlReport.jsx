@@ -62,6 +62,7 @@ export default function DirectLrPlReport() {
           }}
         />
       )}
+      emptyMessage="No Direct LRs in this date range. LRs linked to a booking appear under Booking-wise Profit & Loss."
       {...serverListProps(paged)}
     />
   )

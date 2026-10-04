@@ -23,9 +23,9 @@ describe('reportQuery', () => {
     })
   })
 
-  it('defaultReportFilters returns month-to-date range', () => {
+  it('defaultReportFilters returns financial-year-to-date range', () => {
     const filters = defaultReportFilters()
-    expect(filters.fromDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(filters.fromDate).toMatch(/^\d{4}-04-01$/)
     expect(filters.toDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(filters.customerId).toBe('')
     expect(filters.vendorId).toBe('')

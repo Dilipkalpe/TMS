@@ -28,11 +28,12 @@ export default function ProfitLoss() {
     ? Number(profitLoss.netProfit)
     : totalIncome - totalExpenses
 
+  const profitColor = grossProfit >= 0 ? 'green' : 'red'
   const statusCards = [
-    { label: 'Total Income', color: 'green', icon: 'TrendingUp', count: formatCurrency(totalIncome) },
+    { label: 'Total Income', color: totalIncome >= 0 ? 'green' : 'red', icon: 'TrendingUp', count: formatCurrency(totalIncome) },
     { label: 'Total Expenses', color: 'red', icon: 'TrendingDown', count: formatCurrency(totalExpenses) },
-    { label: 'Gross Profit', color: 'blue', icon: 'IndianRupee', count: formatCurrency(grossProfit) },
-    { label: 'Net Profit', color: 'green', icon: 'CheckCircle', count: formatCurrency(grossProfit) },
+    { label: grossProfit >= 0 ? 'Gross Profit' : 'Gross Loss', color: 'blue', icon: 'IndianRupee', count: formatCurrency(grossProfit) },
+    { label: grossProfit >= 0 ? 'Net Profit' : 'Net Loss', color: profitColor, icon: 'CheckCircle', count: formatCurrency(grossProfit) },
   ]
 
   const printRows = [
@@ -70,20 +71,30 @@ export default function ProfitLoss() {
     >
       <div className="space-y-4">
         {error && <p className="text-sm text-red-500">{error}</p>}
+        {totalIncome < 0 && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            Income is negative because one or more vouchers posted Income on the Debit side
+            (usually Debit/Credit swapped on a Receipt). Reverse that voucher and re-post:
+            Debit Bank/Cash, Credit Freight Income (or Accounts Receivable).
+          </p>
+        )}
         <StatusSummaryCards cards={statusCards} />
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader title="Income" />
             <div className="space-y-2">
+              {income.length === 0 && (
+                <p className="py-2 text-sm text-slate-500">No income posted in the selected period.</p>
+              )}
               {income.map((item) => (
                 <div key={item.name} className="flex justify-between border-b border-slate-100 py-2 dark:border-slate-800">
                   <span>{item.name}</span>
-                  <span className="font-medium text-green-600">{formatCurrency(item.amount)}</span>
+                  <span className={`font-medium ${item.amount >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatCurrency(item.amount)}</span>
                 </div>
               ))}
               <div className="flex justify-between pt-2 font-bold">
                 <span>Total Income</span>
-                <span className="text-green-600">{formatCurrency(totalIncome)}</span>
+                <span className={totalIncome >= 0 ? 'text-green-600' : 'text-red-500'}>{formatCurrency(totalIncome)}</span>
               </div>
             </div>
           </Card>

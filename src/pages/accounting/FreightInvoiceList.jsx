@@ -47,6 +47,7 @@ export default function FreightInvoiceList() {
       sortKey="invoiceNo"
       onRowClick={(r) => navigate(`/accounting/freight-invoices/${r.id}`)}
       exportFilename="freight-invoices-export.csv"
+      emptyMessage="No freight invoices yet. Create one from Billing Invoice, LR Process (Generate Freight Invoice), or Booking Finance."
       serverMode
       serverTotal={paged.total}
       serverHasMore={paged.hasMore}
