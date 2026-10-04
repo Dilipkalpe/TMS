@@ -21,7 +21,10 @@ export default function DirectLrPlReport() {
     [applied.fromDate, applied.toDate],
   )
 
-  const pageProfit = paged.items.reduce((s, r) => s + (r.profit ?? 0), 0)
+  const netOf = (r) => Number(r.netProfit ?? r.profit ?? 0)
+  const grossOf = (r) => Number(r.grossProfit ?? ((r.gst ?? 0) + netOf(r)))
+  const pageNet = paged.items.reduce((s, r) => s + netOf(r), 0)
+  const pageGross = paged.items.reduce((s, r) => s + grossOf(r), 0)
 
   const columns = [
     { key: 'lrNumber', label: 'LR No.' },
@@ -30,11 +33,13 @@ export default function DirectLrPlReport() {
     { key: 'customer', label: 'Consignor', render: (r) => r.customer || '—' },
     { key: 'route', label: 'Route' },
     { key: 'stage', label: 'Stage', render: (r) => <Badge variant={statusVariant(r.status)}>{r.stage || r.status}</Badge> },
-    { key: 'income', label: 'Income', render: (r) => formatCurrency(r.income) },
+    { key: 'income', label: 'Income (FR+GST)', render: (r) => formatCurrency(r.income) },
+    { key: 'gst', label: 'GST', render: (r) => formatCurrency(r.gst ?? 0) },
     { key: 'expenses', label: 'LR Expenses', render: (r) => formatCurrency(r.expenses) },
-    { key: 'profit', label: 'Profit', render: (r) => (
-      <span className={`font-semibold ${(r.profit ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-        {formatCurrency(r.profit)}
+    { key: 'grossProfit', label: 'Gross Profit', render: (r) => formatCurrency(grossOf(r)) },
+    { key: 'netProfit', label: 'Net Profit', render: (r) => (
+      <span className={`font-semibold ${netOf(r) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+        {formatCurrency(netOf(r))}
       </span>
     ) },
     { key: 'marginPercent', label: 'Margin %', render: (r) => `${r.marginPercent ?? 0}%` },
@@ -46,7 +51,8 @@ export default function DirectLrPlReport() {
       title="Direct LR Profit & Loss"
       statusCards={[
         { label: 'Direct LRs', color: 'violet', icon: 'FileSpreadsheet', count: paged.total },
-        { label: 'Profit (page)', color: pageProfit >= 0 ? 'green' : 'red', icon: 'PieChart', count: Math.round(pageProfit) },
+        { label: 'Gross (page)', color: 'blue', icon: 'IndianRupee', count: formatCurrency(pageGross) },
+        { label: 'Net (page)', color: pageNet >= 0 ? 'green' : 'red', icon: 'PieChart', count: formatCurrency(pageNet) },
       ]}
       showActions={false}
       searchPlaceholder="LR No., consignor, route..."
@@ -62,7 +68,7 @@ export default function DirectLrPlReport() {
           }}
         />
       )}
-      emptyMessage="No Direct LRs in this date range. LRs linked to a booking appear under Booking-wise Profit & Loss."
+      emptyMessage="No Direct LRs in this date range. LRs linked to a booking appear under Booking-wise Profit & Loss. Gross = GST + Net · Net = Freight − LR Expenses."
       {...serverListProps(paged)}
     />
   )

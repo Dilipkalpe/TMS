@@ -649,6 +649,7 @@ public class FreightInvoicesController(
             UpdatedAt = DateTime.UtcNow,
         };
         db.FreightInvoices.Add(inv);
+        BookingFinanceService.ClearBookingBalanceAfterInvoice(booking);
         await db.SaveChangesAsync();
 
         var sort = 0;
@@ -674,6 +675,8 @@ public class FreightInvoicesController(
             // Ops invoice must succeed; surface posting failure for Ops↔GL reconciliation.
             logger.LogWarning(ex, "GL auto-post failed for freight invoice {InvoiceId} ({InvoiceNo})", inv.Id, inv.InvoiceNo);
         }
+        await BookingFinanceService.SyncCustomerOutstandingAsync(db, booking.CompanyId, booking.CustomerId);
+        await db.SaveChangesAsync();
         return CreatedAtAction(nameof(Get), new { id = inv.Id }, Map(inv));
     }
 
@@ -687,9 +690,29 @@ public class FreightInvoicesController(
         if (inv.AmountPaid > 0)
             return BadRequest(new ApiError("Cannot cancel an invoice with payments recorded."));
 
+        try { await glPosting.TryReverseCustomerInvoiceAsync(inv, User.Identity?.Name); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "GL reverse failed for cancelled freight invoice {InvoiceId} ({InvoiceNo})", inv.Id, inv.InvoiceNo);
+            return BadRequest(new ApiError($"Could not reverse GL posting for invoice {inv.InvoiceNo}. Cancel aborted."));
+        }
+
         inv.Status = "Cancelled";
         inv.Balance = 0;
         inv.UpdatedAt = DateTime.UtcNow;
+
+        // Restore booking AR from freight − payments when invoice is cancelled.
+        if (!string.IsNullOrWhiteSpace(inv.BookingId)
+            && !inv.BookingId.StartsWith("LR:", StringComparison.OrdinalIgnoreCase)
+            && !inv.BookingId.StartsWith("INV:", StringComparison.OrdinalIgnoreCase))
+        {
+            var booking = await TenantScope.FindBookingAsync(db, tenants, branches, inv.BookingId);
+            if (booking != null)
+                await BookingFinanceService.RecalculateBookingPaymentStatusAsync(db, booking);
+        }
+
+        await db.SaveChangesAsync();
+        await BookingFinanceService.SyncCustomerOutstandingAsync(db, inv.CompanyId, inv.CustomerId);
         await db.SaveChangesAsync();
         return Ok(Map(inv));
     }

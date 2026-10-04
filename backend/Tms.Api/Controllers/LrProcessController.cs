@@ -20,7 +20,8 @@ public class LrProcessController(
     IBranchContext branches,
     DocumentNumberService documentNumbers,
     IWebHostEnvironment env,
-    Tms.Api.Services.Accounting.GlOpsPostingService glPosting) : ControllerBase
+    Tms.Api.Services.Accounting.GlOpsPostingService glPosting,
+    ILogger<LrProcessController> logger) : ControllerBase
 {
     static readonly HashSet<string> AllowedUploadExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
     const long MaxUploadBytes = 5 * 1024 * 1024;
@@ -294,6 +295,9 @@ public class LrProcessController(
         {
             foreach (var row in lrs)
             {
+                // Never regress a later workflow status (In Transit / Delivered / Invoiced).
+                if (IsStatusDowngrade(row.Status, LrStatuses.LoadingCompleted))
+                    continue;
                 row.Status = LrStatuses.LoadingCompleted;
                 row.UpdatedAt = DateTime.UtcNow;
             }
@@ -862,8 +866,9 @@ public class LrProcessController(
         };
         db.Documents.Add(doc);
 
+        // POD may advance only from Delivery Completed — do not skip Delivery Complete.
         if (docType.Equals("POD", StringComparison.OrdinalIgnoreCase)
-            && lr.Status is LrStatuses.TransitPassGenerated or LrStatuses.InTransit or LrStatuses.DeliveryCompleted)
+            && lr.Status == LrStatuses.DeliveryCompleted)
             lr.Status = LrStatuses.PodUploaded;
 
         lr.UpdatedAt = DateTime.UtcNow;
@@ -1307,9 +1312,20 @@ public class LrProcessController(
         {
             lr.Status = LrStatuses.InvoiceGenerated;
             lr.UpdatedAt = DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(lr.BookingId))
+            {
+                var booked = await TenantScope.FindBookingAsync(db, tenants, branches, lr.BookingId);
+                if (booked != null)
+                    BookingFinanceService.ClearBookingBalanceAfterInvoice(booked);
+            }
         }
 
         await db.SaveChangesAsync();
+        try { await glPosting.TryPostCustomerInvoiceAsync(inv, CurrentUser()); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "GL auto-post failed for consolidated invoice {InvoiceNo}", inv.InvoiceNo);
+        }
         await BookingFinanceService.SyncCustomerOutstandingAsync(db, companyId, inv.CustomerId);
         await db.SaveChangesAsync();
 
@@ -1453,7 +1469,14 @@ public class LrProcessController(
         db.FreightInvoices.Add(inv);
         lr.Status = LrStatuses.InvoiceGenerated;
         lr.UpdatedAt = DateTime.UtcNow;
+        if (booking != null)
+            BookingFinanceService.ClearBookingBalanceAfterInvoice(booking);
         await db.SaveChangesAsync();
+        try { await glPosting.TryPostCustomerInvoiceAsync(inv, CurrentUser()); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "GL auto-post failed for LR invoice {InvoiceNo}", inv.InvoiceNo);
+        }
         await BookingFinanceService.SyncCustomerOutstandingAsync(db, lr.CompanyId, inv.CustomerId);
         await db.SaveChangesAsync();
 

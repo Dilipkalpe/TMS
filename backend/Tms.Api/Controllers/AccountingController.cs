@@ -499,7 +499,13 @@ public class AccountingController(
         }
 
         // ---- Customers: bookings + direct LRs + freight invoices ----
-        var bookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking().Where(b => b.Balance > 0);
+        // When an active invoice exists for a booking, AR is invoice-only (no booking+invoice double-count).
+        var invoicedBookingIds = TenantScope.FreightInvoices(db, tenants, branches).AsNoTracking()
+            .Where(i => i.Status != "Cancelled" && i.BookingId != null && i.BookingId != "")
+            .Select(i => i.BookingId!);
+
+        var bookings = TenantScope.Bookings(db, tenants, branches).AsNoTracking()
+            .Where(b => b.Balance > 0 && !invoicedBookingIds.Contains(b.Id));
         if (!string.IsNullOrWhiteSpace(customerId))
             bookings = bookings.Where(b => b.CustomerId == customerId);
 

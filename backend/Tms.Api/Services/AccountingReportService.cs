@@ -153,17 +153,31 @@ public static class AccountingReportService
 
     public static async Task<object> BuildProfitLossAsync(TmsDbContext db, ITenantContext tenants, IBranchContext branches, CancellationToken ct = default)
     {
-        var income = await TenantScope.Bookings(db, tenants, branches).SumAsync(b => b.Freight, ct);
-        var expenses = (await DashboardMetricsService.ExpenseBreakdownAsync(db, tenants, branches, ct))
+        var freightIncome = await TenantScope.Bookings(db, tenants, branches).SumAsync(b => b.Freight, ct);
+        var gst = await TenantScope.LorryReceipts(db, tenants, branches).SumAsync(l => l.Gst, ct);
+        var expenseRows = (await DashboardMetricsService.ExpenseBreakdownAsync(db, tenants, branches, ct))
             .Where(e => e.Amount > 0)
             .Select(e => new { name = e.Label, amount = e.Amount })
-            .Cast<object>()
             .ToList();
+        var expenseTotal = expenseRows.Sum(e => e.Amount);
+        var totalIncome = freightIncome + gst;
+        var netProfit = freightIncome - expenseTotal;
+        var grossProfit = gst + netProfit;
 
         return new
         {
-            income = new[] { new { name = "Freight Income", amount = income } },
-            expenses
+            freightIncome,
+            gst,
+            income = totalIncome,
+            expenses = expenseTotal,
+            grossProfit,
+            netProfit,
+            incomeRows = new object[]
+            {
+                new { code = "FR", name = "Freight Income", amount = freightIncome },
+                new { code = "GST", name = "Output GST", amount = gst },
+            },
+            expenseRows = expenseRows.Cast<object>().ToList(),
         };
     }
 

@@ -82,6 +82,15 @@ public class GlOpsPostingService(TmsDbContext db, AccountingPostingEngine engine
         return v.Id;
     }
 
+    /// <summary>Reverse the GL voucher posted for a freight invoice (if any).</summary>
+    public async Task<bool> TryReverseCustomerInvoiceAsync(FreightInvoice inv, string? user, CancellationToken ct = default)
+    {
+        var posted = await engine.FindBySourceAsync(AccountingSourceTypes.CustomerInvoice, inv.Id.ToString("N"), ct);
+        if (posted == null) return false;
+        await engine.ReverseAsync(posted.Id, $"Invoice cancelled: {inv.InvoiceNo}", user, ct);
+        return true;
+    }
+
     public async Task<Guid?> TryPostCustomerReceiptAsync(
         BookingPayment payment, string? customerId, string? customerName, string? user, CancellationToken ct = default)
     {

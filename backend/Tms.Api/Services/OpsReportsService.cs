@@ -961,8 +961,12 @@ public class OpsReportsService(ReadOnlyTmsDbContext db, ITenantContext tenants, 
         var rows = list.Select(l =>
         {
             expenseByLr.TryGetValue(l.LrNumber, out var expenses);
-            var income = l.Freight + l.Gst;
-            var profit = income - expenses;
+            var freight = l.Freight;
+            var gst = l.Gst;
+            var income = freight + gst; // Total income = FR + GST
+            // Align with Booking P&L: Net = FR − expenses; Gross = GST + Net.
+            var netProfit = freight - expenses;
+            var grossProfit = gst + netProfit;
             return (object)new
             {
                 lrNumber = l.LrNumber,
@@ -972,11 +976,13 @@ public class OpsReportsService(ReadOnlyTmsDbContext db, ITenantContext tenants, 
                 workflow = "direct",
                 workflowLabel = "Direct LR",
                 income,
-                freight = l.Freight,
-                gst = l.Gst,
+                freight,
+                gst,
                 expenses,
-                profit,
-                marginPercent = income > 0 ? Math.Round(profit / income * 100, 2) : 0,
+                profit = netProfit, // legacy alias
+                netProfit,
+                grossProfit,
+                marginPercent = freight > 0 ? Math.Round(netProfit / freight * 100, 2) : 0,
                 status = l.Status,
                 stage = FlowStage(l.Status),
             };

@@ -43,8 +43,20 @@ public static class BookingFinanceService
         var customer = await db.Customers.FindAsync([customerId], ct);
         if (customer == null || customer.CompanyId != companyId) return;
 
+        // Once a freight invoice exists for a booking, AR lives on the invoice only
+        // (avoids booking.Balance + invoice.Balance double-count).
+        var invoicedBookingIds = db.FreightInvoices.AsNoTracking()
+            .Where(i => i.CompanyId == companyId
+                && i.Status != "Cancelled"
+                && i.BookingId != null
+                && i.BookingId != "")
+            .Select(i => i.BookingId!);
+
         var bookingBal = await db.Bookings
-            .Where(b => b.CompanyId == companyId && b.CustomerId == customerId)
+            .Where(b => b.CompanyId == companyId
+                && b.CustomerId == customerId
+                && b.Balance > 0
+                && !invoicedBookingIds.Contains(b.Id))
             .SumAsync(b => b.Balance, ct);
 
         // Direct LRs (no booking): include open balance until an active freight invoice takes over.
@@ -138,6 +150,18 @@ public static class BookingFinanceService
         vendor.UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// After a freight invoice is issued for a booking, clear booking AR so Outstanding
+    /// does not show booking.Balance and invoice.Balance together.
+    /// </summary>
+    public static void ClearBookingBalanceAfterInvoice(Booking booking)
+    {
+        booking.Balance = 0;
+        if (!string.Equals(booking.Payment, "Paid", StringComparison.OrdinalIgnoreCase))
+            booking.Payment = "Invoiced";
+        booking.UpdatedAt = DateTime.UtcNow;
+    }
+
     public static async Task SyncBrokerOutstandingAsync(TmsDbContext db, Guid companyId, string brokerName, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(brokerName)) return;
@@ -205,7 +229,8 @@ public static class BookingFinanceService
             lrFreightOnlyByBooking.TryGetValue(booking.Id, out var lrFreightOnly);
             lrGstByBooking.TryGetValue(booking.Id, out var lrGst);
             lrExpenseByBooking.TryGetValue(booking.Id, out var lrExpenses);
-            var freight = booking.Freight + lrFreightOnly;
+            // One freight base only (same rule as bill builder) — never booking + LR.
+            var freight = booking.Freight > 0 ? booking.Freight : lrFreightOnly;
             var gst = lrGst;
             var income = freight + gst; // Total income = FR + GST
             var totalCost = brokerCharges + expenses + lrExpenses;
