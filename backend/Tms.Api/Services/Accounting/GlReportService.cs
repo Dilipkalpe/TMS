@@ -67,17 +67,21 @@ public class GlReportService(TmsDbContext db, ITenantContext tenants, Accounting
         var lines = await PostedLinesAsync(fromDate, toDate, ct);
         var ledgers = await db.LedgerAccounts.AsNoTracking().Where(l => l.CompanyId == CompanyId).ToDictionaryAsync(l => l.Id, ct);
 
-        decimal income = 0, expense = 0;
+        decimal freightIncome = 0, outputGst = 0, expense = 0;
         var incomeRows = new List<object>();
         var expenseRows = new List<object>();
         foreach (var g in lines.GroupBy(l => l.LedgerAccountId))
         {
             if (g.Key == null || !ledgers.TryGetValue(g.Key.Value, out var led)) continue;
-            var net = g.Sum(x => x.Credit - x.Debit); // income credit-nature
+            var creditNet = g.Sum(x => x.Credit - x.Debit); // credit-nature
             if (led.AccountType.Equals("Income", StringComparison.OrdinalIgnoreCase))
             {
-                income += net;
-                incomeRows.Add(new { code = led.Code, name = led.Name, amount = net });
+                freightIncome += creditNet;
+                incomeRows.Add(new { code = led.Code, name = led.Name, amount = creditNet });
+            }
+            else if (IsOutputGstLedger(led))
+            {
+                outputGst += creditNet;
             }
             else if (led.AccountType.Equals("Expense", StringComparison.OrdinalIgnoreCase))
             {
@@ -86,17 +90,42 @@ public class GlReportService(TmsDbContext db, ITenantContext tenants, Accounting
                 expenseRows.Add(new { code = led.Code, name = led.Name, amount = expNet });
             }
         }
+
+        if (outputGst != 0)
+            incomeRows.Add(new { code = "GST", name = "Output GST", amount = outputGst });
+
+        // Total Income = FR + GST; Net Profit = FR - Expenses; Gross Profit = GST + Net Profit.
+        var totalIncome = freightIncome + outputGst;
+        var netProfit = freightIncome - expense;
+        var grossProfit = outputGst + netProfit;
+
         return new
         {
             from = fromDate.ToString("yyyy-MM-dd"),
             to = toDate.ToString("yyyy-MM-dd"),
             source = "GL",
-            income,
+            freightIncome,
+            gst = outputGst,
+            income = totalIncome,
             expenses = expense,
-            netProfit = income - expense,
+            grossProfit,
+            netProfit,
             incomeRows,
             expenseRows,
         };
+    }
+
+    static bool IsOutputGstLedger(LedgerAccount led)
+    {
+        if (!led.AccountType.Equals("Liability", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(led.GroupName, "Duties & Taxes", StringComparison.OrdinalIgnoreCase))
+            return false;
+        var name = led.Name ?? "";
+        return name.Contains("Output", StringComparison.OrdinalIgnoreCase)
+            && (name.Contains("GST", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("CGST", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("SGST", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("IGST", StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<object> BalanceSheetAsync(DateOnly? asOf, CancellationToken ct = default)

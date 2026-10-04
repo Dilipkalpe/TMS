@@ -177,9 +177,12 @@ public static class BookingFinanceService
             .Where(l => l.BookingId != null && ids.Contains(l.BookingId))
             .Select(l => new { l.BookingId, l.LrNumber, l.Freight, l.Gst })
             .ToListAsync(ct);
-        var lrFreightByBooking = lrs
+        var lrFreightOnlyByBooking = lrs
             .GroupBy(l => l.BookingId!)
-            .ToDictionary(g => g.Key, g => g.Sum(x => x.Freight + x.Gst));
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Freight));
+        var lrGstByBooking = lrs
+            .GroupBy(l => l.BookingId!)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Gst));
         var lrNumbers = lrs.Select(l => l.LrNumber).Distinct().ToList();
         var lrExpenseByNumber = lrNumbers.Count == 0
             ? new Dictionary<string, decimal>()
@@ -199,11 +202,16 @@ public static class BookingFinanceService
         {
             brokerByBooking.TryGetValue(booking.Id, out var brokerCharges);
             expenseByBooking.TryGetValue(booking.Id, out var expenses);
-            lrFreightByBooking.TryGetValue(booking.Id, out var lrFreight);
+            lrFreightOnlyByBooking.TryGetValue(booking.Id, out var lrFreightOnly);
+            lrGstByBooking.TryGetValue(booking.Id, out var lrGst);
             lrExpenseByBooking.TryGetValue(booking.Id, out var lrExpenses);
-            var income = booking.Freight + lrFreight;
+            var freight = booking.Freight + lrFreightOnly;
+            var gst = lrGst;
+            var income = freight + gst; // Total income = FR + GST
             var totalCost = brokerCharges + expenses + lrExpenses;
-            var profit = income - totalCost;
+            // Net Profit = freight/ops profit (excludes GST). Gross Profit = GST + Net Profit.
+            var netProfit = freight - totalCost;
+            var grossProfit = gst + netProfit;
             var lrCount = lrs.Count(x => string.Equals(x.BookingId, booking.Id, StringComparison.OrdinalIgnoreCase));
             rows.Add(new
             {
@@ -216,13 +224,17 @@ public static class BookingFinanceService
                 lrCount,
                 income,
                 bookingFreight = booking.Freight,
-                lrFreight,
+                lrFreight = lrFreightOnly + lrGst, // keep prior combined field for compatibility
+                lrFreightOnly,
+                gst,
                 brokerCharges,
                 expenses,
                 lrExpenses,
                 totalCost,
-                profit,
-                marginPercent = income > 0 ? Math.Round(profit / income * 100, 2) : 0
+                profit = netProfit, // legacy alias
+                netProfit,
+                grossProfit,
+                marginPercent = freight > 0 ? Math.Round(netProfit / freight * 100, 2) : 0
             });
         }
         return rows;

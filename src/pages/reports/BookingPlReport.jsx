@@ -41,6 +41,9 @@ export default function BookingPlReport() {
     setApplied(toReportQuery(next))
   }
 
+  const netOf = (r) => Number(r.netProfit ?? r.profit ?? 0)
+  const grossOf = (r) => Number(r.grossProfit ?? ((r.gst ?? 0) + netOf(r)))
+
   const columns = [
     { key: 'bookingId', label: 'Booking' },
     { key: 'bookingDate', label: 'Date', render: (r) => formatGridDate(r.bookingDate) },
@@ -48,12 +51,14 @@ export default function BookingPlReport() {
     { key: 'customer', label: 'Customer' },
     { key: 'route', label: 'Route' },
     { key: 'lrCount', label: 'LRs', render: (r) => r.lrCount ?? 0 },
-    { key: 'income', label: 'Income', render: (r) => formatCurrency(r.income) },
-    { key: 'lrFreight', label: 'LR Freight', render: (r) => formatCurrency(r.lrFreight) },
+    { key: 'income', label: 'Income (FR+GST)', render: (r) => formatCurrency(r.income) },
+    { key: 'gst', label: 'GST', render: (r) => formatCurrency(r.gst ?? 0) },
+    { key: 'lrFreight', label: 'LR Freight', render: (r) => formatCurrency(r.lrFreightOnly ?? r.lrFreight) },
     { key: 'brokerCharges', label: 'Broker', render: (r) => formatCurrency(r.brokerCharges) },
     { key: 'expenses', label: 'Booking Exp.', render: (r) => formatCurrency(r.expenses) },
     { key: 'lrExpenses', label: 'LR Exp.', render: (r) => formatCurrency(r.lrExpenses) },
-    { key: 'profit', label: 'Profit', render: (r) => formatCurrency(r.profit) },
+    { key: 'grossProfit', label: 'Gross Profit', render: (r) => formatCurrency(grossOf(r)) },
+    { key: 'netProfit', label: 'Net Profit', render: (r) => formatCurrency(netOf(r)) },
     { key: 'marginPercent', label: 'Margin %', render: (r) => `${r.marginPercent}%` },
   ]
 
@@ -62,7 +67,8 @@ export default function BookingPlReport() {
     printValue: c.render,
   }))
 
-  const totalProfit = items.reduce((s, r) => s + (r.profit ?? 0), 0)
+  const totalNet = items.reduce((s, r) => s + netOf(r), 0)
+  const totalGross = items.reduce((s, r) => s + grossOf(r), 0)
   const rangeLabel = `${formatGridDate(applied.fromDate)} – ${formatGridDate(applied.toDate)}`
 
   return (
@@ -86,7 +92,7 @@ export default function BookingPlReport() {
         columns={printColumns}
         rows={items}
         filename="booking-profit-loss.csv"
-        summary={`${items.length} booking(s) · ${rangeLabel} · Total profit ${formatCurrency(totalProfit)}`}
+        summary={`${items.length} booking(s) · ${rangeLabel} · Gross ${formatCurrency(totalGross)} · Net ${formatCurrency(totalNet)}`}
       />
       {loading ? <p className="text-sm text-slate-500">Loading…</p> : (
         <ERPDataTable
@@ -97,6 +103,9 @@ export default function BookingPlReport() {
           emptyMessage="No bookings found for the selected date range. Default range is financial year (1 Apr → today)."
         />
       )}
+      <p className="mt-2 text-xs text-slate-500">
+        Gross Profit = GST + Net Profit · Net Profit = Freight − (Broker + Booking Exp. + LR Exp.)
+      </p>
     </ERPContentPage>
   )
 }

@@ -8,7 +8,6 @@ import { accountingApi } from '../../services/api'
 
 function asAmountRows(value) {
   if (Array.isArray(value)) return value.map((r) => ({ name: r.name ?? r.code ?? '—', amount: Number(r.amount ?? 0) }))
-  // GL payload: income/expenses are totals; detail lists are incomeRows / expenseRows
   return null
 }
 
@@ -18,22 +17,31 @@ export default function ProfitLoss() {
     ?? (profitLoss?.incomeRows ?? []).map((r) => ({ name: r.name ?? r.code ?? '—', amount: Number(r.amount ?? 0) }))
   const expenses = asAmountRows(profitLoss?.expenses)
     ?? (profitLoss?.expenseRows ?? []).map((r) => ({ name: r.name ?? r.code ?? '—', amount: Number(r.amount ?? 0) }))
-  const totalIncome = typeof profitLoss?.income === 'number'
+
+  const freightIncome = Number(profitLoss?.freightIncome ?? 0)
+  const gst = Number(profitLoss?.gst ?? 0)
+  const totalIncome = profitLoss?.income != null && typeof profitLoss.income === 'number'
     ? Number(profitLoss.income)
-    : income.reduce((s, i) => s + (i.amount ?? 0), 0)
+    : (freightIncome > 0 || gst > 0
+      ? freightIncome + gst
+      : income.reduce((s, i) => s + (i.amount ?? 0), 0))
   const totalExpenses = typeof profitLoss?.expenses === 'number'
     ? Number(profitLoss.expenses)
     : expenses.reduce((s, e) => s + (e.amount ?? 0), 0)
-  const grossProfit = profitLoss?.netProfit != null
-    ? Number(profitLoss.netProfit)
-    : totalIncome - totalExpenses
 
-  const profitColor = grossProfit >= 0 ? 'green' : 'red'
+  // Net Profit = FR − Expenses; Gross Profit = GST + Net Profit (= FR + GST − Expenses)
+  const netProfit = profitLoss?.netProfit != null
+    ? Number(profitLoss.netProfit)
+    : (freightIncome || totalIncome - gst) - totalExpenses
+  const grossProfit = profitLoss?.grossProfit != null
+    ? Number(profitLoss.grossProfit)
+    : gst + netProfit
+
   const statusCards = [
     { label: 'Total Income', color: totalIncome >= 0 ? 'green' : 'red', icon: 'TrendingUp', count: formatCurrency(totalIncome) },
     { label: 'Total Expenses', color: 'red', icon: 'TrendingDown', count: formatCurrency(totalExpenses) },
     { label: grossProfit >= 0 ? 'Gross Profit' : 'Gross Loss', color: 'blue', icon: 'IndianRupee', count: formatCurrency(grossProfit) },
-    { label: grossProfit >= 0 ? 'Net Profit' : 'Net Loss', color: profitColor, icon: 'CheckCircle', count: formatCurrency(grossProfit) },
+    { label: netProfit >= 0 ? 'Net Profit' : 'Net Loss', color: netProfit >= 0 ? 'green' : 'red', icon: 'CheckCircle', count: formatCurrency(netProfit) },
   ]
 
   const printRows = [
@@ -64,7 +72,7 @@ export default function ProfitLoss() {
             title="Profit & Loss Statement"
             columns={printColumns}
             rows={printRows}
-            summary={`Income: ${formatCurrency(totalIncome)} · Expenses: ${formatCurrency(totalExpenses)} · Net: ${formatCurrency(grossProfit)}`}
+            summary={`Income (FR+GST): ${formatCurrency(totalIncome)} · Expenses: ${formatCurrency(totalExpenses)} · Gross: ${formatCurrency(grossProfit)} · Net: ${formatCurrency(netProfit)}`}
           />
         </div>
       )}
@@ -78,6 +86,9 @@ export default function ProfitLoss() {
             Debit Bank/Cash, Credit Freight Income (or Accounts Receivable).
           </p>
         )}
+        <p className="text-xs text-slate-500">
+          Total Income = Freight (FR) + Output GST · Gross Profit = GST + Net Profit · Net Profit = FR − Expenses
+        </p>
         <StatusSummaryCards cards={statusCards} />
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
@@ -93,7 +104,7 @@ export default function ProfitLoss() {
                 </div>
               ))}
               <div className="flex justify-between pt-2 font-bold">
-                <span>Total Income</span>
+                <span>Total Income (FR + GST)</span>
                 <span className={totalIncome >= 0 ? 'text-green-600' : 'text-red-500'}>{formatCurrency(totalIncome)}</span>
               </div>
             </div>
