@@ -259,11 +259,15 @@ public static class BookingFinanceService
             .ToListAsync(ct);
         var expenseCategories = expenses.Select(e => e.Category).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var lr = await db.LorryReceipts.FirstOrDefaultAsync(l => l.BookingId == booking.Id, ct);
+        // Prefer booking freight; fall back to linked LR freight when booking amount was left at 0.
+        var freight = booking.Freight > 0 ? booking.Freight : (lr?.Freight ?? 0);
+
         var lines = new List<BillLineItem>
         {
             new(
                 "Transport freight",
-                booking.Freight,
+                freight,
                 $"{booking.FromCity} → {booking.ToCity}")
         };
 
@@ -273,7 +277,6 @@ public static class BookingFinanceService
             lines.Add(new BillLineItem(label, e.Amount));
         }
 
-        var lr = await db.LorryReceipts.FirstOrDefaultAsync(l => l.BookingId == booking.Id, ct);
         if (lr != null)
         {
             AddLrLineIfMissing(lines, expenseCategories, "Hamali", lr.Hamali);
@@ -281,8 +284,6 @@ public static class BookingFinanceService
             AddLrLineIfMissing(lines, expenseCategories, "Unloading", lr.UnloadingCharges);
             AddLrLineIfMissing(lines, expenseCategories, "Insurance", lr.Insurance);
         }
-
-        var freight = booking.Freight;
         var otherCharges = lines.Skip(1).Sum(l => l.Amount);
         var taxable = freight + otherCharges;
         var gstRate = billType.Equals("RCM", StringComparison.OrdinalIgnoreCase) ? 0.05m : 0.18m;
